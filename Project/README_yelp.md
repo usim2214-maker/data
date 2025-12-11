@@ -58,6 +58,7 @@ yelp_data/
 ---
 
 📈 분석 결과
+
 1️⃣ 리뷰 길이
 
   ● 긴 리뷰일수록 useful votes가 많음

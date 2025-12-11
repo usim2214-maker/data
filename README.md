@@ -89,5 +89,15 @@ yelp_data/
   
 ---
 
+## 📥 데이터 다운로드
+
+Yelp 리뷰 데이터는 용량이 크기 때문에 GitHub에는 포함되어 있지 않습니다.  
+아래 링크에서 직접 다운로드한 후 프로젝트 `data/` 폴더에 넣어주세요.
+
+- **Yelp Dataset (JSON)**  
+  다운로드 링크: [https://www.yelp.com/dataset](https://www.yelp.com/dataset)  
+  > 다운로드 후, `yelp_academic_dataset_review.json` 파일을 `data/` 폴더에 넣으면 프로젝트 코드를 실행할 수 있습니다.
+
+
 ## 👤 만든이
 Sim WooSeock  

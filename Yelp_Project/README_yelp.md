@@ -89,5 +89,9 @@ yelp_data/
   
 ---
 
+- **Yelp Dataset (JSON)**  
+  다운로드 링크: [https://www.yelp.com/dataset](https://www.yelp.com/dataset)  
+  > 다운로드 후, `yelp_academic_dataset_review.json` 파일을 `data/` 폴더에 넣으면 프로젝트 코드를 실행할 수 있습니다.
+
 ## 👤 만든이
 Sim WooSeock  

@@ -33,6 +33,8 @@
 - **Dashboard**: 주요 지표(매출, 유입 채널 등)를 한눈에 확인할 수 있는 시각화 리포트 도출.
 
 ---
+<img width="970" height="725" alt="1" src="https://github.com/user-attachments/assets/4500d407-b46d-43b1-accb-6c892ada9ca0" />
+<img width="945" height="744" alt="2" src="https://github.com/user-attachments/assets/a5a250e5-404e-4936-9a60-1ab0b18aacbc" />
 
 ## 📊 분석 결과 요약
 1. **리텐션 분석**: 특정 월 유입 고객의 재방문율 추이를 분석하여 고객 유지 전략 필요성 확인.

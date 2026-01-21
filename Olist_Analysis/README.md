@@ -35,6 +35,8 @@
 ## 📊 분석 결과 요약 (Real-world Insight)
 1. **가설 검증**: "주기적인 재구매가 일어날 것"이라는 가설과 달리, 실전 데이터에서는 초기 이탈률이 매우 높음을 확인하며 CRM 마케팅의 중요성 도출.
 2. **성과 측정**: 채널별 ROAS 분석 결과, 광고비 지출 규모와 성과가 반드시 비례하지 않음을 수치로 증명하여 효율 중심의 매체 운용 제안.
+<img width="733" height="1105" alt="1" src="https://github.com/user-attachments/assets/cbbe6b58-997f-4789-a0e4-925a032e0d5b" />
+<img width="799" height="1099" alt="2" src="https://github.com/user-attachments/assets/504126fd-e542-4a1b-8a9f-015b508a3f8e" />
 
 ---
 

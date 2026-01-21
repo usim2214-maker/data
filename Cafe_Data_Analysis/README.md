@@ -35,6 +35,8 @@
 ## 📊 분석 결과 요약 (Real-world Insight)
 1. **가설 검증**: "주기적인 재구매가 일어날 것"이라는 가설과 달리, 실전 데이터에서는 초기 이탈률이 매우 높음을 확인하며 CRM 마케팅의 중요성 도출.
 2. **성과 측정**: 채널별 ROAS 분석 결과, 광고비 지출 규모와 성과가 반드시 비례하지 않음을 수치로 증명하여 효율 중심의 매체 운용 제안.
+<img width="733" height="1105" alt="1" src="https://github.com/user-attachments/assets/53cf5941-ee6d-4271-b001-c635826d50d2" />
+<img width="799" height="1099" alt="2" src="https://github.com/user-attachments/assets/1816a0b9-1aae-4b6f-bc93-194e1fdf2380" />
 
 ---
 
@@ -45,7 +47,4 @@
 
 ---
 
-## 📂 파일 구조
-- `Olist_Cohort_Retention_Analysis.ipynb`: 전체 분석 프로세스 및 시각화 코드
-- `sql_queries/`: 데이터 마트 생성 및 지표 산출 SQL 쿼리 모음 (선택사항)
-- `visuals/`: 분석 결과 차트 및 히트맵 이미지
+

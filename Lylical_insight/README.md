@@ -50,13 +50,3 @@
 - **Solution**: 가사의 분위기를 단순히 '슬픔', '기쁨'으로 나누는 것을 넘어, Stable Diffusion 등 생성 AI 모델이 즉시 활용할 수 있는 형태의 **프롬프트 자동 추천 기능** 구현.
 
 ---
-
-## 📂 Project Structure
-```text
-.
-├── main.py          # FastAPI 서버 및 API 엔드포인트
-├── scraper.py       # Selenium 기반 멜론 가사 크롤러
-├── analyzer.py      # LangChain & LLM 분석 로직
-├── templates/       # 결과 시각화를 위한 HTML 템플릿
-├── requirements.txt # 의존성 라이브러리 목록
-└── README.md        # 프로젝트 문서

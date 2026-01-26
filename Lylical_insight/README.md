@@ -24,9 +24,9 @@
 2. **Transformation**: LangChain과 Llama 3.3 모델을 연동하여 텍스트 맥락 분석 및 지표 정형화.
 3. **Validation**: `JsonOutputParser`를 통해 데이터 정합성을 검증하고 JSON 포맷으로 변환.
 4. **Serving**: FastAPI를 통해 분석된 데이터를 비즈니스 리포트 형태로 시각화.
-![Uploading 1.png…]()
-
+<img width="1254" height="1320" alt="1" src="https://github.com/user-attachments/assets/6d72f3af-d607-41a0-9a34-2e5613e57c35" />
 ---
+
 
 ## 🛠 Tech Stack
 - **Languages**: `Python 3.10+`

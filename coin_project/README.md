@@ -18,6 +18,9 @@
 
 "왜 이 기술인가?"에 대해 고민하며 프로젝트를 구성했습니다.
 
+<img width="841" height="558" alt="파이프라인 구조" src="https://github.com/user-attachments/assets/f386dd89-d463-4888-ab13-bac65423ecbe" />
+
+
 | 레이어 | 선택 기술 | 선택 이유 (Why?) |
 | :--- | :---: | :--- |
 | **수집** | **Python (asyncio)** | **비동기 I/O**를 써서 대량의 WebSocket 데이터를 지연 없이 받기 위해 선택했습니다. 수집기와 가공기를 별도 프로세스로 분리해 안정성을 높였습니다. |
@@ -39,7 +42,6 @@
 ---
 
 ## 📂 프로젝트 구조
-- `coin_project/arch.png`: 시스템 구성도 이미지
 - `coin_project/01_Binance_producer.ipynb`: 실시간 수집 및 데이터 보충(Backfill) 로직
 - `coin_project/02_Spark_streaming.ipynb`: Kafka 데이터 가공 및 DB 적재 로직
 - `coin_project/docker-compose.yml`: 전체 인프라(Kafka, DB 등) 구축 스크립트

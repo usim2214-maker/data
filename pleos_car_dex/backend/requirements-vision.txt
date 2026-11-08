@@ -1,0 +1,3 @@
+# YOLO 탐지를 실제로 돌릴 때만 설치 (torch 포함, 용량 큼)
+-r requirements.txt
+ultralytics>=8.3

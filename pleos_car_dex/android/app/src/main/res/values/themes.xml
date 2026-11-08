@@ -1,0 +1,3 @@
+<resources>
+    <style name="Theme.PleosCarDex" parent="android:Theme.Material.NoActionBar" />
+</resources>

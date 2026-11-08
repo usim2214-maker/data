@@ -1,0 +1,14 @@
+# backend
+__pycache__/
+*.pyc
+.venv/
+.env
+backend/storage/
+*.pt
+# android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+*.iml

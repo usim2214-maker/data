@@ -101,14 +101,11 @@ class PleosVehicleContextProvider(context: Context) : VehicleContextProvider {
     private companion object { const val TAG = "PleosLocation" }
 }
 
-/** Pleos 서비스가 없는 환경/시연용: 서울 시내를 천천히 이동하는 가짜 위치 */
+/** Pleos 서비스가 없는 환경/시연용: 서울 시청에 정차해 있는 가짜 위치 (주행 모드는 시연 전환으로 확인) */
 class MockVehicleContextProvider : VehicleContextProvider {
     override fun snapshots(): Flow<DrivingSnapshot> = flow {
-        var lat = 37.5665
-        var lon = 126.9780
         while (true) {
-            lat += 0.0001; lon += 0.0001
-            emit(DrivingSnapshot(GeoPoint(lat, lon), source = "Mock"))
+            emit(DrivingSnapshot(GeoPoint(37.5665, 126.9780), source = "Mock"))
             delay(1_000)
         }
     }

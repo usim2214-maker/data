@@ -22,6 +22,8 @@ import com.pleos.cardex.data.SynergyScore
 import com.pleos.cardex.pleos.AssetFrameSource
 import com.pleos.cardex.pleos.DrivingSnapshot
 import com.pleos.cardex.pleos.FrameSource
+import com.pleos.cardex.pleos.GearMonitor
+import com.pleos.cardex.pleos.VoiceGuide
 import com.pleos.cardex.pleos.LandmarkTarget
 import com.pleos.cardex.pleos.PleosNavi
 import com.pleos.cardex.pleos.VehicleContextProvider
@@ -33,6 +35,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -58,6 +63,11 @@ data class UiState(
     val weekly: Leaderboard? = null,
     val rankingRegionId: String? = null,
     val masters: MastersResponse? = null,
+    /** 주행 중이면 조작 화면을 잠그고 '주행 모드'만 보여준다 */
+    val isDriving: Boolean = false,
+    val drivingSource: String = "",
+    val speedKmh: Float? = null,
+    val voiceOn: Boolean = true,
     val error: String? = null,
 )
 
@@ -76,6 +86,11 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
     private var locationJob: Job? = null
     private var provider: VehicleContextProvider? = null
     private val navi = PleosNavi(app).apply { onError = { msg -> _state.update { it.copy(error = msg) } } }
+    private val voice = VoiceGuide(app)
+    private val gear = GearMonitor(app)
+    private var gearAvailable = false
+    private var simulated: Boolean? = null
+    private var lastFix: Pair<GeoPoint, Long>? = null
 
     init {
         refreshCollection()
@@ -84,7 +99,52 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
         loadStamps()
         loadChallenge()
         loadRankings()
+        // 알림은 음성으로도 (주행 중 화면을 보지 않도록)
+        viewModelScope.launch {
+            state.map { it.notice }.distinctUntilChanged().filterNotNull().collect { msg ->
+                if (_state.value.voiceOn) voice.speak(msg)
+            }
+        }
     }
+
+    // ---------------- 주행 상태 (안전 모드) ----------------
+    /** Pleos Vehicle SDK 기어 상태 구독. 권한이 없거나 미지원이면 위치 속도로 추정 */
+    fun startGear(permissionGranted: Boolean) {
+        if (!permissionGranted || BuildConfig.USE_MOCK_PLEOS) return
+        gearAvailable = gear.start { parked ->
+            if (simulated == null && parked != null) setDriving(!parked, "Pleos 기어")
+        }
+    }
+
+    private fun setDriving(driving: Boolean, source: String) {
+        if (_state.value.isDriving != driving || _state.value.drivingSource != source) {
+            _state.update { it.copy(isDriving = driving, drivingSource = source) }
+        }
+    }
+
+    /** Vehicle SDK 가 없을 때: 위치 변화로 속도 추정 (8km/h 이상 주행, 3km/h 이하 정차) */
+    private fun estimateSpeed(at: GeoPoint) {
+        val now = System.currentTimeMillis()
+        val prev = lastFix
+        lastFix = at to now
+        if (prev == null || now - prev.second < 1_000) return
+        val kmh = distanceM(prev.first, at) / ((now - prev.second) / 1000f) * 3.6f
+        if (kmh > 250f) return // adb geo fix 등 순간이동은 무시
+        _state.update { it.copy(speedKmh = kmh) }
+        if (gearAvailable || simulated != null) return
+        when {
+            kmh >= 8f -> setDriving(true, "위치 속도 추정")
+            kmh <= 3f -> setDriving(false, "위치 속도 추정")
+        }
+    }
+
+    /** 시연용: 주행/정차 강제 전환 (null 이면 자동) */
+    fun simulateDriving(on: Boolean?) {
+        simulated = on
+        if (on != null) setDriving(on, "시연 전환") else setDriving(false, "")
+    }
+
+    fun toggleVoice() = _state.update { it.copy(voiceOn = !it.voiceOn) }
 
     /** Pleos 위치 권한 결과를 받은 뒤 호출. SDK 미지원/권한 거부 시 목업 위치로 대체 */
     fun startLocation(permissionGranted: Boolean) {
@@ -98,7 +158,7 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
             runCatching {
                 p.snapshots().collect { s ->
                     _state.update { it.copy(driving = s) }
-                    s.location?.let { reportVisit(it); refreshLandmarks(it); checkLandmarkDistance(it) }
+                    s.location?.let { estimateSpeed(it); reportVisit(it); refreshLandmarks(it); checkLandmarkDistance(it) }
                 }
             }
                 .onFailure { e -> _state.update { it.copy(error = "위치 서비스 오류: ${e.message}") } }
@@ -359,6 +419,8 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
 
     override fun onCleared() {
         navi.release()
+        voice.release()
+        gear.release()
         frames.release()
     }
 }

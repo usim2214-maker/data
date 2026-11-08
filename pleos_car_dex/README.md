@@ -51,12 +51,20 @@
 | SDK 저장소 | `https://nexus-playground.pleos.ai/repository/maven-releases/` (공식 샘플과 동일) |
 | FusedLocation SDK | `ai.pleos.playground:FusedLocation:1.1.3`, 권한 `pleos.car.permission.FUSED_LOCATION` — 지역 스탬프 획득 + 도감의 '발견 장소' |
 | NaviHelper SDK | `ai.pleos.playground:NaviHelper:3.0.5`, 권한 `NAVI_ROUTE`·`NAVI_ROUTE_SEARCH` — AI 코스 길안내 (목적지 + 경유지 2곳) |
-| Vehicle SDK (예정) | `ai.pleos.playground:Vehicle` — 차속/기어 연동 시 추가 (`TODO(Pleos)`) |
+| Vehicle SDK | `ai.pleos.playground:Vehicle:2.3.2`, 권한 `CAR_DRIVE` — 기어(P단) 상태로 **주행 중 화면 잠금** |
+| TextToSpeech SDK | `ai.pleos.playground:TextToSpeech:3.3.1` (ON_DEVICE) — 스탬프·코스 알림을 **음성 안내** (실패 시 안드로이드 기본 TTS) |
 | 서라운드뷰/카메라 | 공개 API 미확인 → 영상 직접 입력으로 대체 |
 
-> **NaviHelper / 근접 알림 주의**: 공식 문서(document.pleos.ai)를 작성 환경에서 열 수 없어, NaviHelper 는 공개된 Pleos 앱들의
-> 사용 코드, 근접 알림은 공식 FusedLocation 샘플을 기준으로 작성했습니다. 첫 빌드 때 `RouteInfo` 생성자 인자와
-> `ProximityAlertRequest.radiusMeters` 타입을 SDK 시그니처로 확인하세요.
+> **빌드 확인**: Pleos SDK(FusedLocation 1.1.3, NaviHelper 3.0.5, Vehicle 2.3.2, TextToSpeech 3.3.1)를 실제로 받아
+> `./gradlew assembleDebug` 컴파일까지 통과했습니다. 에뮬레이터/실차에서의 동작 확인은 아직입니다.
+
+## 운전자 안전 설계
+- **주행 모드**: 주행 중(Pleos Vehicle SDK 기어 ≠ P, 또는 SDK 미지원 시 위치 기반 속도 8km/h 이상)에는 모든 조작 화면을 잠그고,
+  큰 글씨의 정보(챌린지 진행률·다음 장소·가까운 히든 스탬프·랭킹)와 **"남은 곳 길안내" 버튼 하나**만 보여줍니다. 정차(P단)하면 전체 기능이 열립니다.
+- **음성 안내**: 스탬프 획득·코스 진행·완주 알림을 Pleos TTS 로 읽어줘 화면을 볼 필요가 없습니다 (주행 모드에서 끄기 가능).
+- **속도 경쟁 없음**: 랭킹·마스터는 방문·수집 점수로만 계산합니다.
+- **위치 정보 최소화**: 서버에는 지역 판정·명소 반경 확인에 필요한 좌표만 보내고, 이동 경로는 저장하지 않습니다(도감의 '최초 발견 위치'만 저장).
+- 시연용: 디버그 빌드의 여행 탭에 `🚗 주행 모드 시연` 버튼 (에뮬레이터에서 기어를 바꾸기 어려울 때)
 
 > **API 키 관련 메모**: 공식 FusedLocation 샘플 기준, 차량 내 SDK(FusedLocation/Vehicle)는 별도 API 키 없이
 > Maven 의존성 + 권한으로 동작합니다. Playground 에서 발급하는 *Vehicle Data API* 키는 내 차량의 커넥티드
@@ -86,10 +94,13 @@ pleos_car_dex/
 │       ├── assets/demo_video/       ← 시연 주행 영상 demo_drive.mp4
 │       ├── assets/demo_frames/      ← (대체) 시연 이미지
 │       └── java/com/pleos/cardex/
-│           ├── pleos/VehicleContext.kt  Pleos FusedLocation 연동 (+목업 대체) → 30초마다 스탬프 방문 보고
+│           ├── pleos/VehicleContext.kt  Pleos FusedLocation 위치·근접 알림 (+목업 대체)
+│           ├── pleos/GearMonitor.kt     Pleos Vehicle SDK 기어 → 주행 모드
+│           ├── pleos/VoiceGuide.kt      Pleos TTS 음성 안내
+│           ├── pleos/PleosNavi.kt       Pleos NaviHelper 길안내
 │           ├── pleos/FrameSource.kt     영상 프레임 입력 (서라운드뷰 연계 지점)
 │           ├── data/                    Retrofit API
-│           └── ui/                      스캔(영상+카드) / 도감(시너지) / 쇼룸(전시·꾸미기·스탬프북) / 키워드
+│           └── ui/                      여행(코스·챌린지·히든) / 랭킹 / 쇼룸 / 도감 / 인식(베타) / 키워드 / 주행 모드
 └── scripts/demo_request.sh
 ```
 
@@ -112,9 +123,10 @@ curl -F "video=@drive.mp4" http://localhost:8000/api/v1/recognize/video
 키가 없으면 `app/data/mock_attractions.json`(전국 명소 19곳 + 시연용 축제 5개)으로 동작합니다.
 
 ### Pleos 앱
-1. Android Studio 로 `android/` 열기 → Pleos Connect 에뮬레이터 실행
+1. Android Studio 로 `android/` 열기 (또는 `./gradlew assembleDebug`) → Pleos Connect 에뮬레이터 실행
 2. `assets/demo_video/demo_drive.mp4` 에 주행 영상 넣기
-3. 실행 → FusedLocation 권한 허용 (지원 안 되는 환경이면 자동으로 목업 위치)
+3. 실행 → Pleos 권한(위치·기어·내비) 허용 (지원 안 되는 환경이면 자동으로 목업 위치)
+   앱은 **여행 탭**에서 시작합니다. 차량 인식은 `인식(베타)` 탭 — 차량 영상 API 공개 후 확장 예정
 4. 스캔 탭: 영상 재생 중 `자동 스캔` → 차량 카드 등장, 탭하면 뒤집혀 키워드 요약
 5. 도감 탭: 시너지 점수 확인, `쇼룸에 전시` 로 대표 차량 지정
 6. 쇼룸 탭: 대표 차량 무대 + 획득한 지역 스탬프로 배경/스티커 꾸미기, 스탬프북 확인

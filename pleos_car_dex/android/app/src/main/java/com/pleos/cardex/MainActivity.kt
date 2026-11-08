@@ -38,6 +38,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.pleos.cardex.ui.CarDexViewModel
 import com.pleos.cardex.ui.screens.CollectionScreen
+import com.pleos.cardex.ui.screens.DrivingScreen
 import com.pleos.cardex.ui.screens.KeywordSettingsScreen
 import com.pleos.cardex.ui.screens.ScanScreen
 import com.pleos.cardex.ui.screens.RankingScreen
@@ -46,11 +47,11 @@ import com.pleos.cardex.ui.screens.TravelScreen
 import com.pleos.cardex.ui.theme.CarDexTheme
 
 private enum class Dest(val route: String, val label: String, val icon: ImageVector) {
-    Scan("scan", "스캔", Icons.Filled.CameraAlt),
-    Collection("collection", "도감", Icons.Filled.CollectionsBookmark),
-    Showroom("showroom", "쇼룸", Icons.Filled.DirectionsCar),
     Travel("travel", "여행", Icons.Filled.Map),
     Ranking("ranking", "랭킹", Icons.Filled.EmojiEvents),
+    Showroom("showroom", "쇼룸", Icons.Filled.DirectionsCar),
+    Collection("collection", "도감", Icons.Filled.CollectionsBookmark),
+    Scan("scan", "인식(베타)", Icons.Filled.CameraAlt), // 차량 인식: 차량 영상 API 공개 후 확장 예정
     Settings("settings", "키워드", Icons.Filled.Tune),
 }
 
@@ -61,11 +62,12 @@ class MainActivity : ComponentActivity() {
     private val pleosPermissions =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
             vm.startLocation(result[PLEOS_LOCATION_PERMISSION] == true)
+            vm.startGear(result[PLEOS_GEAR_PERMISSION] == true)
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        pleosPermissions.launch(arrayOf(PLEOS_LOCATION_PERMISSION, *PLEOS_NAVI_PERMISSIONS))
+        pleosPermissions.launch(arrayOf(PLEOS_LOCATION_PERMISSION, PLEOS_GEAR_PERMISSION, *PLEOS_NAVI_PERMISSIONS))
         setContent {
             CarDexTheme {
                 val state by vm.state.collectAsStateWithLifecycle()
@@ -74,19 +76,28 @@ class MainActivity : ComponentActivity() {
 
                 Surface(Modifier.fillMaxSize()) {
                     // 차량 가로형 디스플레이: 좌측 내비게이션 레일
-                    Row {
+                    if (state.isDriving) {
+                        Box(Modifier.fillMaxSize()) {
+                            DrivingScreen(
+                                state = state,
+                                onResumeNavigation = vm::resumeNavigation,
+                                onToggleVoice = vm::toggleVoice,
+                                onExitSimulation = if (state.drivingSource == "시연 전환") ({ vm.simulateDriving(null) }) else null,
+                            )
+                        }
+                    } else Row {
                         NavigationRail {
                             Dest.entries.forEach { d ->
                                 NavigationRailItem(
                                     selected = current == d.route,
-                                    onClick = { nav.navigate(d.route) { launchSingleTop = true; popUpTo(Dest.Scan.route) } },
+                                    onClick = { nav.navigate(d.route) { launchSingleTop = true; popUpTo(Dest.Travel.route) } },
                                     icon = { Icon(d.icon, d.label) },
                                     label = { Text(d.label) },
                                 )
                             }
                         }
                         Box(Modifier.fillMaxSize()) {
-                        NavHost(nav, startDestination = Dest.Scan.route) {
+                        NavHost(nav, startDestination = Dest.Travel.route) {
                             composable(Dest.Scan.route) {
                                 ScanScreen(state, vm.videoPositionMs, vm::scanOnce) { vm.toggleAutoScan() }
                             }
@@ -121,6 +132,7 @@ class MainActivity : ComponentActivity() {
                                     onStartChallenge = vm::startChallengeAndNavigate,
                                     onResumeNavigation = vm::resumeNavigation,
                                     onAbandon = vm::abandonChallenge,
+                                    onSimulateDriving = if (BuildConfig.DEBUG) ({ vm.simulateDriving(true) }) else null,
                                 )
                             }
                             composable(Dest.Ranking.route) {
@@ -155,4 +167,5 @@ class MainActivity : ComponentActivity() {
 }
 
 private const val PLEOS_LOCATION_PERMISSION = "pleos.car.permission.FUSED_LOCATION"
+private const val PLEOS_GEAR_PERMISSION = "pleos.car.permission.CAR_DRIVE" // Vehicle SDK 기어 상태
 private val PLEOS_NAVI_PERMISSIONS = arrayOf("pleos.car.permission.NAVI_ROUTE", "pleos.car.permission.NAVI_ROUTE_SEARCH")

@@ -56,6 +56,7 @@ fun TravelScreen(
     onStartChallenge: () -> Unit,
     onResumeNavigation: () -> Unit,
     onAbandon: () -> Unit,
+    onSimulateDriving: (() -> Unit)? = null,
 ) {
     var hours by remember { mutableDoubleStateOf(4.0) }
     var note by remember { mutableStateOf("") }
@@ -65,6 +66,9 @@ fun TravelScreen(
             Modifier.weight(1.3f).fillMaxHeight().verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            onSimulateDriving?.let {
+                androidx.compose.material3.TextButton(onClick = it) { Text("🚗 주행 모드 시연 (디버그)") }
+            }
             challenge?.let { ChallengeCard(it, onResumeNavigation, onAbandon) }
             Text("AI 드라이브 코스", style = MaterialTheme.typography.displaySmall)
             Text("아직 없는 지역 스탬프와 지금 열리는 축제를 엮어 드려요", color = Color.Gray)

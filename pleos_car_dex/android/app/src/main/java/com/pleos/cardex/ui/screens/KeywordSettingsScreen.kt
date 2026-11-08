@@ -36,7 +36,7 @@ fun KeywordSettingsScreen(current: List<String>, onSave: (List<String>) -> Unit)
 
     Column(Modifier.fillMaxSize().padding(32.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
         Text("카드에 보여줄 정보", style = MaterialTheme.typography.displaySmall)
-        Text("선택한 순서대로 카드 뒷면에 표시됩니다 (최대 $MAX_KEYWORDS개)", color = Color.Gray)
+        Text("선택한 순서대로 카드 뒷면에 표시됩니다 (최대 ${MAX_KEYWORDS}개)", color = Color.Gray)
 
         FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             (PRESETS + selected.filterNot { it in PRESETS }).forEach { kw ->

@@ -12,6 +12,8 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- Pleos FusedLocation SDK 권한 (런타임 요청 필요) -->
     <uses-permission android:name="pleos.car.permission.FUSED_LOCATION" />
+    <!-- Pleos Vehicle SDK: 기어 상태(P단) -> 주행 중 화면 잠금 -->
+    <uses-permission android:name="pleos.car.permission.CAR_DRIVE" />
     <!-- Pleos NaviHelper: 경로 요청(requestRoute / requestRouteWithWaypoints) -->
     <uses-permission android:name="pleos.car.permission.NAVI_ROUTE" />
     <uses-permission android:name="pleos.car.permission.NAVI_ROUTE_SEARCH" />

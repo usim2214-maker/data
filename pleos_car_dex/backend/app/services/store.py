@@ -4,7 +4,7 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
-from app.schemas import CollectionEntry, GeoPoint, Preferences, VehicleCard
+from app.schemas import CollectionEntry, GarageState, GeoPoint, Preferences, VehicleCard
 
 
 class JsonStore:
@@ -12,6 +12,7 @@ class JsonStore:
         self._lock = threading.Lock()
         self._collection_path = data_dir / "collection.json"
         self._prefs_path = data_dir / "preferences.json"
+        self._garage_path = data_dir / "garage.json"
         data_dir.mkdir(parents=True, exist_ok=True)
 
     # ---- preferences ----
@@ -55,10 +56,26 @@ class JsonStore:
             self._dump(entries)
         return entry, is_new
 
+    def get_entry(self, card_id: str) -> CollectionEntry | None:
+        return self._load().get(card_id)
+
     def delete(self, card_id: str) -> bool:
         with self._lock:
             entries = self._load()
             if entries.pop(card_id, None) is None:
                 return False
             self._dump(entries)
-            return True
+        if (g := self.get_garage()).active and g.active.id == card_id:
+            self.set_garage(GarageState())
+        return True
+
+    # ---- garage (소환) ----
+    def get_garage(self) -> GarageState:
+        if self._garage_path.exists():
+            return GarageState.model_validate_json(self._garage_path.read_text(encoding="utf-8"))
+        return GarageState()
+
+    def set_garage(self, state: GarageState) -> GarageState:
+        with self._lock:
+            self._garage_path.write_text(state.model_dump_json(indent=2), encoding="utf-8")
+        return state

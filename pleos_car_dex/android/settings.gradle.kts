@@ -6,9 +6,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        // TODO(Pleos): Pleos Playground 에서 안내하는 SDK 저장소(또는 로컬 aar)를 여기에 추가
-        // maven { url = uri("<Pleos SDK maven url>") }
-        flatDir { dirs("app/libs") }
+        // Pleos Playground SDK 저장소 (공식 샘플 pleos-sample-fusedlocation-app 기준)
+        maven("https://nexus-playground.pleos.ai/repository/maven-releases/")
     }
 }
 rootProject.name = "PleosCarDex"

@@ -11,14 +11,14 @@ android {
 
     defaultConfig {
         applicationId = "com.pleos.cardex"
-        minSdk = 31 // Pleos Connect = Android Automotive OS 기반
+        minSdk = 28 // Pleos Connect SDK 최소 요구 (Android Automotive OS 기반)
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
         // 에뮬레이터에서 호스트 PC 의 FastAPI 서버 = 10.0.2.2
         buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8000/\"")
-        // true: Pleos SDK 없이 목업 위치/주행 정보로 동작
-        buildConfigField("boolean", "USE_MOCK_PLEOS", "true")
+        // true: Pleos SDK 를 쓰지 않고 목업 위치로 동작 (false 여도 isSupported()=false 면 자동으로 목업 사용)
+        buildConfigField("boolean", "USE_MOCK_PLEOS", "false")
     }
 
     buildFeatures {
@@ -50,6 +50,9 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("io.coil-kt:coil-compose:2.7.0")
 
-    // TODO(Pleos): Pleos Playground 에서 받은 SDK 의존성 (FusedLocation / Vehicle 등)
-    // implementation(files("libs/pleos-sdk.aar"))
+    // ---- Pleos Playground SDK ----
+    implementation("ai.pleos.playground:FusedLocation:1.1.3") // 위치 (도감 '발견 장소')
+    // TODO(Pleos): 차속/기어 연동 시 Vehicle SDK 추가 (공식 문서 예시 버전)
+    // implementation("ai.pleos.playground:Vehicle:2.3.1")
+    // TODO(Pleos): 서라운드뷰 등 차량 영상 API 공개 시 VideoFrameSource 를 대체
 }

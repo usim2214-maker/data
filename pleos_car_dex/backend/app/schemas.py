@@ -86,3 +86,35 @@ class CollectionEntry(BaseModel):
 class CollectionResponse(BaseModel):
     total: int
     entries: list[CollectionEntry]
+    synergy: "SynergyScore"
+
+
+class VideoRecognitionResponse(BaseModel):
+    frames_analyzed: int
+    vehicles: list[RecognitionResponse]
+
+
+class SynergyBonus(BaseModel):
+    name: str
+    points: int
+    description: str
+
+
+class SynergyScore(BaseModel):
+    total: int
+    base: int
+    bonuses: list[SynergyBonus]
+
+
+class GarageState(BaseModel):
+    """카트라이더식 '소환' 상태: 도감에서 고른 차량 1대를 대시보드에 띄운다."""
+
+    active: VehicleCard | None = None
+    summoned_at: datetime | None = None
+
+
+class SummonRequest(BaseModel):
+    card_id: str
+
+
+CollectionResponse.model_rebuild()

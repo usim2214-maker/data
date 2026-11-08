@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
-from app.routers import collection, preferences, recognize
+from app.routers import collection, garage, preferences, recognize
 
 logging.basicConfig(level=logging.INFO)
 
@@ -16,6 +16,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 app.include_router(recognize.router)
 app.include_router(collection.router)
 app.include_router(preferences.router)
+app.include_router(garage.router)
 app.mount("/static/crops", StaticFiles(directory=settings.crops_dir), name="crops")
 
 

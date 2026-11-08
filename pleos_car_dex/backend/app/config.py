@@ -16,9 +16,15 @@ class Settings(BaseSettings):
 
     # Vision
     detector_mode: Literal["yolo", "mock"] = "yolo"
-    yolo_weights: str = "yolo11n.pt"
+    yolo_weights: str = "yolov8n.pt"
     yolo_conf: float = 0.35
     identifier_mode: Literal["llm", "mock"] = "llm"
+
+    # Video (주행 영상 직접 입력)
+    video_sample_fps: float = 2.0
+    video_max_vehicles: int = 3
+    # 같은 차량을 이 시간(초) 안에 다시 보면 LLM 요약을 재사용 (비용/지연 절감)
+    reuse_card_within_sec: int = 120
 
     # Storage
     data_dir: Path = Path("./storage")

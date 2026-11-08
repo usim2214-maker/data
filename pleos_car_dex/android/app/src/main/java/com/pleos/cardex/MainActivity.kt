@@ -3,6 +3,7 @@ package com.pleos.cardex
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -38,8 +39,13 @@ private enum class Dest(val route: String, val label: String, val icon: ImageVec
 class MainActivity : ComponentActivity() {
     private val vm: CarDexViewModel by viewModels()
 
+    // Pleos FusedLocation 런타임 권한 (공식 샘플과 동일한 권한 문자열)
+    private val locationPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> vm.startLocation(granted) }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        locationPermission.launch(PLEOS_LOCATION_PERMISSION)
         setContent {
             CarDexTheme {
                 val state by vm.state.collectAsStateWithLifecycle()
@@ -60,9 +66,18 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         NavHost(nav, startDestination = Dest.Scan.route) {
-                            composable(Dest.Scan.route) { ScanScreen(state, vm::scanOnce, { vm.toggleAutoScan() }) }
+                            composable(Dest.Scan.route) {
+                                ScanScreen(state, vm.videoPositionMs, vm::scanOnce, { vm.toggleAutoScan() }, vm::dismissSummon)
+                            }
                             composable(Dest.Collection.route) {
-                                CollectionScreen(state.collection, vm::refreshCollection, vm::deleteEntry)
+                                CollectionScreen(
+                                    entries = state.collection,
+                                    synergy = state.synergy,
+                                    summonedId = state.summoned?.id,
+                                    onRefresh = vm::refreshCollection,
+                                    onSummon = vm::summon,
+                                    onDelete = vm::deleteEntry,
+                                )
                             }
                             composable(Dest.Settings.route) { KeywordSettingsScreen(state.keywords, vm::saveKeywords) }
                         }
@@ -72,3 +87,5 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
+private const val PLEOS_LOCATION_PERMISSION = "pleos.car.permission.FUSED_LOCATION"

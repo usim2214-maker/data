@@ -3,6 +3,7 @@ package com.pleos.cardex.ui.screens
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10,6 +11,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -20,14 +23,33 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.pleos.cardex.data.CollectionEntry
+import com.pleos.cardex.data.SynergyScore
 import com.pleos.cardex.ui.components.FlipCard
 
-/** 도감: 수집한 차량 카드 그리드 (탭하면 뒤집혀 키워드 요약 확인) */
+/** 도감: 시너지 점수 + 수집 카드 그리드 (탭=뒤집기, 소환 버튼) */
 @Composable
-fun CollectionScreen(entries: List<CollectionEntry>, onRefresh: () -> Unit, onDelete: (String) -> Unit) {
+fun CollectionScreen(
+    entries: List<CollectionEntry>,
+    synergy: SynergyScore?,
+    summonedId: String?,
+    onRefresh: () -> Unit,
+    onSummon: (String) -> Unit,
+    onDelete: (String) -> Unit,
+) {
     LaunchedEffect(Unit) { onRefresh() }
     Column(Modifier.fillMaxSize().padding(32.dp)) {
-        Text("차량 도감 · ${entries.size}종", style = MaterialTheme.typography.displaySmall)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+            Text("차량 도감 · ${entries.size}종", style = MaterialTheme.typography.displaySmall)
+            synergy?.let {
+                Text("시너지 ${it.total}점", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.secondary)
+            }
+        }
+        synergy?.takeIf { it.bonuses.isNotEmpty() }?.let { s ->
+            Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AssistChip(onClick = {}, label = { Text("기본 ${s.base}") })
+                s.bonuses.forEach { b -> AssistChip(onClick = {}, label = { Text("${b.name} +${b.points}") }) }
+            }
+        }
         if (entries.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("아직 수집한 차량이 없어요", style = MaterialTheme.typography.titleLarge, color = Color.Gray)
@@ -44,7 +66,12 @@ fun CollectionScreen(entries: List<CollectionEntry>, onRefresh: () -> Unit, onDe
                 Column {
                     FlipCard(entry.card, Modifier.fillMaxWidth().aspectRatio(0.72f))
                     Text("발견 ${entry.seenCount}회", color = Color.Gray, modifier = Modifier.padding(top = 8.dp))
-                    TextButton(onClick = { onDelete(entry.card.id) }) { Text("삭제") }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Button(onClick = { onSummon(entry.card.id) }, enabled = summonedId != entry.card.id) {
+                            Text(if (summonedId == entry.card.id) "소환 중" else "소환")
+                        }
+                        TextButton(onClick = { onDelete(entry.card.id) }) { Text("삭제") }
+                    }
                 }
             }
         }

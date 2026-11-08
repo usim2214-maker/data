@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.schemas import CollectionResponse
+from app.services import synergy
 from app.services.pipeline import RecognitionPipeline, get_pipeline
 
 router = APIRouter(prefix="/api/v1/collection", tags=["collection"])
@@ -9,7 +10,9 @@ router = APIRouter(prefix="/api/v1/collection", tags=["collection"])
 @router.get("", response_model=CollectionResponse)
 def list_collection(pipeline: RecognitionPipeline = Depends(get_pipeline)):
     entries = pipeline.store.list_entries()
-    return CollectionResponse(total=len(entries), entries=entries)
+    active = pipeline.store.get_garage().active
+    score = synergy.compute(entries, summoned_brand=active.brand if active else None)
+    return CollectionResponse(total=len(entries), entries=entries, synergy=score)
 
 
 @router.delete("/{card_id}", status_code=204)

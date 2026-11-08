@@ -61,4 +61,20 @@ data class CollectionEntry(
 )
 
 @Serializable
-data class CollectionResponse(val total: Int, val entries: List<CollectionEntry>)
+data class SynergyBonus(val name: String, val points: Int, val description: String)
+
+@Serializable
+data class SynergyScore(val total: Int, val base: Int, val bonuses: List<SynergyBonus>)
+
+@Serializable
+data class CollectionResponse(val total: Int, val entries: List<CollectionEntry>, val synergy: SynergyScore)
+
+/** 카트라이더식 소환 상태 */
+@Serializable
+data class GarageState(
+    val active: VehicleCard? = null,
+    @SerialName("summoned_at") val summonedAt: String? = null,
+)
+
+@Serializable
+data class SummonRequest(@SerialName("card_id") val cardId: String)

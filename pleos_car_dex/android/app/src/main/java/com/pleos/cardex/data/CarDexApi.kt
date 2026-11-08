@@ -34,6 +34,15 @@ interface CarDexApi {
     @DELETE("api/v1/collection/{id}")
     suspend fun deleteEntry(@Path("id") id: String)
 
+    @GET("api/v1/garage")
+    suspend fun garage(): GarageState
+
+    @POST("api/v1/garage/summon")
+    suspend fun summon(@Body req: SummonRequest): GarageState
+
+    @DELETE("api/v1/garage/summon")
+    suspend fun dismiss(): GarageState
+
     @GET("api/v1/preferences")
     suspend fun preferences(): Preferences
 

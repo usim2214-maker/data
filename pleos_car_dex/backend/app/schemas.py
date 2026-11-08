@@ -102,7 +102,8 @@ class SynergyBonus(BaseModel):
 
 class SynergyScore(BaseModel):
     total: int
-    base: int
+    base: int  # 차량 희귀도 합
+    travel: int = 0  # 지역 스탬프 기본 점수 합
     bonuses: list[SynergyBonus]
 
 
@@ -114,6 +115,8 @@ class Region(BaseModel):
     landmark: str
     emoji: str
     colors: list[str]  # 쇼룸 배경 그라데이션 [시작, 끝] (#RRGGBB)
+    travel_points: int = 10  # 첫 방문 점수 (지방·인구감소지역일수록 높게)
+    area: str = ""  # 권역 (수도권/충청권/호남권/영남권/강원권/제주권)
 
 
 class Stamp(BaseModel):

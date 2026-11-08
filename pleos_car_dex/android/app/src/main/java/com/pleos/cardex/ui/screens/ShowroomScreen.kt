@@ -185,11 +185,13 @@ private fun StampBadge(region: Region, acquired: Boolean) {
     Surface(
         shape = CircleShape,
         color = if (acquired) hex(region.colors.first()) else Color(0xFF30363D),
-        modifier = Modifier.size(64.dp).alpha(if (acquired) 1f else 0.45f),
+        modifier = Modifier.size(72.dp).alpha(if (acquired) 1f else 0.6f),
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
             Text(if (acquired) region.emoji else "🔒", fontSize = 22.sp)
             Text(region.name, fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.SemiBold)
+            // 미획득 지역은 획득 시 점수를 보여줘 방문 동기 부여
+            if (!acquired) Text("+${region.travelPoints}", fontSize = 11.sp, color = Color(0xFFFFC94D))
         }
     }
 }

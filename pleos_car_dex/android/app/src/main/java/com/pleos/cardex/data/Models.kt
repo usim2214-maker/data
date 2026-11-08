@@ -64,7 +64,7 @@ data class CollectionEntry(
 data class SynergyBonus(val name: String, val points: Int, val description: String)
 
 @Serializable
-data class SynergyScore(val total: Int, val base: Int, val bonuses: List<SynergyBonus>)
+data class SynergyScore(val total: Int, val base: Int, val travel: Int = 0, val bonuses: List<SynergyBonus>)
 
 @Serializable
 data class CollectionResponse(val total: Int, val entries: List<CollectionEntry>, val synergy: SynergyScore)
@@ -79,6 +79,8 @@ data class Region(
     val landmark: String,
     val emoji: String,
     val colors: List<String>, // [시작, 끝] #RRGGBB
+    @SerialName("travel_points") val travelPoints: Int = 10, // 첫 방문 점수 (지방일수록 높음)
+    val area: String = "",
 )
 
 @Serializable

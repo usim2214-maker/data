@@ -44,9 +44,10 @@ fun CollectionScreen(
                 Text("시너지 ${it.total}점", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.secondary)
             }
         }
-        synergy?.takeIf { it.bonuses.isNotEmpty() }?.let { s ->
+        synergy?.let { s ->
             Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AssistChip(onClick = {}, label = { Text("기본 ${s.base}") })
+                AssistChip(onClick = {}, label = { Text("차량 ${s.base}") })
+                AssistChip(onClick = {}, label = { Text("여행 ${s.travel}") })
                 s.bonuses.forEach { b -> AssistChip(onClick = {}, label = { Text("${b.name} +${b.points}") }) }
             }
         }

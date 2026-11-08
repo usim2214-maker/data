@@ -116,3 +116,16 @@ def test_showroom(client):
 
     client.delete("/api/v1/collection/hyundai-ioniq-5")
     assert client.get("/api/v1/showroom").json()["car"] is None
+
+
+def test_travel_score(client):
+    # 부산에서 차량 발견 (스탬프 자동 획득 + 여행지 발견 보너스)
+    client.post("/api/v1/recognize", files={"image": ("kia-ev9.jpg", _jpeg(), "image/jpeg")}, data={"lat": "35.18", "lon": "129.08"})
+    for lat, lon in [(37.57, 126.98), (37.46, 126.71), (37.28, 127.01)]:  # 서울·인천·경기 -> 수도권 완주
+        client.post("/api/v1/stamps/visit", json={"lat": lat, "lon": lon})
+    syn = client.get("/api/v1/collection").json()["synergy"]
+    names = {b["name"]: b["points"] for b in syn["bonuses"]}
+    assert syn["travel"] == 20 + 10 + 10 + 10
+    assert names["수도권 완주"] == 100
+    assert names["여행지 발견"] == 10
+    assert syn["total"] == syn["base"] + syn["travel"] + sum(names.values())

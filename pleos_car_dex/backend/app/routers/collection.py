@@ -18,6 +18,7 @@ def list_collection(pipeline: RecognitionPipeline = Depends(get_pipeline)):
         stamps=pipeline.store.get_stamps(),
         regions=regions.all_regions(),
         locate=regions.locate,
+        hidden_points=[h.points for h in pipeline.store.get_hidden().values()],
     )
     return CollectionResponse(total=len(entries), entries=entries, synergy=score)
 

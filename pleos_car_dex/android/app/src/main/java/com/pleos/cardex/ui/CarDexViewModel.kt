@@ -7,6 +7,9 @@ import androidx.lifecycle.viewModelScope
 import com.pleos.cardex.BuildConfig
 import com.pleos.cardex.data.CarDexRepository
 import com.pleos.cardex.data.CollectionEntry
+import com.pleos.cardex.data.DriveCourse
+import com.pleos.cardex.data.GeoPoint
+import com.pleos.cardex.data.LandmarkNearby
 import com.pleos.cardex.data.Preferences
 import com.pleos.cardex.data.RecognitionResponse
 import com.pleos.cardex.data.Showroom
@@ -16,6 +19,9 @@ import com.pleos.cardex.data.SynergyScore
 import com.pleos.cardex.pleos.AssetFrameSource
 import com.pleos.cardex.pleos.DrivingSnapshot
 import com.pleos.cardex.pleos.FrameSource
+import com.pleos.cardex.pleos.LandmarkTarget
+import com.pleos.cardex.pleos.PleosNavi
+import com.pleos.cardex.pleos.VehicleContextProvider
 import com.pleos.cardex.pleos.MockVehicleContextProvider
 import com.pleos.cardex.pleos.PleosVehicleContextProvider
 import com.pleos.cardex.pleos.VideoFrameSource
@@ -42,6 +48,9 @@ data class UiState(
     val keywords: List<String> = emptyList(),
     val driving: DrivingSnapshot? = null,
     val demoVideo: Uri? = null,
+    val landmarks: List<LandmarkNearby> = emptyList(),
+    val course: DriveCourse? = null,
+    val courseLoading: Boolean = false,
     val error: String? = null,
 )
 
@@ -58,6 +67,8 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
     val state: StateFlow<UiState> = _state.asStateFlow()
     private var scanJob: Job? = null
     private var locationJob: Job? = null
+    private var provider: VehicleContextProvider? = null
+    private val navi = PleosNavi(app).apply { onError = { msg -> _state.update { it.copy(error = msg) } } }
 
     init {
         refreshCollection()
@@ -72,12 +83,13 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
         val pleos = if (!BuildConfig.USE_MOCK_PLEOS && permissionGranted) {
             PleosVehicleContextProvider(getApplication()).takeIf { it.isSupported() }
         } else null
-        val provider = pleos ?: MockVehicleContextProvider()
+        val p = pleos ?: MockVehicleContextProvider()
+        provider = p
         locationJob = viewModelScope.launch {
             runCatching {
-                provider.snapshots().collect { s ->
+                p.snapshots().collect { s ->
                     _state.update { it.copy(driving = s) }
-                    s.location?.let { reportVisit(it) }
+                    s.location?.let { reportVisit(it); refreshLandmarks(it); checkLandmarkDistance(it) }
                 }
             }
                 .onFailure { e -> _state.update { it.copy(error = "위치 서비스 오류: ${e.message}") } }
@@ -156,6 +168,75 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
 
     fun clearNotice() = _state.update { it.copy(notice = null) }
 
+    // ---------------- 히든 스탬프 (TourAPI 명소 근접) ----------------
+    private var lastLandmarkFetch: Pair<GeoPoint, Long>? = null
+    private val visiting = mutableSetOf<String>()
+
+    /** 3km 이상 이동했거나 10분 지나면 주변 명소를 다시 받아 Pleos 근접 알림 재등록 */
+    private fun refreshLandmarks(at: GeoPoint, force: Boolean = false) {
+        val now = System.currentTimeMillis()
+        val last = lastLandmarkFetch
+        if (!force && last != null && distanceM(last.first, at) < 3_000 && now - last.second < 10 * 60_000) return
+        lastLandmarkFetch = at to now
+        viewModelScope.launch {
+            runCatching { repo.landmarksNearby(at) }.onSuccess { list ->
+                _state.update { it.copy(landmarks = list) }
+                val targets = list.filterNot { it.collected }.take(MAX_PROXIMITY_ALERTS).map {
+                    LandmarkTarget(it.attraction.contentId, it.attraction.title, it.attraction.lat, it.attraction.lon, LANDMARK_RADIUS_M)
+                }
+                provider?.watchLandmarks(targets) { t -> visitLandmark(t.id) }
+            }
+        }
+    }
+
+    /** Pleos 근접 알림이 없는 환경(목업 등)을 위한 거리 판정. 서버가 중복을 걸러준다. */
+    private fun checkLandmarkDistance(at: GeoPoint) {
+        _state.value.landmarks
+            .filter { !it.collected && distanceM(at, GeoPoint(it.attraction.lat, it.attraction.lon)) <= LANDMARK_RADIUS_M }
+            .forEach { visitLandmark(it.attraction.contentId) }
+    }
+
+    private fun visitLandmark(id: String) {
+        val at = _state.value.driving?.location ?: return
+        if (!visiting.add(id)) return
+        viewModelScope.launch {
+            runCatching { repo.visitLandmark(id, at) }.onSuccess { r ->
+                if (r.isNew) {
+                    _state.update { s ->
+                        s.copy(
+                            notice = r.message,
+                            landmarks = s.landmarks.map { if (it.attraction.contentId == id) it.copy(collected = true) else it },
+                        )
+                    }
+                    loadStamps(); refreshCollection()
+                }
+            }
+            visiting.remove(id)
+        }
+    }
+
+    // ---------------- AI 드라이브 코스 ----------------
+    fun recommendCourse(maxHours: Double, note: String) {
+        val at = _state.value.driving?.location ?: run {
+            _state.update { it.copy(error = "현재 위치를 아직 받지 못했어요.") }; return
+        }
+        _state.update { it.copy(courseLoading = true, error = null) }
+        viewModelScope.launch {
+            runCatching { repo.recommendCourse(at, maxHours, note) }
+                .onSuccess { c -> _state.update { it.copy(course = c) } }
+                .onFailure { e -> _state.update { it.copy(error = "코스 추천 실패: ${e.message}") } }
+            _state.update { it.copy(courseLoading = false) }
+        }
+    }
+
+    /** 추천 코스를 Pleos 내비게이션으로 길안내 */
+    fun startNavigation() {
+        val stops = _state.value.course?.stops.orEmpty()
+        if (stops.isEmpty()) return
+        navi.navigate(stops)
+        _state.update { it.copy(notice = "🧭 Pleos 내비로 '${stops.last().name}' 길안내를 요청했어요") }
+    }
+
     // ---------------- 쇼룸 ----------------
     private fun loadShowroom() {
         viewModelScope.launch {
@@ -202,9 +283,20 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private companion object { const val VISIT_REPORT_INTERVAL_MS = 30_000L }
+    private companion object {
+        const val VISIT_REPORT_INTERVAL_MS = 30_000L
+        const val LANDMARK_RADIUS_M = 500 // 백엔드 LANDMARK_RADIUS_M 과 동일하게
+        const val MAX_PROXIMITY_ALERTS = 20
+
+        fun distanceM(a: GeoPoint, b: GeoPoint): Float {
+            val out = FloatArray(1)
+            android.location.Location.distanceBetween(a.lat, a.lon, b.lat, b.lon, out)
+            return out[0]
+        }
+    }
 
     override fun onCleared() {
+        navi.release()
         frames.release()
     }
 }

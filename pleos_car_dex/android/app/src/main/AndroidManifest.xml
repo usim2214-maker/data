@@ -12,12 +12,17 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- Pleos FusedLocation SDK 권한 (런타임 요청 필요) -->
     <uses-permission android:name="pleos.car.permission.FUSED_LOCATION" />
+    <!-- Pleos NaviHelper: 경로 요청(requestRoute / requestRouteWithWaypoints) -->
+    <uses-permission android:name="pleos.car.permission.NAVI_ROUTE" />
+    <uses-permission android:name="pleos.car.permission.NAVI_ROUTE_SEARCH" />
 
     <application
         android:label="@string/app_name"
         android:theme="@style/Theme.PleosCarDex"
         android:usesCleartextTraffic="true"
         android:networkSecurityConfig="@xml/network_security_config">
+
+        <uses-library android:name="android.car" android:required="false" />
 
         <!-- 주행 중에도 표시 가능하도록 distraction-optimized 선언 (정책상 주행 중 UI 제한은 별도 검토) -->
         <meta-data android:name="distractionOptimized" android:value="true" />

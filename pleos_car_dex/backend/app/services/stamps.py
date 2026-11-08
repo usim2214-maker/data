@@ -32,7 +32,8 @@ def record_visit(store: JsonStore, lat: float, lon: float) -> VisitResponse:
 def stamp_book(store: JsonStore) -> StampBook:
     recs = store.get_stamps()
     stamps = [_stamp(r, recs.get(r.id)) for r in regions.all_regions()]
-    return StampBook(acquired=sum(s.acquired for s in stamps), total=len(stamps), stamps=stamps)
+    hidden = sorted(store.get_hidden().values(), key=lambda h: h.acquired_at, reverse=True)
+    return StampBook(acquired=sum(s.acquired for s in stamps), total=len(stamps), stamps=stamps, hidden=hidden)
 
 
 def acquired_ids(store: JsonStore) -> set[str]:

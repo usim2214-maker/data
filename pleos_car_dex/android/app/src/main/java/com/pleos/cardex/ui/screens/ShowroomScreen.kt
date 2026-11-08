@@ -127,6 +127,14 @@ fun ShowroomScreen(
                     StampBadge(s.region, s.acquired)
                 }
             }
+
+            val hidden = stampBook?.hidden.orEmpty()
+            if (hidden.isNotEmpty()) {
+                Section("히든 스탬프 ${hidden.size}")
+                hidden.forEach { h ->
+                    Text("✨ ${h.attraction.title}  +${h.points}", style = MaterialTheme.typography.bodyLarge)
+                }
+            }
         }
     }
 }

@@ -129,3 +129,31 @@ def test_travel_score(client):
     assert names["수도권 완주"] == 100
     assert names["여행지 발견"] == 10
     assert syn["total"] == syn["base"] + syn["travel"] + sum(names.values())
+
+
+def test_hidden_landmark_stamp(client):
+    near = client.get("/api/v1/landmarks/nearby", params={"lat": 35.16, "lon": 129.15, "radius_m": 5000}).json()
+    assert near[0]["attraction"]["content_id"] == "mock-haeundae" and near[0]["collected"] is False
+
+    far = client.post("/api/v1/landmarks/mock-haeundae/visit", json={"lat": 35.165, "lon": 129.15}).json()
+    assert far["acquired"] is False  # 약 1km 떨어짐 -> 반경 500m 밖
+
+    ok = client.post("/api/v1/landmarks/mock-haeundae/visit", json={"lat": 35.1588, "lon": 129.1600}).json()
+    assert ok["acquired"] and ok["is_new"] and ok["stamp"]["points"] == 15 + 20 // 2
+    again = client.post("/api/v1/landmarks/mock-haeundae/visit", json={"lat": 35.1588, "lon": 129.1600}).json()
+    assert again["is_new"] is False
+
+    assert client.get("/api/v1/stamps").json()["hidden"][0]["attraction"]["title"] == "해운대 해수욕장"
+    syn = client.get("/api/v1/collection").json()["synergy"]
+    assert any(b["name"] == "히든 스탬프" and b["points"] == 25 for b in syn["bonuses"])
+
+
+def test_course_recommend_rule_based(client):
+    # 서울 출발, 6시간, 11월 초 -> 시연용 축제/미방문 지역 명소로 코스 구성
+    r = client.post("/api/v1/courses/recommend", json={"lat": 37.5665, "lon": 126.9780, "max_hours": 6, "date": "20261108"})
+    body = r.json()
+    assert r.status_code == 200, body
+    assert 1 <= len(body["stops"]) <= 4
+    assert body["candidates_source"] == "mock"
+    assert body["est_drive_hours"] > 0 and body["expected_points"] > 0
+    assert all(s["content_id"].startswith("mock-") for s in body["stops"])

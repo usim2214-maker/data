@@ -40,15 +40,9 @@ fun ScanScreen(
     videoPositionMs: AtomicLong,
     onScanOnce: () -> Unit,
     onToggleAuto: () -> Unit,
-    onClearNotice: () -> Unit,
 ) {
     Row(Modifier.fillMaxSize().padding(24.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
         Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            // 새 지역 스탬프 획득 알림 (4초 후 사라짐)
-            state.notice?.let {
-                LaunchedEffect(it) { delay(4_000); onClearNotice() }
-                Text(it, style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.secondary)
-            }
 
             state.demoVideo?.let { DriveVideo(it, videoPositionMs, Modifier.fillMaxWidth().aspectRatio(16f / 9f)) }
 

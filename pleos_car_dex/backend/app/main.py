@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
-from app.routers import collection, preferences, recognize, showroom, stamps
+from app.routers import collection, courses, landmarks, preferences, recognize, showroom, stamps
 
 logging.basicConfig(level=logging.INFO)
 
@@ -18,6 +18,8 @@ app.include_router(collection.router)
 app.include_router(preferences.router)
 app.include_router(showroom.router)
 app.include_router(stamps.router)
+app.include_router(landmarks.router)
+app.include_router(courses.router)
 app.mount("/static/crops", StaticFiles(directory=settings.crops_dir), name="crops")
 
 
@@ -28,4 +30,5 @@ def health():
         "detector": settings.detector_mode,
         "identifier": settings.identifier_mode if settings.llm_enabled else "mock",
         "llm": settings.llm_model if settings.llm_enabled else "mock",
+        "tour": "tourapi" if settings.tour_enabled else "mock",
     }

@@ -15,6 +15,8 @@
 | 카드: 앞면 차량 이미지 / 뒷면 정보 요약 | `FlipCard.kt` — 탭하면 뒤집힘 |
 | 주행 중 마주친 차량 도감 등록 + 시너지 점수 | `store.py`(최초 발견 위치 = Pleos FusedLocation) + `synergy.py` |
 | 카트라이더식 쇼룸 (대표 차량 전시) | `routers/showroom.py` + `ShowroomScreen.kt` — 도감에서 획득한 차량만 전시 가능 |
+| 명소 히든 스탬프 | `services/tour.py`·`landmarks.py` + `PleosVehicleContextProvider.watchLandmarks` — 한국관광공사 TourAPI 명소/축제에 Pleos 근접 알림 등록 → 반경 500m 진입 시 획득 (서버가 거리 재검증) |
+| AI 드라이브 코스 추천 | `services/courses.py` + `TravelScreen.kt` + `PleosNavi.kt` — 미획득 지역·축제·명소 후보를 서버가 모으고 LLM 이 코스 선택 → Pleos NaviHelper 로 길안내 |
 | 지나간 지역 스탬프로 배경 꾸미기 | `services/regions.py`·`stamps.py` — Pleos FusedLocation 위치로 17개 시·도 스탬프 획득 → 쇼룸 배경 테마/스티커(최대 3개)로 사용 |
 
 ### 시너지 점수 규칙 (MVP 정의, `synergy.py` 상수로 튜닝)
@@ -30,6 +32,7 @@
 - 단골 여행: 같은 지역 재방문(1시간 이상 간격) +5 (지역당 최대 15)
 - 권역 완주: 수도권·충청권·호남권·영남권 내 모든 시·도 방문 시 +100
 - 여행지 발견: 수도권 밖에서 처음 발견한 차량 1대당 +10
+- 히든 스탬프: 명소 15 + 지역 가중치/2 (축제 +10) — 예: 부산 명소 25, 전남 명소 35
 
 ## Pleos Playground 에서 쓰는 것
 
@@ -37,8 +40,13 @@
 |---|---|
 | SDK 저장소 | `https://nexus-playground.pleos.ai/repository/maven-releases/` (공식 샘플과 동일) |
 | FusedLocation SDK | `ai.pleos.playground:FusedLocation:1.1.3`, 권한 `pleos.car.permission.FUSED_LOCATION` — 지역 스탬프 획득 + 도감의 '발견 장소' |
+| NaviHelper SDK | `ai.pleos.playground:NaviHelper:3.0.5`, 권한 `NAVI_ROUTE`·`NAVI_ROUTE_SEARCH` — AI 코스 길안내 (목적지 + 경유지 2곳) |
 | Vehicle SDK (예정) | `ai.pleos.playground:Vehicle` — 차속/기어 연동 시 추가 (`TODO(Pleos)`) |
 | 서라운드뷰/카메라 | 공개 API 미확인 → 영상 직접 입력으로 대체 |
+
+> **NaviHelper / 근접 알림 주의**: 공식 문서(document.pleos.ai)를 작성 환경에서 열 수 없어, NaviHelper 는 공개된 Pleos 앱들의
+> 사용 코드, 근접 알림은 공식 FusedLocation 샘플을 기준으로 작성했습니다. 첫 빌드 때 `RouteInfo` 생성자 인자와
+> `ProximityAlertRequest.radiusMeters` 타입을 SDK 시그니처로 확인하세요.
 
 > **API 키 관련 메모**: 공식 FusedLocation 샘플 기준, 차량 내 SDK(FusedLocation/Vehicle)는 별도 API 키 없이
 > Maven 의존성 + 권한으로 동작합니다. Playground 에서 발급하는 *Vehicle Data API* 키는 내 차량의 커넥티드
@@ -82,13 +90,16 @@ pleos_car_dex/
 cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-vision.txt     # YOLOv8 포함 (mock 만 쓸 거면 requirements.txt)
-cp .env.example .env                       # ANTHROPIC_API_KEY 입력 (비우면 mock 요약)
+cp .env.example .env                       # ANTHROPIC_API_KEY(LLM), TOUR_API_KEY(공공데이터포털) 입력 — 비우면 mock
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 # 영상 통째 테스트
 curl -F "video=@drive.mp4" http://localhost:8000/api/v1/recognize/video
 ```
 완전 오프라인 시연: `DETECTOR_MODE=mock IDENTIFIER_MODE=mock USE_MOCK_LLM=true` (파일명으로 차종 결정).
 테스트: `python -m pytest -q`
+
+**TourAPI 키 발급**: 공공데이터포털(data.go.kr)에서 '한국관광공사_국문 관광정보 서비스_GW' 활용신청 → 일반 인증키(Decoding)를 `TOUR_API_KEY` 에 입력.
+키가 없으면 `app/data/mock_attractions.json`(전국 명소 19곳 + 시연용 축제 5개)으로 동작합니다.
 
 ### Pleos 앱
 1. Android Studio 로 `android/` 열기 → Pleos Connect 에뮬레이터 실행
@@ -98,7 +109,9 @@ curl -F "video=@drive.mp4" http://localhost:8000/api/v1/recognize/video
 5. 도감 탭: 시너지 점수 확인, `쇼룸에 전시` 로 대표 차량 지정
 6. 쇼룸 탭: 대표 차량 무대 + 획득한 지역 스탬프로 배경/스티커 꾸미기, 스탬프북 확인
    (에뮬레이터에서 `adb emu geo fix 129.07 35.17` 로 부산 이동 → 부산 스탬프 획득)
-7. 키워드 탭: 항목 변경 → 다음 인식부터 카드 뒷면 변경
+7. 여행 탭: 왕복 시간·취향 선택 → `코스 추천받기` → `Pleos 내비로 길안내`
+   우측 '주변 히든 스탬프'에서 명소 거리 확인 (`adb emu geo fix 129.1604 35.1587` → 해운대 히든 스탬프)
+8. 키워드 탭: 항목 변경 → 다음 인식부터 카드 뒷면 변경
 
 에뮬레이터 → 호스트 백엔드 주소는 `http://10.0.2.2:8000/` (`app/build.gradle.kts`).
 에뮬레이터 위치 테스트: `adb emu geo fix 127.0276 37.4979` (경도 먼저).
@@ -114,6 +127,9 @@ curl -F "video=@drive.mp4" http://localhost:8000/api/v1/recognize/video
 | GET / PUT | `/api/v1/showroom` | 쇼룸 조회 / `{card_id, background_region_id, sticker_region_ids}` 변경 (획득한 차량·스탬프만) |
 | GET | `/api/v1/stamps` | 스탬프북 (17개 시·도, 미획득 포함) |
 | POST | `/api/v1/stamps/visit` | `{lat, lon}` 방문 보고 → 새 지역이면 스탬프 획득 (인식 요청에 위치가 있어도 자동 기록) |
+| GET | `/api/v1/landmarks/nearby?lat&lon&radius_m` | 주변 TourAPI 명소·진행 중 축제 (획득 여부·점수) |
+| POST | `/api/v1/landmarks/{content_id}/visit` | `{lat, lon}` 근접 진입 보고 → 반경 검증 후 히든 스탬프 |
+| POST | `/api/v1/courses/recommend` | `{lat, lon, max_hours, date?, note?}` → AI 드라이브 코스 (이동 시간·예상 점수는 서버 계산) |
 | GET / PUT | `/api/v1/preferences` | 유저 키워드(최대 8개) |
 
 ## LLM 설정 메모
@@ -121,4 +137,5 @@ curl -F "video=@drive.mp4" http://localhost:8000/api/v1/recognize/video
 - 안전 필터 거절 시 서버 측 자동 재시도(`fallbacks="default"`), 최종 실패 시 mock 요약
 - 같은 차량을 2분 안에 다시 보면 저장된 카드 재사용 (영상 연속 인식 비용 절감)
 - 카탈로그 수치는 예시값 — 시연 전 검수 필요
+- 코스 추천: LLM 은 서버가 모은 후보 ID 중에서만 고르게 하고(없는 장소 지어내기 방지), 이동 시간·점수는 서버가 계산. 희망 시간을 넘으면 경유지를 자동으로 줄임. LLM 이 없으면 규칙 기반 추천
 - 지역 판정은 시·도 중심좌표 최근접(반경 60km) 근사 — 경계 부근은 부정확할 수 있음 (역지오코딩으로 교체 가능)

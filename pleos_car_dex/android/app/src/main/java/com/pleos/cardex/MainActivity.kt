@@ -5,19 +5,29 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -30,25 +40,29 @@ import com.pleos.cardex.ui.screens.CollectionScreen
 import com.pleos.cardex.ui.screens.KeywordSettingsScreen
 import com.pleos.cardex.ui.screens.ScanScreen
 import com.pleos.cardex.ui.screens.ShowroomScreen
+import com.pleos.cardex.ui.screens.TravelScreen
 import com.pleos.cardex.ui.theme.CarDexTheme
 
 private enum class Dest(val route: String, val label: String, val icon: ImageVector) {
     Scan("scan", "스캔", Icons.Filled.CameraAlt),
     Collection("collection", "도감", Icons.Filled.CollectionsBookmark),
     Showroom("showroom", "쇼룸", Icons.Filled.DirectionsCar),
+    Travel("travel", "여행", Icons.Filled.Map),
     Settings("settings", "키워드", Icons.Filled.Tune),
 }
 
 class MainActivity : ComponentActivity() {
     private val vm: CarDexViewModel by viewModels()
 
-    // Pleos FusedLocation 런타임 권한 (공식 샘플과 동일한 권한 문자열)
-    private val locationPermission =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> vm.startLocation(granted) }
+    // Pleos 런타임 권한: FusedLocation(공식 샘플과 동일) + NaviHelper 경로 요청
+    private val pleosPermissions =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+            vm.startLocation(result[PLEOS_LOCATION_PERMISSION] == true)
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        locationPermission.launch(PLEOS_LOCATION_PERMISSION)
+        pleosPermissions.launch(arrayOf(PLEOS_LOCATION_PERMISSION, *PLEOS_NAVI_PERMISSIONS))
         setContent {
             CarDexTheme {
                 val state by vm.state.collectAsStateWithLifecycle()
@@ -68,9 +82,10 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
                         }
+                        Box(Modifier.fillMaxSize()) {
                         NavHost(nav, startDestination = Dest.Scan.route) {
                             composable(Dest.Scan.route) {
-                                ScanScreen(state, vm.videoPositionMs, vm::scanOnce, { vm.toggleAutoScan() }, vm::clearNotice)
+                                ScanScreen(state, vm.videoPositionMs, vm::scanOnce) { vm.toggleAutoScan() }
                             }
                             composable(Dest.Collection.route) {
                                 CollectionScreen(
@@ -93,7 +108,28 @@ class MainActivity : ComponentActivity() {
                                     onToggleSticker = vm::toggleSticker,
                                 )
                             }
+                            composable(Dest.Travel.route) {
+                                TravelScreen(
+                                    course = state.course,
+                                    loading = state.courseLoading,
+                                    landmarks = state.landmarks,
+                                    onRecommend = vm::recommendCourse,
+                                    onNavigate = vm::startNavigation,
+                                )
+                            }
                             composable(Dest.Settings.route) { KeywordSettingsScreen(state.keywords, vm::saveKeywords) }
+                        }
+                        // 전역 알림 배너: 스탬프 획득, 길안내 요청 등 (4초 후 사라짐)
+                        state.notice?.let { msg ->
+                            LaunchedEffect(msg) { delay(4_000); vm.clearNotice() }
+                            Surface(
+                                color = MaterialTheme.colorScheme.secondary,
+                                shape = RoundedCornerShape(16.dp),
+                                modifier = Modifier.align(Alignment.TopCenter).padding(16.dp),
+                            ) {
+                                Text(msg, color = Color.Black, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(16.dp))
+                            }
+                        }
                         }
                     }
                 }
@@ -103,3 +139,4 @@ class MainActivity : ComponentActivity() {
 }
 
 private const val PLEOS_LOCATION_PERMISSION = "pleos.car.permission.FUSED_LOCATION"
+private val PLEOS_NAVI_PERMISSIONS = arrayOf("pleos.car.permission.NAVI_ROUTE", "pleos.car.permission.NAVI_ROUTE_SEARCH")

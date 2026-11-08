@@ -126,10 +126,90 @@ class Stamp(BaseModel):
     visit_count: int = 0
 
 
+class Attraction(BaseModel):
+    """TourAPI 관광지/축제 (히든 스탬프 & 코스 후보)"""
+
+    content_id: str
+    title: str
+    addr: str = ""
+    lat: float
+    lon: float
+    image: str | None = None
+    kind: str = "attraction"  # attraction | festival
+    event_start: str | None = None  # YYYYMMDD (축제)
+    event_end: str | None = None
+    region_id: str | None = None
+
+
+class HiddenStamp(BaseModel):
+    attraction: Attraction
+    acquired_at: datetime
+    points: int
+
+
+class LandmarkNearby(BaseModel):
+    attraction: Attraction
+    distance_m: int
+    collected: bool
+    points: int
+
+
+class LandmarkVisitRequest(BaseModel):
+    lat: float
+    lon: float
+
+
+class LandmarkVisitResponse(BaseModel):
+    acquired: bool
+    is_new: bool = False
+    stamp: HiddenStamp | None = None
+    message: str = ""
+
+
 class StampBook(BaseModel):
     acquired: int
     total: int
     stamps: list[Stamp]
+    hidden: list[HiddenStamp] = []
+
+
+# ---------------- AI 드라이브 코스 ----------------
+class CourseRequest(BaseModel):
+    lat: float
+    lon: float
+    max_hours: float = Field(4.0, ge=1, le=12, description="왕복 희망 시간")
+    date: str | None = Field(None, description="YYYYMMDD, 비우면 오늘")
+    note: str = Field("", max_length=200, description="취향 메모 (예: 바다, 아이와 함께)")
+
+
+class CourseStop(BaseModel):
+    content_id: str
+    name: str
+    lat: float
+    lon: float
+    kind: str  # attraction | festival | region
+    region_id: str | None = None
+    reason: str
+    new_region_stamp: bool = False
+    new_hidden_stamp: bool = False
+
+
+class DriveCourse(BaseModel):
+    title: str
+    summary: str
+    stops: list[CourseStop]
+    est_drive_hours: float  # 서버 계산 (직선거리 기반 추정)
+    expected_points: int  # 서버 계산
+    candidates_source: str  # tourapi | mock
+
+
+class LLMCoursePick(BaseModel):
+    """LLM 구조화 출력: 후보 ID 중에서 고른 코스"""
+
+    title: str
+    summary: str
+    stop_ids: list[str]
+    reasons: list[str]
 
 
 class VisitRequest(BaseModel):

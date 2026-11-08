@@ -46,6 +46,19 @@ interface CarDexApi {
     @POST("api/v1/stamps/visit")
     suspend fun visit(@Body req: VisitRequest): VisitResponse
 
+    @GET("api/v1/landmarks/nearby")
+    suspend fun landmarksNearby(
+        @retrofit2.http.Query("lat") lat: Double,
+        @retrofit2.http.Query("lon") lon: Double,
+        @retrofit2.http.Query("radius_m") radiusM: Int = 20_000,
+    ): List<LandmarkNearby>
+
+    @POST("api/v1/landmarks/{id}/visit")
+    suspend fun visitLandmark(@Path("id") id: String, @Body req: VisitRequest): LandmarkVisitResponse
+
+    @POST("api/v1/courses/recommend")
+    suspend fun recommendCourse(@Body req: CourseRequest): DriveCourse
+
     @GET("api/v1/preferences")
     suspend fun preferences(): Preferences
 
@@ -58,7 +71,7 @@ interface CarDexApi {
         fun create(): CarDexApi {
             val json = Json { ignoreUnknownKeys = true }
             val client = OkHttpClient.Builder()
-                .readTimeout(60, TimeUnit.SECONDS) // YOLO + LLM 2회 호출
+                .readTimeout(90, TimeUnit.SECONDS) // YOLO + LLM / 코스 추천(TourAPI + LLM)
                 .build()
             return Retrofit.Builder()
                 .baseUrl(baseUrl)

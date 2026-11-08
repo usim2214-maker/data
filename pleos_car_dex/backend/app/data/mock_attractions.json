@@ -1,0 +1,31 @@
+{
+  "_comment": "TOUR_API_KEY 가 없을 때 쓰는 시연용 명소/축제. 좌표는 대략값, 축제 일정은 시연용 가짜 데이터(event_start/end 는 매년 반복으로 처리).",
+  "attractions": [
+    {"content_id": "mock-gyeongbokgung", "title": "경복궁", "addr": "서울 종로구 사직로 161", "lat": 37.5796, "lon": 126.9770},
+    {"content_id": "mock-namsan", "title": "N서울타워", "addr": "서울 용산구 남산공원길 105", "lat": 37.5512, "lon": 126.9882},
+    {"content_id": "mock-suwon-hwaseong", "title": "수원 화성", "addr": "경기 수원시 팔달구", "lat": 37.2871, "lon": 127.0118},
+    {"content_id": "mock-wolmido", "title": "월미도", "addr": "인천 중구 월미문화로", "lat": 37.4757, "lon": 126.5975},
+    {"content_id": "mock-nami", "title": "남이섬", "addr": "강원 춘천시 남산면", "lat": 37.7911, "lon": 127.5256},
+    {"content_id": "mock-seorak", "title": "설악산 국립공원", "addr": "강원 속초시 설악산로", "lat": 38.1192, "lon": 128.4656},
+    {"content_id": "mock-danyang", "title": "단양 도담삼봉", "addr": "충북 단양군 매포읍", "lat": 37.0010, "lon": 128.3445},
+    {"content_id": "mock-gongsanseong", "title": "공주 공산성", "addr": "충남 공주시 웅진로 280", "lat": 36.4626, "lon": 127.1258},
+    {"content_id": "mock-expo", "title": "대전 엑스포과학공원", "addr": "대전 유성구 대덕대로", "lat": 36.3765, "lon": 127.3870},
+    {"content_id": "mock-jeonju-hanok", "title": "전주 한옥마을", "addr": "전북 전주시 완산구", "lat": 35.8150, "lon": 127.1530},
+    {"content_id": "mock-boseong", "title": "보성 녹차밭 대한다원", "addr": "전남 보성군 보성읍", "lat": 34.7110, "lon": 127.0830},
+    {"content_id": "mock-yeosu", "title": "여수 오동도", "addr": "전남 여수시 수정동", "lat": 34.7445, "lon": 127.7660},
+    {"content_id": "mock-hahoe", "title": "안동 하회마을", "addr": "경북 안동시 풍천면", "lat": 36.5390, "lon": 128.5180},
+    {"content_id": "mock-bulguksa", "title": "경주 불국사", "addr": "경북 경주시 불국로 385", "lat": 35.7900, "lon": 129.3320},
+    {"content_id": "mock-tongyeong", "title": "통영 케이블카", "addr": "경남 통영시 발개로", "lat": 34.8270, "lon": 128.4250},
+    {"content_id": "mock-haeundae", "title": "해운대 해수욕장", "addr": "부산 해운대구 우동", "lat": 35.1587, "lon": 129.1604},
+    {"content_id": "mock-gamcheon", "title": "감천문화마을", "addr": "부산 사하구 감내2로", "lat": 35.0975, "lon": 129.0106},
+    {"content_id": "mock-daewangam", "title": "대왕암공원", "addr": "울산 동구 일산동", "lat": 35.4920, "lon": 129.4330},
+    {"content_id": "mock-seongsan", "title": "성산일출봉", "addr": "제주 서귀포시 성산읍", "lat": 33.4580, "lon": 126.9420}
+  ],
+  "festivals": [
+    {"content_id": "mock-fest-andong", "title": "안동 탈춤 축제 (시연용)", "addr": "경북 안동시", "lat": 36.5640, "lon": 128.7300, "event_start": "0925", "event_end": "1031"},
+    {"content_id": "mock-fest-jinju", "title": "진주 남강 유등 축제 (시연용)", "addr": "경남 진주시", "lat": 35.1900, "lon": 128.0800, "event_start": "1001", "event_end": "1120"},
+    {"content_id": "mock-fest-busan", "title": "부산 불꽃 축제 (시연용)", "addr": "부산 수영구 광안리", "lat": 35.1532, "lon": 129.1186, "event_start": "1101", "event_end": "1115"},
+    {"content_id": "mock-fest-jeju", "title": "제주 감귤 축제 (시연용)", "addr": "제주 서귀포시", "lat": 33.2541, "lon": 126.5600, "event_start": "1101", "event_end": "1210"},
+    {"content_id": "mock-fest-boryeong", "title": "보령 머드 축제 (시연용)", "addr": "충남 보령시 대천해수욕장", "lat": 36.3150, "lon": 126.5130, "event_start": "0701", "event_end": "0731"}
+  ]
+}

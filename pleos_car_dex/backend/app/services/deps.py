@@ -1,0 +1,28 @@
+"""서비스 싱글톤 (FastAPI Depends 용)"""
+from functools import lru_cache
+
+from app.config import get_settings
+from app.services.courses import CourseService
+from app.services.landmarks import LandmarkService
+from app.services.pipeline import get_pipeline
+from app.services.tour import TourClient
+
+
+@lru_cache
+def get_tour() -> TourClient:
+    return TourClient(get_settings())
+
+
+@lru_cache
+def get_landmarks() -> LandmarkService:
+    return LandmarkService(get_settings(), get_tour(), get_pipeline().store)
+
+
+@lru_cache
+def get_courses() -> CourseService:
+    return CourseService(get_settings(), get_tour(), get_pipeline().store)
+
+
+def clear_all() -> None:
+    for f in (get_tour, get_landmarks, get_courses):
+        f.cache_clear()

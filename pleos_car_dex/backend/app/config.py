@@ -26,12 +26,22 @@ class Settings(BaseSettings):
     # 같은 차량을 이 시간(초) 안에 다시 보면 LLM 요약을 재사용 (비용/지연 절감)
     reuse_card_within_sec: int = 120
 
+    # 한국관광공사 TourAPI (공공데이터포털 KorService2). 비우면 시연용 목업 명소/축제 사용
+    tour_api_key: str = ""
+    tour_api_base: str = "https://apis.data.go.kr/B551011/KorService2"
+    # 히든 스탬프: 명소 반경(m) 안에 들어와야 획득 인정 (앱의 근접 알림 반경과 맞출 것)
+    landmark_radius_m: int = 500
+
     # Storage
     data_dir: Path = Path("./storage")
 
     @property
     def llm_enabled(self) -> bool:
         return bool(self.anthropic_api_key) and not self.use_mock_llm
+
+    @property
+    def tour_enabled(self) -> bool:
+        return bool(self.tour_api_key)
 
     @property
     def crops_dir(self) -> Path:

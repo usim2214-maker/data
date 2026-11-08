@@ -29,6 +29,7 @@ def compute(
     stamps: dict[str, dict] | None = None,
     regions: list[Region] | None = None,
     locate=None,
+    hidden_points: list[int] | None = None,
 ) -> SynergyScore:
     stamps, regions = stamps or {}, regions or []
     base = sum(RARITY_POINTS.get(e.card.rarity, 10) for e in entries)
@@ -69,6 +70,9 @@ def compute(
     for area, members in area_members.items():
         if len(members) > 1 and members <= set(stamps):  # 1개짜리 권역(강원·제주)은 스탬프 점수로 충분
             bonuses.append(SynergyBonus(name=f"{area} 완주", points=AREA_COMPLETE_POINTS, description=f"{area} 모든 시·도 방문"))
+
+    if hidden_points:
+        bonuses.append(SynergyBonus(name="히든 스탬프", points=sum(hidden_points), description=f"명소·축제 {len(hidden_points)}곳 방문"))
 
     if locate:
         finds = [

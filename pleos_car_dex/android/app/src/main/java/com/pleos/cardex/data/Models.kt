@@ -91,8 +91,74 @@ data class Stamp(
     @SerialName("visit_count") val visitCount: Int = 0,
 )
 
+/** TourAPI 관광지/축제 */
 @Serializable
-data class StampBook(val acquired: Int, val total: Int, val stamps: List<Stamp>)
+data class Attraction(
+    @SerialName("content_id") val contentId: String,
+    val title: String,
+    val addr: String = "",
+    val lat: Double,
+    val lon: Double,
+    val image: String? = null,
+    val kind: String = "attraction", // attraction | festival
+    @SerialName("event_start") val eventStart: String? = null,
+    @SerialName("event_end") val eventEnd: String? = null,
+    @SerialName("region_id") val regionId: String? = null,
+)
+
+@Serializable
+data class HiddenStamp(val attraction: Attraction, @SerialName("acquired_at") val acquiredAt: String, val points: Int)
+
+@Serializable
+data class LandmarkNearby(
+    val attraction: Attraction,
+    @SerialName("distance_m") val distanceM: Int,
+    val collected: Boolean,
+    val points: Int,
+)
+
+@Serializable
+data class LandmarkVisitResponse(
+    val acquired: Boolean,
+    @SerialName("is_new") val isNew: Boolean = false,
+    val stamp: HiddenStamp? = null,
+    val message: String = "",
+)
+
+@Serializable
+data class StampBook(val acquired: Int, val total: Int, val stamps: List<Stamp>, val hidden: List<HiddenStamp> = emptyList())
+
+// ---------------- AI 드라이브 코스 ----------------
+@Serializable
+data class CourseRequest(
+    val lat: Double,
+    val lon: Double,
+    @SerialName("max_hours") val maxHours: Double,
+    val note: String = "",
+)
+
+@Serializable
+data class CourseStop(
+    @SerialName("content_id") val contentId: String,
+    val name: String,
+    val lat: Double,
+    val lon: Double,
+    val kind: String,
+    @SerialName("region_id") val regionId: String? = null,
+    val reason: String,
+    @SerialName("new_region_stamp") val newRegionStamp: Boolean = false,
+    @SerialName("new_hidden_stamp") val newHiddenStamp: Boolean = false,
+)
+
+@Serializable
+data class DriveCourse(
+    val title: String,
+    val summary: String,
+    val stops: List<CourseStop>,
+    @SerialName("est_drive_hours") val estDriveHours: Double,
+    @SerialName("expected_points") val expectedPoints: Int,
+    @SerialName("candidates_source") val candidatesSource: String,
+)
 
 @Serializable
 data class VisitRequest(val lat: Double, val lon: Double)

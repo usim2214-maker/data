@@ -51,7 +51,8 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.7.0")
 
     // ---- Pleos Playground SDK ----
-    implementation("ai.pleos.playground:FusedLocation:1.1.3") // 위치 (도감 '발견 장소')
+    implementation("ai.pleos.playground:FusedLocation:1.1.3") // 위치·근접 알림 (지역/히든 스탬프)
+    implementation("ai.pleos.playground:NaviHelper:3.0.5")    // AI 코스 -> Pleos 내비 길안내
     // TODO(Pleos): 차속/기어 연동 시 Vehicle SDK 추가 (공식 문서 예시 버전)
     // implementation("ai.pleos.playground:Vehicle:2.3.1")
     // TODO(Pleos): 서라운드뷰 등 차량 영상 API 공개 시 VideoFrameSource 를 대체

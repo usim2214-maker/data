@@ -6,7 +6,7 @@ from pathlib import Path
 
 from datetime import timedelta
 
-from app.schemas import CollectionEntry, GeoPoint, Preferences, ShowroomUpdate, VehicleCard
+from app.schemas import CollectionEntry, GeoPoint, HiddenStamp, Preferences, ShowroomUpdate, VehicleCard
 
 
 class JsonStore:
@@ -16,6 +16,7 @@ class JsonStore:
         self._prefs_path = data_dir / "preferences.json"
         self._showroom_path = data_dir / "showroom.json"
         self._stamps_path = data_dir / "stamps.json"
+        self._hidden_path = data_dir / "hidden_stamps.json"
         data_dir.mkdir(parents=True, exist_ok=True)
 
     # ---- preferences ----
@@ -108,3 +109,20 @@ class JsonStore:
             stamps[region_id] = rec
             self._stamps_path.write_text(json.dumps(stamps, ensure_ascii=False, indent=2), encoding="utf-8")
         return rec, is_new
+
+    # ---- 히든 스탬프 (TourAPI 명소/축제 방문) ----
+    def get_hidden(self) -> dict[str, HiddenStamp]:
+        if not self._hidden_path.exists():
+            return {}
+        raw = json.loads(self._hidden_path.read_text(encoding="utf-8"))
+        return {k: HiddenStamp.model_validate(v) for k, v in raw.items()}
+
+    def add_hidden(self, stamp: HiddenStamp) -> tuple[HiddenStamp, bool]:
+        with self._lock:
+            hidden = self.get_hidden()
+            if (existing := hidden.get(stamp.attraction.content_id)) is not None:
+                return existing, False
+            hidden[stamp.attraction.content_id] = stamp
+            payload = {k: v.model_dump(mode="json") for k, v in hidden.items()}
+            self._hidden_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        return stamp, True

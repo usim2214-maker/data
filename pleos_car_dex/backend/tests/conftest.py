@@ -17,8 +17,12 @@ def client(tmp_path, monkeypatch):
     from app.config import get_settings
     from app.services.pipeline import get_pipeline
 
+    monkeypatch.setenv("TOUR_API_KEY", "")
     get_settings.cache_clear()
     get_pipeline.cache_clear()
+    from app.services.deps import clear_all
+
+    clear_all()
 
     import importlib
 

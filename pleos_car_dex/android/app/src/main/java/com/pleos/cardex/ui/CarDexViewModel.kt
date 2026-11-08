@@ -9,8 +9,10 @@ import com.pleos.cardex.data.CarDexRepository
 import com.pleos.cardex.data.CollectionEntry
 import com.pleos.cardex.data.Preferences
 import com.pleos.cardex.data.RecognitionResponse
+import com.pleos.cardex.data.Showroom
+import com.pleos.cardex.data.ShowroomUpdate
+import com.pleos.cardex.data.StampBook
 import com.pleos.cardex.data.SynergyScore
-import com.pleos.cardex.data.VehicleCard
 import com.pleos.cardex.pleos.AssetFrameSource
 import com.pleos.cardex.pleos.DrivingSnapshot
 import com.pleos.cardex.pleos.FrameSource
@@ -33,7 +35,10 @@ data class UiState(
     val lastResult: RecognitionResponse? = null,
     val collection: List<CollectionEntry> = emptyList(),
     val synergy: SynergyScore? = null,
-    val summoned: VehicleCard? = null,
+    val showroom: Showroom = Showroom(),
+    val stampBook: StampBook? = null,
+    /** 새 스탬프 획득 등 잠깐 띄울 알림 */
+    val notice: String? = null,
     val keywords: List<String> = emptyList(),
     val driving: DrivingSnapshot? = null,
     val demoVideo: Uri? = null,
@@ -57,7 +62,8 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
     init {
         refreshCollection()
         loadPreferences()
-        loadGarage()
+        loadShowroom()
+        loadStamps()
     }
 
     /** Pleos 위치 권한 결과를 받은 뒤 호출. SDK 미지원/권한 거부 시 목업 위치로 대체 */
@@ -68,7 +74,12 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
         } else null
         val provider = pleos ?: MockVehicleContextProvider()
         locationJob = viewModelScope.launch {
-            runCatching { provider.snapshots().collect { s -> _state.update { it.copy(driving = s) } } }
+            runCatching {
+                provider.snapshots().collect { s ->
+                    _state.update { it.copy(driving = s) }
+                    s.location?.let { reportVisit(it) }
+                }
+            }
                 .onFailure { e -> _state.update { it.copy(error = "위치 서비스 오류: ${e.message}") } }
         }
     }
@@ -115,28 +126,64 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
 
     fun deleteEntry(id: String) {
         viewModelScope.launch {
-            runCatching { repo.delete(id) }; refreshCollection(); loadGarage()
+            runCatching { repo.delete(id) }; refreshCollection(); loadShowroom()
         }
     }
 
-    // ---------------- 소환 ----------------
-    private fun loadGarage() {
+    // ---------------- 지역 스탬프 ----------------
+    private var lastVisitReportMs = 0L
+
+    /** Pleos 위치를 30초마다 서버에 보고 -> 새 지역이면 스탬프 획득 */
+    private fun reportVisit(location: com.pleos.cardex.data.GeoPoint) {
+        val now = System.currentTimeMillis()
+        if (now - lastVisitReportMs < VISIT_REPORT_INTERVAL_MS) return
+        lastVisitReportMs = now
         viewModelScope.launch {
-            runCatching { repo.garage() }.onSuccess { g -> _state.update { it.copy(summoned = g.active) } }
+            runCatching { repo.visit(location) }.onSuccess { r ->
+                if (r.isNew) {
+                    _state.update { it.copy(notice = r.message) }
+                    loadStamps()
+                }
+            }
         }
     }
 
-    fun summon(id: String) {
+    fun loadStamps() {
         viewModelScope.launch {
-            runCatching { repo.summon(id) }
-                .onSuccess { g -> _state.update { it.copy(summoned = g.active) }; refreshCollection() }
-                .onFailure { e -> _state.update { it.copy(error = "소환 실패: ${e.message}") } }
+            runCatching { repo.stamps() }.onSuccess { b -> _state.update { it.copy(stampBook = b) } }
         }
     }
 
-    fun dismissSummon() {
+    fun clearNotice() = _state.update { it.copy(notice = null) }
+
+    // ---------------- 쇼룸 ----------------
+    private fun loadShowroom() {
         viewModelScope.launch {
-            runCatching { repo.dismiss() }.onSuccess { _state.update { it.copy(summoned = null) }; refreshCollection() }
+            runCatching { repo.showroom() }.onSuccess { r -> _state.update { it.copy(showroom = r) } }
+        }
+    }
+
+    private fun updateShowroom(transform: (ShowroomUpdate) -> ShowroomUpdate) {
+        val cur = _state.value.showroom
+        val req = transform(ShowroomUpdate(cur.car?.id, cur.background?.id, cur.stickers.map { it.id }))
+        viewModelScope.launch {
+            runCatching { repo.updateShowroom(req) }
+                .onSuccess { r -> _state.update { it.copy(showroom = r) }; refreshCollection() }
+                .onFailure { e -> _state.update { it.copy(error = "쇼룸 변경 실패: ${e.message}") } }
+        }
+    }
+
+    /** 도감 차량을 쇼룸 대표 차량으로 전시 */
+    fun feature(cardId: String) = updateShowroom { it.copy(cardId = cardId) }
+
+    fun setBackground(regionId: String?) = updateShowroom { it.copy(backgroundRegionId = regionId) }
+
+    fun toggleSticker(regionId: String) = updateShowroom {
+        val ids = it.stickerRegionIds
+        when {
+            regionId in ids -> it.copy(stickerRegionIds = ids - regionId)
+            ids.size < com.pleos.cardex.data.MAX_STICKERS -> it.copy(stickerRegionIds = ids + regionId)
+            else -> it
         }
     }
 
@@ -154,6 +201,8 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
                 .onFailure { e -> _state.update { it.copy(error = "저장 실패: ${e.message}") } }
         }
     }
+
+    private companion object { const val VISIT_REPORT_INTERVAL_MS = 30_000L }
 
     override fun onCleared() {
         frames.release()

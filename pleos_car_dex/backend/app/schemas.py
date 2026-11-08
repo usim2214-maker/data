@@ -106,15 +106,55 @@ class SynergyScore(BaseModel):
     bonuses: list[SynergyBonus]
 
 
-class GarageState(BaseModel):
-    """카트라이더식 '소환' 상태: 도감에서 고른 차량 1대를 대시보드에 띄운다."""
+class Region(BaseModel):
+    id: str
+    name: str
+    lat: float
+    lon: float
+    landmark: str
+    emoji: str
+    colors: list[str]  # 쇼룸 배경 그라데이션 [시작, 끝] (#RRGGBB)
 
-    active: VehicleCard | None = None
-    summoned_at: datetime | None = None
+
+class Stamp(BaseModel):
+    region: Region
+    acquired: bool
+    first_visited_at: datetime | None = None
+    visit_count: int = 0
 
 
-class SummonRequest(BaseModel):
-    card_id: str
+class StampBook(BaseModel):
+    acquired: int
+    total: int
+    stamps: list[Stamp]
+
+
+class VisitRequest(BaseModel):
+    lat: float
+    lon: float
+
+
+class VisitResponse(BaseModel):
+    stamp: Stamp | None = None
+    is_new: bool = False
+    message: str = ""
+
+
+MAX_STICKERS = 3
+
+
+class Showroom(BaseModel):
+    """카트라이더식 쇼룸: 대표 차량 1대 + 획득한 지역 스탬프로 꾸민 배경/스티커."""
+
+    car: VehicleCard | None = None
+    background: Region | None = None
+    stickers: list[Region] = []
+
+
+class ShowroomUpdate(BaseModel):
+    card_id: str | None = None
+    background_region_id: str | None = None
+    sticker_region_ids: list[str] = Field(default_factory=list, max_length=MAX_STICKERS)
 
 
 CollectionResponse.model_rebuild()

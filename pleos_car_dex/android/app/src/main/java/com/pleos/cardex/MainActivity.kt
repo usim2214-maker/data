@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CollectionsBookmark
+import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationRail
@@ -28,11 +29,13 @@ import com.pleos.cardex.ui.CarDexViewModel
 import com.pleos.cardex.ui.screens.CollectionScreen
 import com.pleos.cardex.ui.screens.KeywordSettingsScreen
 import com.pleos.cardex.ui.screens.ScanScreen
+import com.pleos.cardex.ui.screens.ShowroomScreen
 import com.pleos.cardex.ui.theme.CarDexTheme
 
 private enum class Dest(val route: String, val label: String, val icon: ImageVector) {
     Scan("scan", "스캔", Icons.Filled.CameraAlt),
     Collection("collection", "도감", Icons.Filled.CollectionsBookmark),
+    Showroom("showroom", "쇼룸", Icons.Filled.DirectionsCar),
     Settings("settings", "키워드", Icons.Filled.Tune),
 }
 
@@ -67,16 +70,27 @@ class MainActivity : ComponentActivity() {
                         }
                         NavHost(nav, startDestination = Dest.Scan.route) {
                             composable(Dest.Scan.route) {
-                                ScanScreen(state, vm.videoPositionMs, vm::scanOnce, { vm.toggleAutoScan() }, vm::dismissSummon)
+                                ScanScreen(state, vm.videoPositionMs, vm::scanOnce, { vm.toggleAutoScan() }, vm::clearNotice)
                             }
                             composable(Dest.Collection.route) {
                                 CollectionScreen(
                                     entries = state.collection,
                                     synergy = state.synergy,
-                                    summonedId = state.summoned?.id,
+                                    featuredId = state.showroom.car?.id,
                                     onRefresh = vm::refreshCollection,
-                                    onSummon = vm::summon,
+                                    onFeature = vm::feature,
                                     onDelete = vm::deleteEntry,
+                                )
+                            }
+                            composable(Dest.Showroom.route) {
+                                ShowroomScreen(
+                                    showroom = state.showroom,
+                                    collection = state.collection,
+                                    stampBook = state.stampBook,
+                                    onRefresh = vm::loadStamps,
+                                    onFeature = vm::feature,
+                                    onBackground = vm::setBackground,
+                                    onToggleSticker = vm::toggleSticker,
                                 )
                             }
                             composable(Dest.Settings.route) { KeywordSettingsScreen(state.keywords, vm::saveKeywords) }

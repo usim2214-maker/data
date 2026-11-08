@@ -34,14 +34,17 @@ interface CarDexApi {
     @DELETE("api/v1/collection/{id}")
     suspend fun deleteEntry(@Path("id") id: String)
 
-    @GET("api/v1/garage")
-    suspend fun garage(): GarageState
+    @GET("api/v1/showroom")
+    suspend fun showroom(): Showroom
 
-    @POST("api/v1/garage/summon")
-    suspend fun summon(@Body req: SummonRequest): GarageState
+    @PUT("api/v1/showroom")
+    suspend fun updateShowroom(@Body req: ShowroomUpdate): Showroom
 
-    @DELETE("api/v1/garage/summon")
-    suspend fun dismiss(): GarageState
+    @GET("api/v1/stamps")
+    suspend fun stamps(): StampBook
+
+    @POST("api/v1/stamps/visit")
+    suspend fun visit(@Body req: VisitRequest): VisitResponse
 
     @GET("api/v1/preferences")
     suspend fun preferences(): Preferences

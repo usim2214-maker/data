@@ -15,10 +15,10 @@ BRAND_SET_SIZE, BRAND_SET_POINTS = 3, 50
 GROUP_TRIO = {"현대", "기아", "제네시스"}
 GROUP_TRIO_POINTS = 100
 BODY_VARIETY_SIZE, BODY_VARIETY_POINTS = 3, 30
-SUMMON_MATCH_POINTS = 5  # 소환한 차량과 같은 브랜드 카드 1장당
+FEATURED_MATCH_POINTS = 5  # 쇼룸 대표 차량과 같은 브랜드 카드 1장당
 
 
-def compute(entries: list[CollectionEntry], summoned_brand: str | None = None) -> SynergyScore:
+def compute(entries: list[CollectionEntry], featured_brand: str | None = None) -> SynergyScore:
     base = sum(RARITY_POINTS.get(e.card.rarity, 10) for e in entries)
     bonuses: list[SynergyBonus] = []
 
@@ -42,8 +42,8 @@ def compute(entries: list[CollectionEntry], summoned_brand: str | None = None) -
             SynergyBonus(name="다양성", points=BODY_VARIETY_POINTS, description=f"차체 유형 {len(bodies)}가지 수집")
         )
 
-    if summoned_brand and brands.get(summoned_brand, 0) > 1:
-        pts = (brands[summoned_brand] - 1) * SUMMON_MATCH_POINTS
-        bonuses.append(SynergyBonus(name="소환 공명", points=pts, description=f"소환 차량과 같은 {summoned_brand} 카드"))
+    if featured_brand and brands.get(featured_brand, 0) > 1:
+        pts = (brands[featured_brand] - 1) * FEATURED_MATCH_POINTS
+        bonuses.append(SynergyBonus(name="대표차 공명", points=pts, description=f"쇼룸 대표 차량과 같은 {featured_brand} 카드"))
 
     return SynergyScore(total=base + sum(b.points for b in bonuses), base=base, bonuses=bonuses)

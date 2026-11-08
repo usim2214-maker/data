@@ -4,7 +4,9 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
-from app.schemas import CollectionEntry, GarageState, GeoPoint, Preferences, VehicleCard
+from datetime import timedelta
+
+from app.schemas import CollectionEntry, GeoPoint, Preferences, ShowroomUpdate, VehicleCard
 
 
 class JsonStore:
@@ -12,7 +14,8 @@ class JsonStore:
         self._lock = threading.Lock()
         self._collection_path = data_dir / "collection.json"
         self._prefs_path = data_dir / "preferences.json"
-        self._garage_path = data_dir / "garage.json"
+        self._showroom_path = data_dir / "showroom.json"
+        self._stamps_path = data_dir / "stamps.json"
         data_dir.mkdir(parents=True, exist_ok=True)
 
     # ---- preferences ----
@@ -65,17 +68,43 @@ class JsonStore:
             if entries.pop(card_id, None) is None:
                 return False
             self._dump(entries)
-        if (g := self.get_garage()).active and g.active.id == card_id:
-            self.set_garage(GarageState())
+        showroom = self.get_showroom()
+        if showroom.card_id == card_id:
+            showroom.card_id = None
+            self.save_showroom(showroom)
         return True
 
-    # ---- garage (소환) ----
-    def get_garage(self) -> GarageState:
-        if self._garage_path.exists():
-            return GarageState.model_validate_json(self._garage_path.read_text(encoding="utf-8"))
-        return GarageState()
+    # ---- showroom (대표 차량 + 배경 꾸미기) ----
+    def get_showroom(self) -> ShowroomUpdate:
+        if self._showroom_path.exists():
+            return ShowroomUpdate.model_validate_json(self._showroom_path.read_text(encoding="utf-8"))
+        return ShowroomUpdate()
 
-    def set_garage(self, state: GarageState) -> GarageState:
+    def save_showroom(self, state: ShowroomUpdate) -> ShowroomUpdate:
         with self._lock:
-            self._garage_path.write_text(state.model_dump_json(indent=2), encoding="utf-8")
+            self._showroom_path.write_text(state.model_dump_json(indent=2), encoding="utf-8")
         return state
+
+    # ---- 지역 스탬프 ----
+    REVISIT_GAP = timedelta(hours=1)  # 같은 지역 재방문으로 세는 최소 간격
+
+    def get_stamps(self) -> dict[str, dict]:
+        """{region_id: {"first_visited_at": iso, "last_visited_at": iso, "visit_count": n}}"""
+        if self._stamps_path.exists():
+            return json.loads(self._stamps_path.read_text(encoding="utf-8"))
+        return {}
+
+    def visit(self, region_id: str) -> tuple[dict, bool]:
+        now = datetime.now(timezone.utc)
+        with self._lock:
+            stamps = self.get_stamps()
+            rec = stamps.get(region_id)
+            is_new = rec is None
+            if is_new:
+                rec = {"first_visited_at": now.isoformat(), "last_visited_at": now.isoformat(), "visit_count": 1}
+            elif now - datetime.fromisoformat(rec["last_visited_at"]) >= self.REVISIT_GAP:
+                rec["visit_count"] += 1
+                rec["last_visited_at"] = now.isoformat()
+            stamps[region_id] = rec
+            self._stamps_path.write_text(json.dumps(stamps, ensure_ascii=False, indent=2), encoding="utf-8")
+        return rec, is_new

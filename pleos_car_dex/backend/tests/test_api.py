@@ -72,7 +72,7 @@ def test_video_recognition(client, tmp_path):
     assert [v["card"]["id"] for v in body["vehicles"]] == ["kia-ev9"]
 
 
-def test_synergy_and_summon(client):
+def test_synergy(client):
     for name in ["hyundai-ioniq-5.jpg", "kia-ev9.jpg", "genesis-g80.jpg", "hyundai-grandeur.jpg"]:
         client.post("/api/v1/recognize", files={"image": (name, _jpeg(), "image/jpeg")})
     syn = client.get("/api/v1/collection").json()["synergy"]
@@ -80,10 +80,39 @@ def test_synergy_and_summon(client):
     assert syn["base"] == 10 + 30 + 30 + 10
     assert "그룹 트리오" in names and "다양성" in names
 
-    assert client.post("/api/v1/garage/summon", json={"card_id": "nope"}).status_code == 404
-    g = client.post("/api/v1/garage/summon", json={"card_id": "hyundai-ioniq-5"}).json()
-    assert g["active"]["id"] == "hyundai-ioniq-5"
-    syn2 = client.get("/api/v1/collection").json()["synergy"]
-    assert any(b["name"] == "소환 공명" for b in syn2["bonuses"])  # 현대 2장
+
+def test_stamps(client):
+    book = client.get("/api/v1/stamps").json()
+    assert book["acquired"] == 0 and book["total"] == 17
+
+    r = client.post("/api/v1/stamps/visit", json={"lat": 35.16, "lon": 129.16}).json()  # 해운대
+    assert r["is_new"] is True and r["stamp"]["region"]["id"] == "busan"
+    assert client.post("/api/v1/stamps/visit", json={"lat": 35.17, "lon": 129.07}).json()["is_new"] is False
+    assert client.post("/api/v1/stamps/visit", json={"lat": 40.0, "lon": 140.0}).json()["stamp"] is None
+
+    # 인식 요청에 위치가 오면 스탬프 자동 기록 (서울)
+    client.post("/api/v1/recognize", files={"image": ("kia-ev9.jpg", _jpeg(), "image/jpeg")}, data={"lat": "37.57", "lon": "126.98"})
+    assert client.get("/api/v1/stamps").json()["acquired"] == 2
+
+
+def test_showroom(client):
+    client.post("/api/v1/recognize", files={"image": ("hyundai-ioniq-5.jpg", _jpeg(), "image/jpeg")})
+    client.post("/api/v1/recognize", files={"image": ("hyundai-grandeur.jpg", _jpeg(), "image/jpeg")})
+    client.post("/api/v1/stamps/visit", json={"lat": 33.5, "lon": 126.53})  # 제주
+
+    assert client.put("/api/v1/showroom", json={"card_id": "porsche-911"}).status_code == 400  # 미획득 차량
+    assert client.put("/api/v1/showroom", json={"background_region_id": "seoul"}).status_code == 400  # 미획득 스탬프
+
+    sr = client.put(
+        "/api/v1/showroom",
+        json={"card_id": "hyundai-ioniq-5", "background_region_id": "jeju", "sticker_region_ids": ["jeju", "jeju"]},
+    ).json()
+    assert sr["car"]["id"] == "hyundai-ioniq-5" and sr["background"]["name"] == "제주"
+    assert [s["id"] for s in sr["stickers"]] == ["jeju"]
+    assert client.get("/api/v1/showroom").json()["background"]["id"] == "jeju"
+
+    syn = client.get("/api/v1/collection").json()["synergy"]
+    assert any(b["name"] == "대표차 공명" for b in syn["bonuses"])  # 현대 2장
+
     client.delete("/api/v1/collection/hyundai-ioniq-5")
-    assert client.get("/api/v1/garage").json()["active"] is None
+    assert client.get("/api/v1/showroom").json()["car"] is None

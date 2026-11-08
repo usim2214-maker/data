@@ -1,0 +1,23 @@
+{
+  "_comment": "지역 스탬프 정의. 방문 판정은 중심좌표 최근접 + 반경(km). 쇼룸 배경 테마(색상 2개 그라데이션 + 랜드마크)로 사용. MVP 근사치이며, 정확한 행정구역 판정은 역지오코딩으로 교체 가능.",
+  "radius_km": 60,
+  "regions": [
+    {"id": "seoul",     "name": "서울", "lat": 37.5665, "lon": 126.9780, "landmark": "남산타워",   "emoji": "🗼", "colors": ["#1E3A8A", "#F59E0B"]},
+    {"id": "incheon",   "name": "인천", "lat": 37.4563, "lon": 126.7052, "landmark": "인천대교",   "emoji": "✈️", "colors": ["#0E7490", "#E0F2FE"]},
+    {"id": "gyeonggi",  "name": "경기", "lat": 37.2750, "lon": 127.0094, "landmark": "수원화성",   "emoji": "🏯", "colors": ["#7C2D12", "#FDE68A"]},
+    {"id": "gangwon",   "name": "강원", "lat": 37.8228, "lon": 128.1555, "landmark": "설악산",     "emoji": "⛰️", "colors": ["#14532D", "#A7F3D0"]},
+    {"id": "chungbuk",  "name": "충북", "lat": 36.6357, "lon": 127.4917, "landmark": "청남대",     "emoji": "🌲", "colors": ["#365314", "#D9F99D"]},
+    {"id": "chungnam",  "name": "충남", "lat": 36.6588, "lon": 126.6728, "landmark": "서해 갯벌",  "emoji": "🦀", "colors": ["#78350F", "#FED7AA"]},
+    {"id": "sejong",    "name": "세종", "lat": 36.4800, "lon": 127.2890, "landmark": "호수공원",   "emoji": "🏛️", "colors": ["#334155", "#CBD5E1"]},
+    {"id": "daejeon",   "name": "대전", "lat": 36.3504, "lon": 127.3845, "landmark": "엑스포다리", "emoji": "🔬", "colors": ["#4C1D95", "#C4B5FD"]},
+    {"id": "jeonbuk",   "name": "전북", "lat": 35.8203, "lon": 127.1088, "landmark": "전주 한옥마을", "emoji": "🏘️", "colors": ["#713F12", "#FEF3C7"]},
+    {"id": "gwangju",   "name": "광주", "lat": 35.1595, "lon": 126.8526, "landmark": "무등산",     "emoji": "🎨", "colors": ["#831843", "#FBCFE8"]},
+    {"id": "jeonnam",   "name": "전남", "lat": 34.8161, "lon": 126.4629, "landmark": "보성 녹차밭", "emoji": "🍵", "colors": ["#166534", "#BBF7D0"]},
+    {"id": "gyeongbuk", "name": "경북", "lat": 36.5760, "lon": 128.5056, "landmark": "경주 첨성대", "emoji": "🏺", "colors": ["#92400E", "#FDE68A"]},
+    {"id": "daegu",     "name": "대구", "lat": 35.8714, "lon": 128.6014, "landmark": "83타워",     "emoji": "🍎", "colors": ["#991B1B", "#FECACA"]},
+    {"id": "ulsan",     "name": "울산", "lat": 35.5384, "lon": 129.3114, "landmark": "대왕암",     "emoji": "🐋", "colors": ["#1E40AF", "#BFDBFE"]},
+    {"id": "gyeongnam", "name": "경남", "lat": 35.2383, "lon": 128.6924, "landmark": "통영 바다",  "emoji": "⛵", "colors": ["#075985", "#BAE6FD"]},
+    {"id": "busan",     "name": "부산", "lat": 35.1796, "lon": 129.0756, "landmark": "광안대교",   "emoji": "🌉", "colors": ["#0C4A6E", "#F472B6"]},
+    {"id": "jeju",      "name": "제주", "lat": 33.4996, "lon": 126.5312, "landmark": "한라산",     "emoji": "🍊", "colors": ["#EA580C", "#99F6E4"]}
+  ]
+}

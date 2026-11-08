@@ -8,6 +8,7 @@ from PIL import Image, UnidentifiedImageError
 from starlette.concurrency import run_in_threadpool
 
 from app.schemas import GeoPoint, RecognitionResponse, VideoRecognitionResponse
+from app.services import stamps
 from app.services.pipeline import RecognitionPipeline, get_pipeline
 
 router = APIRouter(prefix="/api/v1", tags=["recognize"])
@@ -33,6 +34,8 @@ async def recognize(
     except UnidentifiedImageError:
         raise HTTPException(status_code=400, detail="이미지를 읽을 수 없습니다.")
     kw, location = _parse(keywords, lat, lon)
+    if location:
+        stamps.record_visit(pipeline.store, location.lat, location.lon)
     # 동기 파이프라인(YOLO/LLM)은 스레드풀에서 실행
     return await run_in_threadpool(
         pipeline.run, img, keywords=kw, location=location, filename_hint=image.filename or "",

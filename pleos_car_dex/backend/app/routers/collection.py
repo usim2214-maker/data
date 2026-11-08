@@ -10,8 +10,9 @@ router = APIRouter(prefix="/api/v1/collection", tags=["collection"])
 @router.get("", response_model=CollectionResponse)
 def list_collection(pipeline: RecognitionPipeline = Depends(get_pipeline)):
     entries = pipeline.store.list_entries()
-    active = pipeline.store.get_garage().active
-    score = synergy.compute(entries, summoned_brand=active.brand if active else None)
+    featured_id = pipeline.store.get_showroom().card_id
+    featured = next((e.card for e in entries if e.card.id == featured_id), None)
+    score = synergy.compute(entries, featured_brand=featured.brand if featured else None)
     return CollectionResponse(total=len(entries), entries=entries, synergy=score)
 
 

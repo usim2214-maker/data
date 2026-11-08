@@ -26,14 +26,14 @@ import com.pleos.cardex.data.CollectionEntry
 import com.pleos.cardex.data.SynergyScore
 import com.pleos.cardex.ui.components.FlipCard
 
-/** 도감: 시너지 점수 + 수집 카드 그리드 (탭=뒤집기, 소환 버튼) */
+/** 도감: 시너지 점수 + 수집 카드 그리드 (탭=뒤집기, 쇼룸 대표 차량 지정) */
 @Composable
 fun CollectionScreen(
     entries: List<CollectionEntry>,
     synergy: SynergyScore?,
-    summonedId: String?,
+    featuredId: String?,
     onRefresh: () -> Unit,
-    onSummon: (String) -> Unit,
+    onFeature: (String) -> Unit,
     onDelete: (String) -> Unit,
 ) {
     LaunchedEffect(Unit) { onRefresh() }
@@ -67,8 +67,8 @@ fun CollectionScreen(
                     FlipCard(entry.card, Modifier.fillMaxWidth().aspectRatio(0.72f))
                     Text("발견 ${entry.seenCount}회", color = Color.Gray, modifier = Modifier.padding(top = 8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Button(onClick = { onSummon(entry.card.id) }, enabled = summonedId != entry.card.id) {
-                            Text(if (summonedId == entry.card.id) "소환 중" else "소환")
+                        Button(onClick = { onFeature(entry.card.id) }, enabled = featuredId != entry.card.id) {
+                            Text(if (featuredId == entry.card.id) "전시 중" else "쇼룸에 전시")
                         }
                         TextButton(onClick = { onDelete(entry.card.id) }) { Text("삭제") }
                     }

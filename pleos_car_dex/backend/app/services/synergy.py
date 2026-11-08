@@ -30,6 +30,8 @@ def compute(
     regions: list[Region] | None = None,
     locate=None,
     hidden_points: list[int] | None = None,
+    course_points: list[int] | None = None,
+    badge_points: list[int] | None = None,
 ) -> SynergyScore:
     stamps, regions = stamps or {}, regions or []
     base = sum(RARITY_POINTS.get(e.card.rarity, 10) for e in entries)
@@ -73,6 +75,11 @@ def compute(
 
     if hidden_points:
         bonuses.append(SynergyBonus(name="히든 스탬프", points=sum(hidden_points), description=f"명소·축제 {len(hidden_points)}곳 방문"))
+
+    if course_points:
+        bonuses.append(SynergyBonus(name="코스 완주", points=sum(course_points), description=f"추천 코스 {len(course_points)}회 완주"))
+    if badge_points:
+        bonuses.append(SynergyBonus(name="축제 한정", points=sum(badge_points), description=f"축제 한정 배지 {len(badge_points)}개"))
 
     if locate:
         finds = [

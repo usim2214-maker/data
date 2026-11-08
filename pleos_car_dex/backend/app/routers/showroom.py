@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.schemas import Showroom, ShowroomUpdate
 from app.services import regions, stamps
+from app.services.deps import get_competition
 from app.services.pipeline import RecognitionPipeline, get_pipeline
 
 router = APIRouter(prefix="/api/v1/showroom", tags=["showroom"])
@@ -10,10 +11,15 @@ router = APIRouter(prefix="/api/v1/showroom", tags=["showroom"])
 
 def _resolve(pipeline: RecognitionPipeline, state: ShowroomUpdate) -> Showroom:
     entry = pipeline.store.get_entry(state.card_id) if state.card_id else None
+    masters = get_competition().masters()
+    mastered = {m.region.id for m in masters.masters if m.is_me}
     return Showroom(
         car=entry.card if entry else None,
         background=regions.get_region(state.background_region_id) if state.background_region_id else None,
         stickers=[r for rid in state.sticker_region_ids if (r := regions.get_region(rid))],
+        background_mastered=state.background_region_id in mastered,
+        titles=masters.my_titles,
+        badges=pipeline.store.get_badges(),
     )
 
 

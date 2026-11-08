@@ -12,7 +12,8 @@ from datetime import date, datetime
 import anthropic
 
 from app.config import Settings
-from app.schemas import Attraction, CourseRequest, CourseStop, DriveCourse, LLMCoursePick
+from app.schemas import Attraction, CourseRequest, CourseStop, DriveCourse, LimitedEvent, LLMCoursePick
+from app.services.challenge import completion_bonus
 from app.services import llm, regions
 from app.services.landmarks import points_for
 from app.services.store import JsonStore
@@ -71,6 +72,8 @@ class CourseService:
         new_regions = {s.region_id for s in stops if s.new_region_stamp and s.region_id}
         expected = sum(r.travel_points for rid in new_regions if (r := regions.get_region(rid)))
         expected += sum(s.points for s in stops if s.new_hidden_stamp)
+        fest = next((s for s in stops if s.kind == "festival" and s.event), None)
+        limited = LimitedEvent(content_id=fest.content_id, title=fest.name, event_end=fest.event.split("~")[1]) if fest else None
         return DriveCourse(
             title=pick.title,
             summary=pick.summary,
@@ -78,6 +81,8 @@ class CourseService:
             est_drive_hours=_road_hours(route),
             expected_points=expected,
             candidates_source=self.tour.source,
+            limited=limited,
+            completion_bonus=completion_bonus(expected),
         )
 
     # ---------------- 후보 ----------------

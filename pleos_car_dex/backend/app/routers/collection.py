@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.schemas import CollectionResponse
 from app.services import regions, synergy
+from app.services.competition import points_by_kind
 from app.services.pipeline import RecognitionPipeline, get_pipeline
 
 router = APIRouter(prefix="/api/v1/collection", tags=["collection"])
@@ -19,6 +20,8 @@ def list_collection(pipeline: RecognitionPipeline = Depends(get_pipeline)):
         regions=regions.all_regions(),
         locate=regions.locate,
         hidden_points=[h.points for h in pipeline.store.get_hidden().values()],
+        course_points=(kinds := points_by_kind(pipeline.store, {"course_complete", "limited_badge"}))["course_complete"],
+        badge_points=kinds["limited_badge"],
     )
     return CollectionResponse(total=len(entries), entries=entries, synergy=score)
 

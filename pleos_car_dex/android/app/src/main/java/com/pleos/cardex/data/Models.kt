@@ -123,6 +123,7 @@ data class LandmarkVisitResponse(
     @SerialName("is_new") val isNew: Boolean = false,
     val stamp: HiddenStamp? = null,
     val message: String = "",
+    val challenge: ChallengeUpdate? = null,
 )
 
 @Serializable
@@ -150,6 +151,14 @@ data class CourseStop(
     @SerialName("new_hidden_stamp") val newHiddenStamp: Boolean = false,
 )
 
+/** 축제 한정 코스 정보 */
+@Serializable
+data class LimitedEvent(
+    @SerialName("content_id") val contentId: String,
+    val title: String,
+    @SerialName("event_end") val eventEnd: String,
+)
+
 @Serializable
 data class DriveCourse(
     val title: String,
@@ -158,7 +167,67 @@ data class DriveCourse(
     @SerialName("est_drive_hours") val estDriveHours: Double,
     @SerialName("expected_points") val expectedPoints: Int,
     @SerialName("candidates_source") val candidatesSource: String,
+    val limited: LimitedEvent? = null,
+    @SerialName("completion_bonus") val completionBonus: Int = 0,
 )
+
+// ---------------- 경쟁 ----------------
+@Serializable
+data class Challenge(
+    val course: DriveCourse,
+    @SerialName("started_at") val startedAt: String,
+    @SerialName("expires_at") val expiresAt: String,
+    val visited: List<String> = emptyList(),
+    val status: String = "active", // active | completed | expired
+    @SerialName("completed_at") val completedAt: String? = null,
+)
+
+@Serializable
+data class LimitedBadge(
+    val id: String,
+    val title: String,
+    @SerialName("festival_title") val festivalTitle: String,
+    @SerialName("region_id") val regionId: String? = null,
+    @SerialName("earned_at") val earnedAt: String,
+)
+
+@Serializable
+data class ChallengeUpdate(
+    val challenge: Challenge,
+    @SerialName("just_completed") val justCompleted: Boolean = false,
+    @SerialName("bonus_points") val bonusPoints: Int = 0,
+    val badge: LimitedBadge? = null,
+)
+
+@Serializable
+data class RankRow(
+    val rank: Int,
+    @SerialName("user_id") val userId: String,
+    val nickname: String,
+    val points: Int,
+    @SerialName("is_me") val isMe: Boolean = false,
+)
+
+@Serializable
+data class Leaderboard(
+    val period: String,
+    @SerialName("region_id") val regionId: String? = null,
+    val rows: List<RankRow>,
+    val me: RankRow? = null,
+    @SerialName("gap_to_next") val gapToNext: Int? = null,
+)
+
+@Serializable
+data class RegionMaster(
+    val region: Region,
+    val master: RankRow? = null,
+    @SerialName("my_points") val myPoints: Int = 0,
+    val gap: Int = 0,
+    @SerialName("is_me") val isMe: Boolean = false,
+)
+
+@Serializable
+data class MastersResponse(val period: String, val masters: List<RegionMaster>, @SerialName("my_titles") val myTitles: List<String>)
 
 @Serializable
 data class VisitRequest(val lat: Double, val lon: Double)
@@ -168,7 +237,14 @@ data class VisitResponse(val stamp: Stamp? = null, @SerialName("is_new") val isN
 
 /** 카트라이더식 쇼룸: 대표 차량 + 스탬프로 꾸민 배경/스티커 */
 @Serializable
-data class Showroom(val car: VehicleCard? = null, val background: Region? = null, val stickers: List<Region> = emptyList())
+data class Showroom(
+    val car: VehicleCard? = null,
+    val background: Region? = null,
+    val stickers: List<Region> = emptyList(),
+    @SerialName("background_mastered") val backgroundMastered: Boolean = false,
+    val titles: List<String> = emptyList(),
+    val badges: List<LimitedBadge> = emptyList(),
+)
 
 @Serializable
 data class ShowroomUpdate(

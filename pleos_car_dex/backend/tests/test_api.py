@@ -157,3 +157,54 @@ def test_course_recommend_rule_based(client):
     assert body["candidates_source"] == "mock"
     assert body["est_drive_hours"] > 0 and body["expected_points"] > 0
     assert all(s["content_id"].startswith("mock-") for s in body["stops"])
+
+
+def _course(limited_end="20991231"):
+    stops = [
+        {"content_id": "mock-haeundae", "name": "해운대 해수욕장", "lat": 35.1587, "lon": 129.1604, "kind": "attraction",
+         "region_id": "busan", "reason": "명소"},
+        {"content_id": "mock-fest-busan", "name": "부산 불꽃 축제 (시연용)", "lat": 35.1532, "lon": 129.1186, "kind": "festival",
+         "region_id": "busan", "reason": "축제"},
+    ]
+    return {"title": "부산 바다 코스", "summary": "s", "stops": stops, "est_drive_hours": 1.0, "expected_points": 60,
+            "candidates_source": "mock", "completion_bonus": 60,
+            "limited": {"content_id": "mock-fest-busan", "title": "부산 불꽃 축제 (시연용)", "event_end": limited_end}}
+
+
+def test_course_challenge_and_limited_badge(client):
+    ch = client.post("/api/v1/challenge", json=_course()).json()
+    assert ch["status"] == "active" and ch["visited"] == []
+
+    r1 = client.post("/api/v1/landmarks/mock-haeundae/visit", json={"lat": 35.1588, "lon": 129.1600}).json()
+    assert r1["challenge"]["challenge"]["visited"] == ["mock-haeundae"] and "코스 1/2" in r1["message"]
+
+    r2 = client.post("/api/v1/landmarks/mock-fest-busan/visit", json={"lat": 35.1533, "lon": 129.1187}).json()
+    assert r2["challenge"]["just_completed"] is True and r2["challenge"]["bonus_points"] == 60
+    assert r2["challenge"]["badge"]["festival_title"] == "부산 불꽃 축제 (시연용)"
+    assert client.get("/api/v1/challenge").json()["status"] == "completed"
+
+    syn = {b["name"]: b["points"] for b in client.get("/api/v1/collection").json()["synergy"]["bonuses"]}
+    assert syn["코스 완주"] == 60 and syn["축제 한정"] == 50
+    assert len(client.get("/api/v1/showroom").json()["badges"]) == 1
+
+
+def test_rankings_and_region_master(client):
+    lb = client.get("/api/v1/rankings/weekly").json()
+    assert lb["me"]["points"] == 0 and lb["gap_to_next"] >= 1
+
+    # 부산 마스터(부산갈매기 120점)를 넘어보자: 지역 20 + 히든(명소 25 + 축제 35) + 코스완주 60 + 한정 50 = 190
+    client.post("/api/v1/stamps/visit", json={"lat": 35.18, "lon": 129.08})
+    client.post("/api/v1/challenge", json=_course())
+    client.post("/api/v1/landmarks/mock-haeundae/visit", json={"lat": 35.1588, "lon": 129.1600})
+    client.post("/api/v1/landmarks/mock-fest-busan/visit", json={"lat": 35.1533, "lon": 129.1187})
+
+    masters = {m["region"]["id"]: m for m in client.get("/api/v1/rankings/masters").json()["masters"]}
+    assert masters["busan"]["is_me"] is True and masters["busan"]["my_points"] == 190
+    assert masters["jeju"]["is_me"] is False and masters["jeju"]["gap"] == 161
+
+    busan = client.get("/api/v1/rankings/weekly", params={"region_id": "busan"}).json()
+    assert busan["me"]["rank"] == 1
+
+    client.put("/api/v1/showroom", json={"background_region_id": "busan"})
+    sr = client.get("/api/v1/showroom").json()
+    assert sr["background_mastered"] is True and sr["titles"] == ["부산"]

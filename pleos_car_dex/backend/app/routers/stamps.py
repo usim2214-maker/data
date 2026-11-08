@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends
 
 from app.schemas import StampBook, VisitRequest, VisitResponse
 from app.services import stamps
+from app.services.competition import CompetitionService
+from app.services.deps import get_competition
 from app.services.pipeline import RecognitionPipeline, get_pipeline
 
 router = APIRouter(prefix="/api/v1/stamps", tags=["stamps"])
@@ -14,6 +16,10 @@ def get_stamp_book(pipeline: RecognitionPipeline = Depends(get_pipeline)):
 
 
 @router.post("/visit", response_model=VisitResponse)
-def visit(req: VisitRequest, pipeline: RecognitionPipeline = Depends(get_pipeline)):
+def visit(
+    req: VisitRequest,
+    pipeline: RecognitionPipeline = Depends(get_pipeline),
+    competition: CompetitionService = Depends(get_competition),
+):
     """앱이 Pleos FusedLocation 위치를 주기적으로 보고 -> 새 지역이면 스탬프 획득"""
-    return stamps.record_visit(pipeline.store, req.lat, req.lon)
+    return stamps.record_visit(pipeline.store, req.lat, req.lon, competition)

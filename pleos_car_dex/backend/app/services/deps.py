@@ -2,6 +2,8 @@
 from functools import lru_cache
 
 from app.config import get_settings
+from app.services.challenge import ChallengeService
+from app.services.competition import CompetitionService
 from app.services.courses import CourseService
 from app.services.landmarks import LandmarkService
 from app.services.pipeline import get_pipeline
@@ -14,8 +16,18 @@ def get_tour() -> TourClient:
 
 
 @lru_cache
+def get_competition() -> CompetitionService:
+    return CompetitionService(get_pipeline().store)
+
+
+@lru_cache
+def get_challenge() -> ChallengeService:
+    return ChallengeService(get_pipeline().store, get_competition())
+
+
+@lru_cache
 def get_landmarks() -> LandmarkService:
-    return LandmarkService(get_settings(), get_tour(), get_pipeline().store)
+    return LandmarkService(get_settings(), get_tour(), get_pipeline().store, get_challenge(), get_competition())
 
 
 @lru_cache
@@ -24,5 +36,5 @@ def get_courses() -> CourseService:
 
 
 def clear_all() -> None:
-    for f in (get_tour, get_landmarks, get_courses):
+    for f in (get_tour, get_competition, get_challenge, get_landmarks, get_courses):
         f.cache_clear()

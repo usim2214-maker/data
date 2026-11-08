@@ -33,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.pleos.cardex.data.Challenge
 import com.pleos.cardex.data.CourseStop
 import com.pleos.cardex.data.DriveCourse
 import com.pleos.cardex.data.LandmarkNearby
@@ -50,8 +51,11 @@ fun TravelScreen(
     course: DriveCourse?,
     loading: Boolean,
     landmarks: List<LandmarkNearby>,
+    challenge: Challenge?,
     onRecommend: (Double, String) -> Unit,
-    onNavigate: () -> Unit,
+    onStartChallenge: () -> Unit,
+    onResumeNavigation: () -> Unit,
+    onAbandon: () -> Unit,
 ) {
     var hours by remember { mutableDoubleStateOf(4.0) }
     var note by remember { mutableStateOf("") }
@@ -61,6 +65,7 @@ fun TravelScreen(
             Modifier.weight(1.3f).fillMaxHeight().verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            challenge?.let { ChallengeCard(it, onResumeNavigation, onAbandon) }
             Text("AI 드라이브 코스", style = MaterialTheme.typography.displaySmall)
             Text("아직 없는 지역 스탬프와 지금 열리는 축제를 엮어 드려요", color = Color.Gray)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -78,7 +83,7 @@ fun TravelScreen(
                 }
                 if (loading) CircularProgressIndicator()
             }
-            course?.let { CourseCard(it, onNavigate) }
+            course?.let { CourseCard(it, onStartChallenge) }
         }
 
         Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -92,20 +97,27 @@ fun TravelScreen(
 }
 
 @Composable
-private fun CourseCard(course: DriveCourse, onNavigate: () -> Unit) {
+private fun CourseCard(course: DriveCourse, onStartChallenge: () -> Unit) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(course.title, style = MaterialTheme.typography.headlineMedium)
             Text(course.summary, style = MaterialTheme.typography.bodyLarge)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AssistChip(onClick = {}, label = { Text("운전 약 ${course.estDriveHours}시간") })
-                AssistChip(onClick = {}, label = { Text("예상 +${course.expectedPoints}점") })
+                AssistChip(onClick = {}, label = { Text("스탬프 +${course.expectedPoints}") })
+                AssistChip(onClick = {}, label = { Text("🏁 완주 +${course.completionBonus}") })
                 if (course.candidatesSource == "mock") AssistChip(onClick = {}, label = { Text("시연 데이터") })
+            }
+            course.limited?.let { lim ->
+                Text(
+                    "🎖️ 축제 한정: '${lim.title}' 기간(~${lim.eventEnd.drop(4).chunked(2).joinToString("/")}) 안에 완주하면 한정 배지 +50",
+                    color = Color(0xFFFF7043), style = MaterialTheme.typography.bodyLarge,
+                )
             }
             course.stops.forEachIndexed { i, s -> StopRow(i + 1, s) }
             if (course.stops.size > 3) Text("※ 내비에는 앞의 3곳까지 경로로 보냅니다", color = Color.Gray)
-            FilledTonalButton(onClick = onNavigate, enabled = course.stops.isNotEmpty(), modifier = Modifier.height(64.dp)) {
-                Text("🧭 Pleos 내비로 길안내", style = MaterialTheme.typography.labelLarge)
+            FilledTonalButton(onClick = onStartChallenge, enabled = course.stops.isNotEmpty(), modifier = Modifier.height(64.dp)) {
+                Text("🏁 챌린지 시작 + Pleos 길안내", style = MaterialTheme.typography.labelLarge)
             }
         }
     }
@@ -141,5 +153,36 @@ private fun LandmarkRow(item: LandmarkNearby) {
             )
         }
         Text(if (item.collected) "획득" else "+${item.points}", color = MaterialTheme.colorScheme.secondary)
+    }
+}
+
+/** 진행 중/완료된 코스 챌린지 */
+@Composable
+private fun ChallengeCard(ch: Challenge, onResume: () -> Unit, onAbandon: () -> Unit) {
+    val total = ch.course.stops.size
+    val done = ch.visited.size
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            val head = when (ch.status) {
+                "completed" -> "🏁 완주! ${ch.course.title}"
+                "expired" -> "⌛ 시간 초과 — ${ch.course.title}"
+                else -> "진행 중 챌린지 · ${ch.course.title}"
+            }
+            Text(head, style = MaterialTheme.typography.headlineMedium)
+            androidx.compose.material3.LinearProgressIndicator(
+                progress = { if (total == 0) 0f else done / total.toFloat() },
+                modifier = Modifier.fillMaxWidth().height(10.dp),
+            )
+            Text("$done / $total 곳 방문 · 완주 보너스 +${ch.course.completionBonus}", style = MaterialTheme.typography.bodyLarge)
+            ch.course.stops.forEach { s ->
+                Text((if (s.contentId in ch.visited) "✅ " else "⬜ ") + s.name, style = MaterialTheme.typography.bodyLarge)
+            }
+            if (ch.status == "active") {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(onClick = onResume) { Text("남은 곳 길안내") }
+                    androidx.compose.material3.TextButton(onClick = onAbandon) { Text("포기") }
+                }
+            }
+        }
     }
 }

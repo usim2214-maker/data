@@ -1,0 +1,11 @@
+{
+  "_comment": "시연용 가상 경쟁자. 실제 서비스에서는 사용자 계정별 점수 원장으로 대체한다. monthly = 이번 달 지역별 여행 점수, weekly_ratio = 그중 이번 주 비율.",
+  "rivals": [
+    {"user_id": "rival-1", "nickname": "강원도드라이버", "weekly_ratio": 0.5, "monthly": {"gangwon": 140, "gyeonggi": 40, "seoul": 20}},
+    {"user_id": "rival-2", "nickname": "부산갈매기", "weekly_ratio": 0.4, "monthly": {"busan": 120, "ulsan": 45, "gyeongnam": 60}},
+    {"user_id": "rival-3", "nickname": "전국일주중", "weekly_ratio": 0.6, "monthly": {"jeonnam": 70, "jeonbuk": 50, "gwangju": 30, "chungnam": 35, "gyeongbuk": 40}},
+    {"user_id": "rival-4", "nickname": "제주감귤러", "weekly_ratio": 0.3, "monthly": {"jeju": 160}},
+    {"user_id": "rival-5", "nickname": "주말캠핑족", "weekly_ratio": 0.7, "monthly": {"chungbuk": 55, "gangwon": 60, "gyeongbuk": 35}},
+    {"user_id": "rival-6", "nickname": "서울출퇴근러", "weekly_ratio": 0.8, "monthly": {"seoul": 30, "incheon": 25, "gyeonggi": 30}}
+  ]
+}

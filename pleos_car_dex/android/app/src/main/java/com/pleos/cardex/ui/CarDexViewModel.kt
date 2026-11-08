@@ -6,7 +6,10 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.pleos.cardex.BuildConfig
 import com.pleos.cardex.data.CarDexRepository
+import com.pleos.cardex.data.Challenge
 import com.pleos.cardex.data.CollectionEntry
+import com.pleos.cardex.data.Leaderboard
+import com.pleos.cardex.data.MastersResponse
 import com.pleos.cardex.data.DriveCourse
 import com.pleos.cardex.data.GeoPoint
 import com.pleos.cardex.data.LandmarkNearby
@@ -51,6 +54,10 @@ data class UiState(
     val landmarks: List<LandmarkNearby> = emptyList(),
     val course: DriveCourse? = null,
     val courseLoading: Boolean = false,
+    val challenge: Challenge? = null,
+    val weekly: Leaderboard? = null,
+    val rankingRegionId: String? = null,
+    val masters: MastersResponse? = null,
     val error: String? = null,
 )
 
@@ -75,6 +82,8 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
         loadPreferences()
         loadShowroom()
         loadStamps()
+        loadChallenge()
+        loadRankings()
     }
 
     /** Pleos 위치 권한 결과를 받은 뒤 호출. SDK 미지원/권한 거부 시 목업 위치로 대체 */
@@ -154,7 +163,7 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
             runCatching { repo.visit(location) }.onSuccess { r ->
                 if (r.isNew) {
                     _state.update { it.copy(notice = r.message) }
-                    loadStamps()
+                    loadStamps(); loadRankings()
                 }
             }
         }
@@ -181,19 +190,33 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             runCatching { repo.landmarksNearby(at) }.onSuccess { list ->
                 _state.update { it.copy(landmarks = list) }
-                val targets = list.filterNot { it.collected }.take(MAX_PROXIMITY_ALERTS).map {
-                    LandmarkTarget(it.attraction.contentId, it.attraction.title, it.attraction.lat, it.attraction.lon, LANDMARK_RADIUS_M)
-                }
-                provider?.watchLandmarks(targets) { t -> visitLandmark(t.id) }
+                registerProximity()
             }
         }
     }
 
+    /** 근접 알림 대상 = 미획득 주변 명소 + 진행 중인 챌린지 코스의 남은 장소 */
+    private fun proximityTargets(): List<LandmarkTarget> {
+        val s = _state.value
+        val landmarks = s.landmarks.filterNot { it.collected }.map {
+            LandmarkTarget(it.attraction.contentId, it.attraction.title, it.attraction.lat, it.attraction.lon, LANDMARK_RADIUS_M)
+        }
+        val ch = s.challenge?.takeIf { it.status == "active" }
+        val stops = ch?.course?.stops.orEmpty().filterNot { it.contentId in ch!!.visited }.map {
+            LandmarkTarget(it.contentId, it.name, it.lat, it.lon, LANDMARK_RADIUS_M)
+        }
+        return (stops + landmarks).distinctBy { it.id }.take(MAX_PROXIMITY_ALERTS)
+    }
+
+    private fun registerProximity() {
+        provider?.watchLandmarks(proximityTargets()) { t -> visitLandmark(t.id) }
+    }
+
     /** Pleos 근접 알림이 없는 환경(목업 등)을 위한 거리 판정. 서버가 중복을 걸러준다. */
     private fun checkLandmarkDistance(at: GeoPoint) {
-        _state.value.landmarks
-            .filter { !it.collected && distanceM(at, GeoPoint(it.attraction.lat, it.attraction.lon)) <= LANDMARK_RADIUS_M }
-            .forEach { visitLandmark(it.attraction.contentId) }
+        proximityTargets()
+            .filter { distanceM(at, GeoPoint(it.lat, it.lon)) <= it.radiusMeters }
+            .forEach { visitLandmark(it.id) }
     }
 
     private fun visitLandmark(id: String) {
@@ -201,6 +224,11 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
         if (!visiting.add(id)) return
         viewModelScope.launch {
             runCatching { repo.visitLandmark(id, at) }.onSuccess { r ->
+                r.challenge?.let { u ->
+                    _state.update { it.copy(challenge = u.challenge, notice = r.message) }
+                    registerProximity()
+                    if (u.justCompleted) { loadRankings(); loadShowroom(); refreshCollection() }
+                }
                 if (r.isNew) {
                     _state.update { s ->
                         s.copy(
@@ -208,7 +236,7 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
                             landmarks = s.landmarks.map { if (it.attraction.contentId == id) it.copy(collected = true) else it },
                         )
                     }
-                    loadStamps(); refreshCollection()
+                    loadStamps(); refreshCollection(); loadRankings()
                 }
             }
             visiting.remove(id)
@@ -229,12 +257,46 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** 추천 코스를 Pleos 내비게이션으로 길안내 */
-    fun startNavigation() {
-        val stops = _state.value.course?.stops.orEmpty()
-        if (stops.isEmpty()) return
-        navi.navigate(stops)
-        _state.update { it.copy(notice = "🧭 Pleos 내비로 '${stops.last().name}' 길안내를 요청했어요") }
+    /** 추천 코스로 완주 챌린지를 시작하고 Pleos 내비게이션 길안내 */
+    fun startChallengeAndNavigate() {
+        val course = _state.value.course ?: return
+        if (course.stops.isEmpty()) return
+        viewModelScope.launch {
+            runCatching { repo.startChallenge(course) }
+                .onSuccess { ch ->
+                    _state.update { it.copy(challenge = ch, notice = "🏁 챌린지 시작! 완주하면 +${course.completionBonus}") }
+                    registerProximity()
+                    navi.navigate(ch.course.stops.filterNot { it.contentId in ch.visited })
+                }
+                .onFailure { e -> _state.update { it.copy(error = "챌린지 시작 실패: ${e.message}") } }
+        }
+    }
+
+    /** 진행 중인 챌린지의 남은 장소로 다시 길안내 */
+    fun resumeNavigation() {
+        val ch = _state.value.challenge ?: return
+        navi.navigate(ch.course.stops.filterNot { it.contentId in ch.visited })
+    }
+
+    fun abandonChallenge() {
+        viewModelScope.launch {
+            runCatching { repo.abandonChallenge() }.onSuccess { _state.update { it.copy(challenge = null) }; registerProximity() }
+        }
+    }
+
+    private fun loadChallenge() {
+        viewModelScope.launch {
+            runCatching { repo.challenge() }.onSuccess { ch -> _state.update { it.copy(challenge = ch) } }
+        }
+    }
+
+    // ---------------- 랭킹 / 지역 마스터 ----------------
+    fun loadRankings(regionId: String? = _state.value.rankingRegionId) {
+        viewModelScope.launch {
+            runCatching { repo.weeklyRanking(regionId) }
+                .onSuccess { lb -> _state.update { it.copy(weekly = lb, rankingRegionId = regionId) } }
+            runCatching { repo.masters() }.onSuccess { m -> _state.update { it.copy(masters = m) } }
+        }
     }
 
     // ---------------- 쇼룸 ----------------

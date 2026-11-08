@@ -6,7 +6,17 @@ from pathlib import Path
 
 from datetime import timedelta
 
-from app.schemas import CollectionEntry, GeoPoint, HiddenStamp, Preferences, ShowroomUpdate, VehicleCard
+from app.schemas import (
+    Challenge,
+    CollectionEntry,
+    GeoPoint,
+    HiddenStamp,
+    LimitedBadge,
+    PointEvent,
+    Preferences,
+    ShowroomUpdate,
+    VehicleCard,
+)
 
 
 class JsonStore:
@@ -17,6 +27,9 @@ class JsonStore:
         self._showroom_path = data_dir / "showroom.json"
         self._stamps_path = data_dir / "stamps.json"
         self._hidden_path = data_dir / "hidden_stamps.json"
+        self._events_path = data_dir / "point_events.json"
+        self._challenge_path = data_dir / "challenge.json"
+        self._badges_path = data_dir / "badges.json"
         data_dir.mkdir(parents=True, exist_ok=True)
 
     # ---- preferences ----
@@ -95,8 +108,10 @@ class JsonStore:
             return json.loads(self._stamps_path.read_text(encoding="utf-8"))
         return {}
 
-    def visit(self, region_id: str) -> tuple[dict, bool]:
+    def visit(self, region_id: str) -> tuple[dict, bool, bool]:
+        """반환: (기록, 첫 방문 여부, 재방문으로 카운트됐는지)"""
         now = datetime.now(timezone.utc)
+        revisit = False
         with self._lock:
             stamps = self.get_stamps()
             rec = stamps.get(region_id)
@@ -106,9 +121,10 @@ class JsonStore:
             elif now - datetime.fromisoformat(rec["last_visited_at"]) >= self.REVISIT_GAP:
                 rec["visit_count"] += 1
                 rec["last_visited_at"] = now.isoformat()
+                revisit = True
             stamps[region_id] = rec
             self._stamps_path.write_text(json.dumps(stamps, ensure_ascii=False, indent=2), encoding="utf-8")
-        return rec, is_new
+        return rec, is_new, revisit
 
     # ---- 히든 스탬프 (TourAPI 명소/축제 방문) ----
     def get_hidden(self) -> dict[str, HiddenStamp]:
@@ -126,3 +142,43 @@ class JsonStore:
             payload = {k: v.model_dump(mode="json") for k, v in hidden.items()}
             self._hidden_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         return stamp, True
+
+    # ---- 여행 점수 원장 (랭킹/마스터) ----
+    def get_events(self) -> list[PointEvent]:
+        if not self._events_path.exists():
+            return []
+        return [PointEvent.model_validate(e) for e in json.loads(self._events_path.read_text(encoding="utf-8"))]
+
+    def add_event(self, event: PointEvent) -> None:
+        with self._lock:
+            events = self.get_events() + [event]
+            payload = [e.model_dump(mode="json") for e in events]
+            self._events_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    # ---- 코스 챌린지 ----
+    def get_challenge(self) -> Challenge | None:
+        if not self._challenge_path.exists():
+            return None
+        return Challenge.model_validate_json(self._challenge_path.read_text(encoding="utf-8"))
+
+    def save_challenge(self, challenge: Challenge | None) -> None:
+        with self._lock:
+            if challenge is None:
+                self._challenge_path.unlink(missing_ok=True)
+            else:
+                self._challenge_path.write_text(challenge.model_dump_json(indent=2), encoding="utf-8")
+
+    # ---- 축제 한정 배지 ----
+    def get_badges(self) -> list[LimitedBadge]:
+        if not self._badges_path.exists():
+            return []
+        return [LimitedBadge.model_validate(b) for b in json.loads(self._badges_path.read_text(encoding="utf-8"))]
+
+    def add_badge(self, badge: LimitedBadge) -> bool:
+        with self._lock:
+            badges = self.get_badges()
+            if any(b.id == badge.id for b in badges):
+                return False
+            payload = [b.model_dump(mode="json") for b in badges + [badge]]
+            self._badges_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        return True

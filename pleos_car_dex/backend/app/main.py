@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
-from app.routers import collection, courses, landmarks, preferences, recognize, showroom, stamps
+from app.routers import challenge, collection, courses, landmarks, preferences, rankings, recognize, showroom, stamps
 
 logging.basicConfig(level=logging.INFO)
 
@@ -20,6 +20,8 @@ app.include_router(showroom.router)
 app.include_router(stamps.router)
 app.include_router(landmarks.router)
 app.include_router(courses.router)
+app.include_router(challenge.router)
+app.include_router(rankings.router)
 app.mount("/static/crops", StaticFiles(directory=settings.crops_dir), name="crops")
 
 

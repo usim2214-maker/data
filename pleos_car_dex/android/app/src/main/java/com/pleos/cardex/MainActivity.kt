@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
@@ -39,6 +40,7 @@ import com.pleos.cardex.ui.CarDexViewModel
 import com.pleos.cardex.ui.screens.CollectionScreen
 import com.pleos.cardex.ui.screens.KeywordSettingsScreen
 import com.pleos.cardex.ui.screens.ScanScreen
+import com.pleos.cardex.ui.screens.RankingScreen
 import com.pleos.cardex.ui.screens.ShowroomScreen
 import com.pleos.cardex.ui.screens.TravelScreen
 import com.pleos.cardex.ui.theme.CarDexTheme
@@ -48,6 +50,7 @@ private enum class Dest(val route: String, val label: String, val icon: ImageVec
     Collection("collection", "도감", Icons.Filled.CollectionsBookmark),
     Showroom("showroom", "쇼룸", Icons.Filled.DirectionsCar),
     Travel("travel", "여행", Icons.Filled.Map),
+    Ranking("ranking", "랭킹", Icons.Filled.EmojiEvents),
     Settings("settings", "키워드", Icons.Filled.Tune),
 }
 
@@ -113,8 +116,21 @@ class MainActivity : ComponentActivity() {
                                     course = state.course,
                                     loading = state.courseLoading,
                                     landmarks = state.landmarks,
+                                    challenge = state.challenge,
                                     onRecommend = vm::recommendCourse,
-                                    onNavigate = vm::startNavigation,
+                                    onStartChallenge = vm::startChallengeAndNavigate,
+                                    onResumeNavigation = vm::resumeNavigation,
+                                    onAbandon = vm::abandonChallenge,
+                                )
+                            }
+                            composable(Dest.Ranking.route) {
+                                RankingScreen(
+                                    weekly = state.weekly,
+                                    masters = state.masters,
+                                    currentRegion = state.masters?.masters?.map { it.region }?.let { regions ->
+                                        state.driving?.location?.let { loc -> regions.minByOrNull { r -> (r.lat - loc.lat) * (r.lat - loc.lat) + (r.lon - loc.lon) * (r.lon - loc.lon) } }
+                                    },
+                                    onLoad = { vm.loadRankings(it) },
                                 )
                             }
                             composable(Dest.Settings.route) { KeywordSettingsScreen(state.keywords, vm::saveKeywords) }

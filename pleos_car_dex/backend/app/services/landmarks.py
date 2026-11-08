@@ -21,8 +21,9 @@ def points_for(a: Attraction) -> int:
 
 
 class LandmarkService:
-    def __init__(self, settings: Settings, tour: TourClient, store: JsonStore):
+    def __init__(self, settings: Settings, tour: TourClient, store: JsonStore, challenge=None, competition=None):
         self.settings, self.tour, self.store = settings, tour, store
+        self.challenge, self.competition = challenge, competition
 
     def _candidates(self, lat: float, lon: float, radius_m: int) -> list[Attraction]:
         festivals = [f for f in self.tour.festivals(date.today(), within_days=0) if distance_m(lat, lon, f.lat, f.lon) <= radius_m]
@@ -44,6 +45,12 @@ class LandmarkService:
     def visit(self, content_id: str, lat: float, lon: float) -> LandmarkVisitResponse:
         limit = self.settings.landmark_radius_m
         target = next((a for a in self._candidates(lat, lon, max(limit * 4, 2_000)) if a.content_id == content_id), None)
+        if target is None and self.challenge and (ch := self.challenge.current()):
+            # 챌린지 코스 장소는 명소 목록 갱신 시점과 무관하게 인정
+            stop = next((s for s in ch.course.stops if s.content_id == content_id), None)
+            if stop:
+                target = Attraction(content_id=stop.content_id, title=stop.name, lat=stop.lat, lon=stop.lon,
+                                    kind=stop.kind, region_id=stop.region_id)
         if target is None:
             return LandmarkVisitResponse(acquired=False, message="주변에서 해당 명소를 찾지 못했어요.")
         dist = distance_m(lat, lon, target.lat, target.lon)
@@ -53,4 +60,16 @@ class LandmarkService:
             HiddenStamp(attraction=target, acquired_at=datetime.now(timezone.utc), points=points_for(target))
         )
         msg = f"✨ 히든 스탬프 '{target.title}' 획득! +{stamp.points}" if is_new else f"{target.title} — 이미 획득한 히든 스탬프"
-        return LandmarkVisitResponse(acquired=True, is_new=is_new, stamp=stamp, message=msg)
+        if is_new and self.competition:
+            self.competition.record(stamp.points, target.region_id, "hidden_stamp", target.title)
+
+        progress = self.challenge.on_visit(target.content_id) if self.challenge else None
+        if progress:
+            ch = progress.challenge
+            if progress.just_completed:
+                msg = f"🏁 코스 완주! +{progress.bonus_points}"
+                if progress.badge:
+                    msg += f" · 🎖️ 한정 배지 '{progress.badge.title}'"
+            else:
+                msg += f" · 코스 {len(ch.visited)}/{len(ch.course.stops)}"
+        return LandmarkVisitResponse(acquired=True, is_new=is_new, stamp=stamp, message=msg, challenge=progress)

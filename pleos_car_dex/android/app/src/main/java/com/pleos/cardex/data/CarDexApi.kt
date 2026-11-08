@@ -59,6 +59,21 @@ interface CarDexApi {
     @POST("api/v1/courses/recommend")
     suspend fun recommendCourse(@Body req: CourseRequest): DriveCourse
 
+    @POST("api/v1/challenge")
+    suspend fun startChallenge(@Body course: DriveCourse): Challenge
+
+    @GET("api/v1/challenge")
+    suspend fun challenge(): Challenge?
+
+    @DELETE("api/v1/challenge")
+    suspend fun abandonChallenge()
+
+    @GET("api/v1/rankings/weekly")
+    suspend fun weeklyRanking(@retrofit2.http.Query("region_id") regionId: String? = null): Leaderboard
+
+    @GET("api/v1/rankings/masters")
+    suspend fun masters(): MastersResponse
+
     @GET("api/v1/preferences")
     suspend fun preferences(): Preferences
 

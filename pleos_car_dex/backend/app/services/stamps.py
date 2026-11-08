@@ -17,11 +17,18 @@ def _stamp(region, rec: dict | None) -> Stamp:
     )
 
 
-def record_visit(store: JsonStore, lat: float, lon: float) -> VisitResponse:
+def record_visit(store: JsonStore, lat: float, lon: float, competition=None) -> VisitResponse:
     region = regions.locate(lat, lon)
     if region is None:
         return VisitResponse(message="스탬프 지역 밖이에요.")
-    rec, is_new = store.visit(region.id)
+    rec, is_new, revisit = store.visit(region.id)
+    if competition is not None:  # 랭킹·지역 마스터용 원장 기록 (synergy 의 재방문 상한과 동일하게)
+        from app.services.synergy import REVISIT_CAP, REVISIT_POINTS
+
+        if is_new:
+            competition.record(region.travel_points, region.id, "region_stamp", region.name)
+        elif revisit and (rec["visit_count"] - 1) * REVISIT_POINTS <= REVISIT_CAP:
+            competition.record(REVISIT_POINTS, region.id, "revisit", region.name)
     return VisitResponse(
         stamp=_stamp(region, rec),
         is_new=is_new,

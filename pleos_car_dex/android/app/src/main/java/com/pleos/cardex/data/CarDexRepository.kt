@@ -28,6 +28,11 @@ class CarDexRepository(private val api: CarDexApi = CarDexApi.create()) {
     suspend fun visitLandmark(id: String, at: GeoPoint) = api.visitLandmark(id, VisitRequest(at.lat, at.lon))
     suspend fun recommendCourse(at: GeoPoint, maxHours: Double, note: String) =
         api.recommendCourse(CourseRequest(at.lat, at.lon, maxHours, note))
+    suspend fun startChallenge(course: DriveCourse) = api.startChallenge(course)
+    suspend fun challenge() = api.challenge()
+    suspend fun abandonChallenge() = api.abandonChallenge()
+    suspend fun weeklyRanking(regionId: String?) = api.weeklyRanking(regionId)
+    suspend fun masters() = api.masters()
     suspend fun preferences() = api.preferences()
     suspend fun savePreferences(prefs: Preferences) = api.savePreferences(prefs)
 }

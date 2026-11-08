@@ -77,6 +77,14 @@ fun ShowroomScreen(
             Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            if (showroom.titles.isNotEmpty()) {
+                Text("👑 ${showroom.titles.joinToString(" · ") { "$it 마스터" }}", style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.secondary)
+            }
+            if (showroom.badges.isNotEmpty()) {
+                Section("🎖️ 축제 한정 배지")
+                showroom.badges.forEach { b -> Text("🎖️ ${b.title}", style = MaterialTheme.typography.bodyLarge) }
+            }
             Section("대표 차량")
             if (collection.isEmpty()) Text("도감에서 차량을 먼저 획득하세요", color = Color.Gray)
             LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -149,6 +157,14 @@ private fun ShowroomStage(showroom: Showroom, modifier: Modifier) {
     val brush = Brush.verticalGradient(bg?.colors?.map(::hex) ?: listOf(Color(0xFF1F2937), Color(0xFF0D1117)))
 
     Box(modifier.clip(RoundedCornerShape(28.dp)).background(brush)) {
+        // 이번 달 이 지역 마스터면 왕관·깃발
+        if (showroom.backgroundMastered && bg != null) {
+            Text(
+                "🚩👑 ${bg.name} 마스터",
+                color = Color.White, style = MaterialTheme.typography.headlineMedium,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(20.dp),
+            )
+        }
         // 배경 랜드마크
         bg?.let {
             Text(it.emoji, fontSize = 160.sp, modifier = Modifier.align(Alignment.TopEnd).padding(24.dp).alpha(0.35f))

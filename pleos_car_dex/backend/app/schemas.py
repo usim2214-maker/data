@@ -164,6 +164,7 @@ class LandmarkVisitResponse(BaseModel):
     is_new: bool = False
     stamp: HiddenStamp | None = None
     message: str = ""
+    challenge: "ChallengeUpdate | None" = None
 
 
 class StampBook(BaseModel):
@@ -194,6 +195,14 @@ class CourseStop(BaseModel):
     new_hidden_stamp: bool = False
 
 
+class LimitedEvent(BaseModel):
+    """축제 한정 코스: 축제 기간 안에 완주하면 한정 배지"""
+
+    content_id: str
+    title: str
+    event_end: str  # YYYYMMDD
+
+
 class DriveCourse(BaseModel):
     title: str
     summary: str
@@ -201,6 +210,77 @@ class DriveCourse(BaseModel):
     est_drive_hours: float  # 서버 계산 (직선거리 기반 추정)
     expected_points: int  # 서버 계산
     candidates_source: str  # tourapi | mock
+    limited: LimitedEvent | None = None
+    completion_bonus: int = 0  # 완주 시 추가 점수 (서버 계산)
+
+
+# ---------------- 경쟁: 코스 챌린지 / 랭킹 / 지역 마스터 / 한정 배지 ----------------
+class Challenge(BaseModel):
+    course: DriveCourse
+    started_at: datetime
+    expires_at: datetime
+    visited: list[str] = []  # 방문한 stop content_id
+    status: str = "active"  # active | completed | expired
+    completed_at: datetime | None = None
+
+
+class LimitedBadge(BaseModel):
+    id: str  # "{content_id}-{year}"
+    title: str  # 예: "2026 진주 남강 유등 축제 완주"
+    festival_title: str
+    region_id: str | None = None
+    earned_at: datetime
+
+
+class PointEvent(BaseModel):
+    """여행 점수 원장 (랭킹·지역 마스터 계산용)"""
+
+    user_id: str
+    nickname: str
+    points: int
+    region_id: str | None = None
+    kind: str  # region_stamp | revisit | hidden_stamp | course_complete | limited_badge
+    label: str = ""
+    at: datetime
+
+
+class RankRow(BaseModel):
+    rank: int
+    user_id: str
+    nickname: str
+    points: int
+    is_me: bool = False
+
+
+class Leaderboard(BaseModel):
+    period: str  # 예: "2026-W45"
+    region_id: str | None = None
+    rows: list[RankRow]
+    me: RankRow | None = None
+    gap_to_next: int | None = None  # 바로 윗 순위까지 남은 점수
+
+
+class RegionMaster(BaseModel):
+    region: Region
+    master: RankRow | None = None
+    my_points: int = 0
+    gap: int = 0  # 마스터가 되기까지 필요한 점수 (내가 마스터면 0)
+    is_me: bool = False
+
+
+class MastersResponse(BaseModel):
+    period: str  # 예: "2026-11"
+    masters: list[RegionMaster]
+    my_titles: list[str]  # 내가 마스터인 지역 이름
+
+
+class ChallengeUpdate(BaseModel):
+    """명소 방문 시 챌린지 진행 상황"""
+
+    challenge: Challenge
+    just_completed: bool = False
+    bonus_points: int = 0
+    badge: LimitedBadge | None = None
 
 
 class LLMCoursePick(BaseModel):
@@ -232,6 +312,9 @@ class Showroom(BaseModel):
     car: VehicleCard | None = None
     background: Region | None = None
     stickers: list[Region] = []
+    background_mastered: bool = False  # 배경 지역의 이번 달 마스터면 왕관·깃발 표시
+    titles: list[str] = []  # 내가 마스터인 지역들
+    badges: list["LimitedBadge"] = []  # 축제 한정 배지 (트로피 진열)
 
 
 class ShowroomUpdate(BaseModel):
@@ -241,3 +324,5 @@ class ShowroomUpdate(BaseModel):
 
 
 CollectionResponse.model_rebuild()
+LandmarkVisitResponse.model_rebuild()
+Showroom.model_rebuild()

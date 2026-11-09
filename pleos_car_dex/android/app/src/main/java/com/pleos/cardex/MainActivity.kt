@@ -1,6 +1,24 @@
 package com.pleos.cardex
 
 import android.os.Bundle
+import androidx.compose.runtime.remember
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.launch
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Animatable
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material3.rememberDrawerState
+import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Home
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -20,8 +38,6 @@ import androidx.compose.material.icons.filled.Quiz
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationRail
-import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
@@ -53,7 +69,8 @@ import com.pleos.cardex.ui.screens.ShowroomScreen
 import com.pleos.cardex.ui.screens.TravelScreen
 import com.pleos.cardex.ui.theme.CarDexTheme
 
-private enum class Dest(val route: String, val label: String, val icon: ImageVector) {
+internal enum class Dest(val route: String, val label: String, val icon: ImageVector) {
+    Home("home", "홈", Icons.Filled.Home), // 메인: 내 쇼룸 + 내비 검색·추천
     Collection("collection", "도감", Icons.Filled.CollectionsBookmark), // 메인: 주행 중 마주친 차량 카드 수집
     Scan("scan", "수집", Icons.Filled.CameraAlt), // YOLOv8 인식 -> 차량 정보 카드 (영상 입력 경로는 차량 영상 API 공개 시 연결)
     Quiz("quiz", "퀴즈", Icons.Filled.Quiz), // 아이용 차 맞히기
@@ -71,6 +88,7 @@ class MainActivity : ComponentActivity() {
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
             vm.startLocation(result[PLEOS_LOCATION_PERMISSION] == true)
             vm.startGear(result[PLEOS_GEAR_PERMISSION] == true)
+            vm.loadNaviPlaces()
         }
 
     private fun requestPleosPermissions() =
@@ -84,10 +102,24 @@ class MainActivity : ComponentActivity() {
                 val state by vm.state.collectAsStateWithLifecycle()
                 val nav = rememberNavController()
                 val current = nav.currentBackStackEntryAsState().value?.destination?.route
+                val drawer = rememberDrawerState(DrawerValue.Closed)
+                val scope = rememberCoroutineScope()
+                // 시작 화면(그림 한 장): 최소 1.2초, 첫 데이터가 오면 최대 2.5초 안에 넘어감
+                var showSplash by rememberSaveable { mutableStateOf(true) }
+                val splashProgress = remember { Animatable(0f) }
+                LaunchedEffect(Unit) {
+                    if (!showSplash) return@LaunchedEffect
+                    splashProgress.animateTo(0.7f, tween(1_200))
+                    withTimeoutOrNull(1_300) { snapshotFlow { vm.state.value.home }.first { it != null } }
+                    splashProgress.animateTo(1f, tween(200))
+                    showSplash = false
+                }
 
                 Surface(Modifier.fillMaxSize()) {
                     // 차량 가로형 디스플레이: 좌측 내비게이션 레일
-                    if (!state.onboardingDone) {
+                    if (showSplash) {
+                        com.pleos.cardex.ui.screens.SplashScreen(progress = splashProgress.value)
+                    } else if (!state.onboardingDone) {
                         OnboardingScreen(onFinish = { vm.finishOnboarding(); requestPleosPermissions() })
                     } else if (state.isDriving) {
                         Box(Modifier.fillMaxSize()) {
@@ -99,23 +131,36 @@ class MainActivity : ComponentActivity() {
                                 onExitSimulation = if (state.drivingSource == "시연 전환") ({ vm.simulateDriving(null) }) else null,
                             )
                         }
-                    } else Row {
-                        NavigationRail {
-                            Dest.entries.forEach { d ->
-                                NavigationRailItem(
-                                    selected = current == d.route,
-                                    onClick = { nav.navigate(d.route) { launchSingleTop = true; popUpTo(Dest.Collection.route) } },
-                                    icon = { Icon(d.icon, d.label) },
-                                    label = { Text(d.label) },
+                    } else ModalNavigationDrawer(
+                        drawerState = drawer,
+                        drawerContent = {
+                            AppDrawer(current) { d ->
+                                scope.launch { drawer.close() }
+                                nav.navigate(d.route) { launchSingleTop = true; popUpTo(Dest.Home.route) }
+                            }
+                        },
+                    ) {
+                        Box(Modifier.fillMaxSize()) {
+                        // 메뉴 화면 공통: 상단 ☰ · 제목 · 홈
+                        fun androidx.navigation.NavGraphBuilder.screen(d: Dest, content: @androidx.compose.runtime.Composable () -> Unit) =
+                            composable(d.route) {
+                                SubScreen(d.label, onMenu = { scope.launch { drawer.open() } }, onHome = { nav.popBackStack(Dest.Home.route, inclusive = false) }) { content() }
+                            }
+                        NavHost(nav, startDestination = Dest.Home.route) {
+                            composable(Dest.Home.route) {
+                                com.pleos.cardex.ui.screens.HomeScreen(
+                                    state = state,
+                                    onMenu = { scope.launch { drawer.open() } },
+                                    onSearch = vm::searchPlace,
+                                    onPlace = vm::goToPlace,
+                                    onVoice = vm::listenVoice,
+                                    onOpen = { route -> nav.navigate(route) { launchSingleTop = true; popUpTo(Dest.Home.route) } },
                                 )
                             }
-                        }
-                        Box(Modifier.fillMaxSize()) {
-                        NavHost(nav, startDestination = Dest.Collection.route) {
-                            composable(Dest.Scan.route) {
+                            screen(Dest.Scan) {
                                 ScanScreen(state, vm.videoPositionMs, vm::scanOnce) { vm.toggleAutoScan() }
                             }
-                            composable(Dest.Collection.route) {
+                            screen(Dest.Collection) {
                                 CollectionScreen(
                                     entries = state.collection,
                                     synergy = state.synergy,
@@ -128,10 +173,10 @@ class MainActivity : ComponentActivity() {
                                     home = state.home,
                                 )
                             }
-                            composable(Dest.Quiz.route) {
+                            screen(Dest.Quiz) {
                                 com.pleos.cardex.ui.screens.QuizScreen(state, vm::nextQuiz, vm::answerQuiz, vm::listenVoice)
                             }
-                            composable(Dest.Showroom.route) {
+                            screen(Dest.Showroom) {
                                 ShowroomScreen(
                                     showroom = state.showroom,
                                     collection = state.collection,
@@ -147,7 +192,7 @@ class MainActivity : ComponentActivity() {
                                     onRemoveProp = vm::removeProp,
                                 )
                             }
-                            composable(Dest.Travel.route) {
+                            screen(Dest.Travel) {
                                 TravelScreen(
                                     course = state.course,
                                     loading = state.courseLoading,
@@ -163,7 +208,7 @@ class MainActivity : ComponentActivity() {
                                     home = state.home,
                                 )
                             }
-                            composable(Dest.Ranking.route) {
+                            screen(Dest.Ranking) {
                                 RankingScreen(
                                     weekly = state.weekly,
                                     masters = state.masters,
@@ -173,7 +218,7 @@ class MainActivity : ComponentActivity() {
                                     onLoad = { vm.loadRankings(it) },
                                 )
                             }
-                            composable(Dest.Settings.route) {
+                            screen(Dest.Settings) {
                                 SettingsScreen(
                                     keywords = state.keywords,
                                     voiceOn = state.voiceOn,
@@ -243,3 +288,43 @@ private val PLEOS_NAVI_PERMISSIONS = arrayOf(
     "pleos.car.permission.STT_SERVICE", // 음성 명령
     "android.permission.RECORD_AUDIO",
 )
+
+/** ☰ 메뉴: 홈 외의 모든 기능 */
+@androidx.compose.runtime.Composable
+internal fun AppDrawer(current: String?, onSelect: (Dest) -> Unit) {
+    ModalDrawerSheet(drawerContainerColor = Color(0xFF111827)) {
+        Text("CarDex", color = Color.White, fontSize = 30.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Black, modifier = Modifier.padding(24.dp))
+        val sub = mapOf(
+            Dest.Home to "내 쇼룸 · 길찾기", Dest.Collection to "모은 차 카드 · 28종", Dest.Scan to "지나가는 차 인식",
+            Dest.Quiz to "아이와 차 맞히기", Dest.Showroom to "대표 차·배경 꾸미기", Dest.Travel to "AI 코스 · 스탬프",
+            Dest.Ranking to "주간 랭킹 · 지역 마스터", Dest.Settings to "카드 정보 · 내 차",
+        )
+        Dest.entries.forEach { d ->
+            NavigationDrawerItem(
+                label = {
+                    androidx.compose.foundation.layout.Column {
+                        Text(d.label, fontSize = 20.sp)
+                        Text(sub[d].orEmpty(), fontSize = 13.sp, color = Color.White.copy(alpha = 0.5f))
+                    }
+                },
+                icon = { Icon(d.icon, d.label) },
+                selected = current == d.route,
+                onClick = { onSelect(d) },
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
+            )
+        }
+    }
+}
+
+/** 메뉴 화면 틀: 상단 바(☰ · 제목 · 홈) + 내용 */
+@androidx.compose.runtime.Composable
+private fun SubScreen(title: String, onMenu: () -> Unit, onHome: () -> Unit, content: @androidx.compose.runtime.Composable () -> Unit) {
+    androidx.compose.foundation.layout.Column(Modifier.fillMaxSize()) {
+        Row(Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            androidx.compose.material3.IconButton(onClick = onMenu) { Icon(Icons.Filled.Menu, "메뉴") }
+            Text(title, fontSize = 22.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, modifier = Modifier.weight(1f))
+            androidx.compose.material3.IconButton(onClick = onHome) { Icon(Icons.Filled.Home, "홈") }
+        }
+        Box(Modifier.weight(1f)) { content() }
+    }
+}

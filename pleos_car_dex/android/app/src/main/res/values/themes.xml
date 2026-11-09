@@ -1,3 +1,6 @@
 <resources>
-    <style name="Theme.PleosCarDex" parent="android:Theme.Material.NoActionBar" />
+    <!-- 시작할 때 흰 화면이 번쩍이지 않게 앱 시작 화면과 같은 밤하늘 색 -->
+    <style name="Theme.PleosCarDex" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/splash_background</item>
+    </style>
 </resources>

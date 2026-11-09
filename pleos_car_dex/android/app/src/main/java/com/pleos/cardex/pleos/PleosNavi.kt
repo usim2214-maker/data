@@ -5,6 +5,9 @@ import android.util.Log
 import ai.pleos.playground.navi.constants.NaviErrorCode
 import ai.pleos.playground.navi.constants.RouteOption
 import ai.pleos.playground.navi.constants.WaypointIndex
+import ai.pleos.playground.navi.data.BookmarkInfo
+import ai.pleos.playground.navi.data.NavigationScreenRequest
+import ai.pleos.playground.navi.data.RecentDestinationInfo
 import ai.pleos.playground.navi.data.RequestWaypointInfo
 import ai.pleos.playground.navi.data.RouteInfo
 import ai.pleos.playground.navi.data.RouteWithWaypointsRequest
@@ -25,8 +28,27 @@ class PleosNavi(context: Context) {
     private var ready = false
     private var pending: (() -> Unit)? = null
     var onError: (String) -> Unit = {}
+    /** 최근 목적지·즐겨찾기(집/회사 등) — 메인 화면 추천에 사용 */
+    var onPlaces: (recent: List<NaviPlace>, bookmarks: List<NaviPlace>) -> Unit = { _, _ -> }
+    private var recent: List<NaviPlace> = emptyList()
+    private var bookmarks: List<NaviPlace> = emptyList()
 
     private val listener = object : NaviHelperEventListener {
+        override fun onRecentDestinationInfo(list: List<RecentDestinationInfo>) {
+            recent = list.take(5).map { NaviPlace(it.name ?: it.address ?: "최근 목적지", it.address.orEmpty(), it.latitude, it.longitude, "recent", it.poiId.orEmpty()) }
+            onPlaces(recent, bookmarks)
+        }
+
+        override fun onBookmarkInfo(list: List<BookmarkInfo>) {
+            bookmarks = list.take(5).map {
+                val kind = it.category?.name?.lowercase().orEmpty()
+                NaviPlace(it.name ?: it.address ?: "즐겨찾기", it.address.orEmpty(), it.latitude, it.longitude, if ("home" in kind) "home" else if ("work" in kind || "office" in kind) "work" else "bookmark", it.poiId.orEmpty())
+            }
+            onPlaces(recent, bookmarks)
+        }
+
+        override fun onBookMarkChanged() { loadPlaces() }
+
         override fun onError(errorCode: NaviErrorCode) {
             val msg = when (errorCode) {
                 NaviErrorCode.CAUSE_SEARCH_ROUTE_OVER_DISTANCE -> "경로가 너무 멀어요."
@@ -80,6 +102,23 @@ class PleosNavi(context: Context) {
         }
     }
 
+    /** 최근 목적지·즐겨찾기 요청 (결과는 onPlaces) */
+    fun loadPlaces() = withHelper { h -> runCatching { h.getRecentDestinationInfo(); h.getBookmarkInfo() } }
+
+    /** Pleos 내비의 장소 검색 화면을 검색어와 함께 연다 */
+    fun searchPlace(keyword: String) = withHelper { h ->
+        runCatching { h.requestNavigationScreen(NavigationScreenRequest.SearchPlace(keyword)) }
+            .onFailure { e -> onError(if (e is SecurityException) "내비 검색 권한이 없어요." else "검색을 열지 못했어요: ${e.message}") }
+    }
+
+    /** 최근 목적지·즐겨찾기로 바로 길안내 */
+    fun routeTo(place: NaviPlace) = withHelper { h ->
+        runCatching {
+            h.requestRoute(RouteInfo(latitude = place.lat, longitude = place.lon, displayLatitude = null, displayLongitude = null,
+                poiName = place.name, poiId = place.poiId, poiSubId = "0", address = place.address, routeOption = RouteOption.RECOMMENDED))
+        }.onFailure { e -> onError("경로 요청 실패: ${e.message}") }
+    }
+
     fun release() {
         helper?.let { h ->
             runCatching { h.removeListener(listener) }
@@ -112,3 +151,6 @@ class PleosNavi(context: Context) {
 
     private companion object { const val TAG = "PleosNavi" }
 }
+
+/** 내비 장소 (SDK 타입을 화면에 노출하지 않기 위한 앱 모델). kind: home | work | bookmark | recent */
+data class NaviPlace(val name: String, val address: String, val lat: Double, val lon: Double, val kind: String, val poiId: String = "")

@@ -1,0 +1,8 @@
+<resources>
+    <style name="Theme.PleosCarDex" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/splash_background</item>
+        <!-- Android 12+ 시스템 시작 화면: 같은 배경 + 앱 아이콘 → 이어서 앱 시작 그림 -->
+        <item name="android:windowSplashScreenBackground">@color/splash_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher</item>
+    </style>
+</resources>

@@ -109,6 +109,8 @@ data class UiState(
     val celebration: Celebration? = null,
     /** 주차(P단) 후 주행 리포트 */
     val tripReport: TripReport? = null,
+    /** 내비 최근 목적지·즐겨찾기 (메인 화면 추천) */
+    val naviPlaces: List<com.pleos.cardex.pleos.NaviPlace> = emptyList(),
     /** 저탄소 코스 모드 */
     val ecoCourse: Boolean = false,
     val onboardingDone: Boolean = true,
@@ -185,7 +187,10 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
     private var scanJob: Job? = null
     private var locationJob: Job? = null
     private var provider: VehicleContextProvider? = null
-    private val navi = PleosNavi(app).apply { onError = { msg -> _state.update { it.copy(error = msg) } } }
+    private val navi = PleosNavi(app).apply {
+        onError = { msg -> _state.update { it.copy(error = msg) } }
+        onPlaces = { recent, bookmarks -> _state.update { it.copy(naviPlaces = (bookmarks.sortedBy { b -> if (b.kind == "home") 0 else if (b.kind == "work") 1 else 2 } + recent).distinctBy { p -> p.name }.take(6)) } }
+    }
     private val voice = VoiceGuide(app)
     private val pleosAi = PleosAi(app)
     private val voiceCommand = VoiceCommand(app).apply {
@@ -511,6 +516,22 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
      * AI 드라이브 코스: Pleos LLM 을 쓸 수 있으면 서버 후보·프롬프트 → Pleos LLM 선택 → 서버가 시간·점수 계산,
      * 아니면 서버 추천(규칙 기반/서버 LLM).
      */
+    // ---------------- 메인 화면: 내비 검색 ----------------
+    /** 검색창: Pleos 내비 장소 검색 화면을 검색어와 함께 연다 */
+    fun searchPlace(keyword: String) {
+        val q = keyword.trim()
+        if (q.isEmpty()) return
+        if (BuildConfig.USE_MOCK_PLEOS) { _state.update { it.copy(notice = "🔍 '$q' 내비 검색 (시연 모드)") }; return }
+        navi.searchPlace(q)
+    }
+
+    fun goToPlace(place: com.pleos.cardex.pleos.NaviPlace) {
+        if (BuildConfig.USE_MOCK_PLEOS) { _state.update { it.copy(notice = "🧭 ${place.name} 길안내 (시연 모드)") }; return }
+        navi.routeTo(place)
+    }
+
+    fun loadNaviPlaces() { if (!BuildConfig.USE_MOCK_PLEOS) navi.loadPlaces() }
+
     fun setEcoCourse(on: Boolean) = _state.update { it.copy(ecoCourse = on) }
 
     fun recommendCourse(maxHours: Double, note: String) {

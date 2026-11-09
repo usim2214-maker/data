@@ -105,10 +105,13 @@ def test_showroom(client):
 
     sr = client.put(
         "/api/v1/showroom",
-        json={"card_id": "hyundai-ioniq-5", "background_region_id": "jeju", "sticker_region_ids": ["jeju", "jeju"]},
+        json={"card_id": "hyundai-ioniq-5", "background_region_id": "jeju",
+              "props": [{"item_id": "region:jeju", "x": 0.2, "y": 0.8}, {"item_id": "prop-flag", "x": 0.8, "y": 0.7}]},
     ).json()
     assert sr["car"]["id"] == "hyundai-ioniq-5" and sr["background"]["name"] == "제주"
-    assert [s["id"] for s in sr["stickers"]] == ["jeju"]
+    assert sr["background"]["scene"] == "island"
+    assert [p["item"]["key"] for p in sr["props"]] == ["🍊", "🚩"]
+    assert sr["floor"]["id"] == "floor-concrete" and sr["sign_text"] == "MY GARAGE"
     assert client.get("/api/v1/showroom").json()["background"]["id"] == "jeju"
 
     syn = client.get("/api/v1/collection").json()["synergy"]
@@ -208,3 +211,31 @@ def test_rankings_and_region_master(client):
     client.put("/api/v1/showroom", json={"background_region_id": "busan"})
     sr = client.get("/api/v1/showroom").json()
     assert sr["background_mastered"] is True and sr["titles"] == ["부산"]
+
+
+def test_decor_unlocks(client):
+    cat = client.get("/api/v1/showroom/items").json()
+    items = {i["id"]: i for i in cat["items"]}
+    assert items["floor-concrete"]["unlocked"] and not items["floor-checker"]["unlocked"]
+    assert items["floor-checker"]["unlock_hint"] == "코스 완주 1회"
+    assert not items["region:busan"]["unlocked"]
+
+    # 잠긴 아이템은 장착 불가
+    r = client.put("/api/v1/showroom", json={"floor_id": "floor-checker"})
+    assert r.status_code == 400 and "코스 완주 1회" in r.json()["detail"]
+
+    # 부산 코스 완주 -> 체커 바닥·네온 링·체커기·부산 소품 + (부산 마스터) 골드·마스터 간판 해금
+    client.post("/api/v1/stamps/visit", json={"lat": 35.18, "lon": 129.08})
+    client.post("/api/v1/challenge", json=_course())
+    client.post("/api/v1/landmarks/mock-haeundae/visit", json={"lat": 35.1588, "lon": 129.1600})
+    client.post("/api/v1/landmarks/mock-fest-busan/visit", json={"lat": 35.1533, "lon": 129.1187})
+    items = {i["id"]: i for i in client.get("/api/v1/showroom/items").json()["items"]}
+    for k in ["floor-checker", "pedestal-neon", "prop-checker", "region:busan", "light-aurora", "floor-marble", "sign-master"]:
+        assert items[k]["unlocked"], k
+
+    sr = client.put("/api/v1/showroom", json={
+        "background_region_id": "busan", "floor_id": "floor-marble", "light_id": "light-gold",
+        "pedestal_id": "pedestal-gold", "sign_id": "sign-master",
+        "props": [{"item_id": "prop-trophy", "x": 0.15, "y": 0.85, "scale": 1.5}],
+    }).json()
+    assert sr["sign_text"] == "부산 MASTER" and sr["pedestal"]["key"] == "gold" and sr["props"][0]["scale"] == 1.5

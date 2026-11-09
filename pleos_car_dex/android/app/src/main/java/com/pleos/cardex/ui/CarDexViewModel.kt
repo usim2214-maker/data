@@ -8,6 +8,9 @@ import com.pleos.cardex.BuildConfig
 import com.pleos.cardex.data.CarDexRepository
 import com.pleos.cardex.data.Challenge
 import com.pleos.cardex.data.CollectionEntry
+import com.pleos.cardex.data.DecorCatalog
+import com.pleos.cardex.data.MAX_PROPS
+import com.pleos.cardex.data.PlacedProp
 import com.pleos.cardex.data.Leaderboard
 import com.pleos.cardex.data.MastersResponse
 import com.pleos.cardex.data.DriveCourse
@@ -53,6 +56,7 @@ data class UiState(
     val collection: List<CollectionEntry> = emptyList(),
     val synergy: SynergyScore? = null,
     val showroom: Showroom = Showroom(),
+    val decor: DecorCatalog? = null,
     val stampBook: StampBook? = null,
     /** 새 스탬프 획득 등 잠깐 띄울 알림 */
     val notice: String? = null,
@@ -381,15 +385,15 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // ---------------- 쇼룸 ----------------
-    private fun loadShowroom() {
+    fun loadShowroom() {
         viewModelScope.launch {
             runCatching { repo.showroom() }.onSuccess { r -> _state.update { it.copy(showroom = r) } }
+            runCatching { repo.decorItems() }.onSuccess { c -> _state.update { it.copy(decor = c) } }
         }
     }
 
     private fun updateShowroom(transform: (ShowroomUpdate) -> ShowroomUpdate) {
-        val cur = _state.value.showroom
-        val req = transform(ShowroomUpdate(cur.car?.id, cur.background?.id, cur.stickers.map { it.id }))
+        val req = transform(_state.value.showroom.toUpdate())
         viewModelScope.launch {
             runCatching { repo.updateShowroom(req) }
                 .onSuccess { r -> _state.update { it.copy(showroom = r) }; refreshCollection() }
@@ -402,13 +406,43 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setBackground(regionId: String?) = updateShowroom { it.copy(backgroundRegionId = regionId) }
 
-    fun toggleSticker(regionId: String) = updateShowroom {
-        val ids = it.stickerRegionIds
-        when {
-            regionId in ids -> it.copy(stickerRegionIds = ids - regionId)
-            ids.size < com.pleos.cardex.data.MAX_STICKERS -> it.copy(stickerRegionIds = ids + regionId)
+    /** 바닥/조명/전시대/간판 장착 */
+    fun equip(slot: String, itemId: String) = updateShowroom {
+        when (slot) {
+            "floor" -> it.copy(floorId = itemId)
+            "light" -> it.copy(lightId = itemId)
+            "pedestal" -> it.copy(pedestalId = itemId)
+            "sign" -> it.copy(signId = itemId)
             else -> it
         }
+    }
+
+    /** 소품을 무대에 추가 (빈 자리에 자동 배치) */
+    fun addProp(itemId: String) = updateShowroom {
+        if (it.props.size >= MAX_PROPS) return@updateShowroom it
+        val slots = listOf(0.12f to 0.86f, 0.88f to 0.86f, 0.2f to 0.62f, 0.8f to 0.62f, 0.06f to 0.4f, 0.94f to 0.4f, 0.35f to 0.9f, 0.65f to 0.9f)
+        val (x, y) = slots[it.props.size % slots.size]
+        it.copy(props = it.props + PlacedProp(itemId, x, y))
+    }
+
+    /** 드래그로 옮긴 소품 위치 저장 (화면은 즉시 반영, 서버는 손을 뗄 때) */
+    fun moveProp(index: Int, x: Float, y: Float, commit: Boolean) {
+        val cur = _state.value.showroom
+        if (index !in cur.props.indices) return
+        val moved = cur.props.toMutableList().also { l -> l[index] = l[index].copy(x = x.coerceIn(0f, 1f), y = y.coerceIn(0f, 1f)) }
+        _state.update { it.copy(showroom = cur.copy(props = moved)) }
+        if (commit) updateShowroom { it }
+    }
+
+    fun resizeProp(index: Int) = updateShowroom {
+        if (index !in it.props.indices) return@updateShowroom it
+        val p = it.props[index]
+        val next = when { p.scale < 1f -> 1f; p.scale < 1.5f -> 1.5f; p.scale < 2f -> 2f; else -> 0.5f }
+        it.copy(props = it.props.toMutableList().also { l -> l[index] = p.copy(scale = next) })
+    }
+
+    fun removeProp(index: Int) = updateShowroom {
+        it.copy(props = it.props.filterIndexed { i, _ -> i != index })
     }
 
     // ---------------- 키워드 ----------------

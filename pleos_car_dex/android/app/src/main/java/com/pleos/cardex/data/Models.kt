@@ -81,6 +81,7 @@ data class Region(
     val colors: List<String>, // [시작, 끝] #RRGGBB
     @SerialName("travel_points") val travelPoints: Int = 10, // 첫 방문 점수 (지방일수록 높음)
     val area: String = "",
+    val scene: String = "city", // 쇼룸 배경 풍경 (city|sea|mountain|hanok|island|field|lake|bridge|fortress)
 )
 
 @Serializable
@@ -235,22 +236,72 @@ data class VisitRequest(val lat: Double, val lon: Double)
 @Serializable
 data class VisitResponse(val stamp: Stamp? = null, @SerialName("is_new") val isNew: Boolean = false, val message: String = "")
 
-/** 카트라이더식 쇼룸: 대표 차량 + 스탬프로 꾸민 배경/스티커 */
+/** 쇼룸 꾸미기 아이템 (slot: floor | light | pedestal | sign | prop) */
+@Serializable
+data class DecorItem(
+    val id: String,
+    val slot: String,
+    val key: String, // prop=이모지, light=색(#RRGGBB), sign=문구, floor/pedestal=스타일 키
+    val name: String,
+    val unlocked: Boolean = false,
+    @SerialName("unlock_hint") val unlockHint: String = "",
+)
+
+@Serializable
+data class PlacedProp(
+    @SerialName("item_id") val itemId: String,
+    val x: Float = 0.5f,
+    val y: Float = 0.8f,
+    val scale: Float = 1f,
+)
+
+@Serializable
+data class PlacedPropOut(
+    @SerialName("item_id") val itemId: String,
+    val x: Float,
+    val y: Float,
+    val scale: Float = 1f,
+    val item: DecorItem,
+)
+
+@Serializable
+data class DecorCatalog(val items: List<DecorItem>, val unlocked: Int, val total: Int)
+
+/** 쇼룸(차고): 대표 차량 + 여행으로 얻은 아이템으로 꾸민 무대 */
 @Serializable
 data class Showroom(
     val car: VehicleCard? = null,
     val background: Region? = null,
-    val stickers: List<Region> = emptyList(),
+    val floor: DecorItem? = null,
+    val light: DecorItem? = null,
+    val pedestal: DecorItem? = null,
+    val sign: DecorItem? = null,
+    @SerialName("sign_text") val signText: String = "MY GARAGE",
+    val props: List<PlacedPropOut> = emptyList(),
     @SerialName("background_mastered") val backgroundMastered: Boolean = false,
     val titles: List<String> = emptyList(),
     val badges: List<LimitedBadge> = emptyList(),
-)
+) {
+    fun toUpdate() = ShowroomUpdate(
+        cardId = car?.id,
+        backgroundRegionId = background?.id,
+        floorId = floor?.id ?: "floor-concrete",
+        lightId = light?.id ?: "light-white",
+        pedestalId = pedestal?.id ?: "pedestal-basic",
+        signId = sign?.id ?: "sign-garage",
+        props = props.map { PlacedProp(it.itemId, it.x, it.y, it.scale) },
+    )
+}
 
 @Serializable
 data class ShowroomUpdate(
     @SerialName("card_id") val cardId: String? = null,
     @SerialName("background_region_id") val backgroundRegionId: String? = null,
-    @SerialName("sticker_region_ids") val stickerRegionIds: List<String> = emptyList(),
+    @SerialName("floor_id") val floorId: String = "floor-concrete",
+    @SerialName("light_id") val lightId: String = "light-white",
+    @SerialName("pedestal_id") val pedestalId: String = "pedestal-basic",
+    @SerialName("sign_id") val signId: String = "sign-garage",
+    val props: List<PlacedProp> = emptyList(),
 )
 
-const val MAX_STICKERS = 3
+const val MAX_PROPS = 8

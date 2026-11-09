@@ -33,6 +33,12 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+            all { it.systemProperty("robolectric.dependency.repo.url", "https://maven-central.storage-download.googleapis.com/maven2") }
+        }
+    }
 }
 
 dependencies {
@@ -52,6 +58,13 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("io.coil-kt:coil-compose:2.7.0")
+
+    // 화면 스크린샷 테스트 (JVM 에서 Compose 렌더링): ./gradlew testDebugUnitTest --tests '*Screenshot*'
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation(composeBom)
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 
     // ---- Pleos Playground SDK ----
     implementation("ai.pleos.playground:FusedLocation:1.1.3") // 위치·근접 알림 (지역/히든 스탬프)

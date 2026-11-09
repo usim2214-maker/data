@@ -114,10 +114,15 @@ class MainActivity : ComponentActivity() {
                                     showroom = state.showroom,
                                     collection = state.collection,
                                     stampBook = state.stampBook,
-                                    onRefresh = vm::loadStamps,
+                                    decor = state.decor,
+                                    onRefresh = { vm.loadStamps(); vm.loadShowroom() },
                                     onFeature = vm::feature,
                                     onBackground = vm::setBackground,
-                                    onToggleSticker = vm::toggleSticker,
+                                    onEquip = vm::equip,
+                                    onAddProp = vm::addProp,
+                                    onMoveProp = vm::moveProp,
+                                    onResizeProp = vm::resizeProp,
+                                    onRemoveProp = vm::removeProp,
                                 )
                             }
                             composable(Dest.Travel.route) {

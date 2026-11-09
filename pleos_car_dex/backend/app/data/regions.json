@@ -1,5 +1,5 @@
 {
-  "_comment": "지역 스탬프 정의. 방문 판정은 중심좌표 최근접 + 반경(km). 쇼룸 배경 테마(색상 2개 그라데이션 + 랜드마크)로 사용. MVP 근사치이며, 정확한 행정구역 판정은 역지오코딩으로 교체 가능. travel_points: 방문 장려 가중치(수도권 낮게, 인구감소지역 비중이 높은 도 지역·제주 높게 — 시연용 예시값). area: 권역 세트 보너스용.",
+  "_comment": "지역 스탬프 정의. 방문 판정은 중심좌표 최근접 + 반경(km). 쇼룸 배경 테마(색상 2개 그라데이션 + 랜드마크)로 사용. MVP 근사치이며, 정확한 행정구역 판정은 역지오코딩으로 교체 가능. travel_points: 방문 장려 가중치(수도권 낮게, 인구감소지역 비중이 높은 도 지역·제주 높게 — 시연용 예시값). area: 권역 세트 보너스용. scene: 쇼룸 배경 풍경 종류(city|sea|mountain|hanok|island|field|lake|bridge|fortress).",
   "radius_km": 60,
   "regions": [
     {
@@ -14,7 +14,8 @@
         "#F59E0B"
       ],
       "travel_points": 10,
-      "area": "수도권"
+      "area": "수도권",
+      "scene": "city"
     },
     {
       "id": "incheon",
@@ -28,7 +29,8 @@
         "#E0F2FE"
       ],
       "travel_points": 10,
-      "area": "수도권"
+      "area": "수도권",
+      "scene": "sea"
     },
     {
       "id": "gyeonggi",
@@ -42,7 +44,8 @@
         "#FDE68A"
       ],
       "travel_points": 10,
-      "area": "수도권"
+      "area": "수도권",
+      "scene": "fortress"
     },
     {
       "id": "gangwon",
@@ -56,7 +59,8 @@
         "#A7F3D0"
       ],
       "travel_points": 40,
-      "area": "강원권"
+      "area": "강원권",
+      "scene": "mountain"
     },
     {
       "id": "chungbuk",
@@ -70,7 +74,8 @@
         "#D9F99D"
       ],
       "travel_points": 30,
-      "area": "충청권"
+      "area": "충청권",
+      "scene": "lake"
     },
     {
       "id": "chungnam",
@@ -84,7 +89,8 @@
         "#FED7AA"
       ],
       "travel_points": 30,
-      "area": "충청권"
+      "area": "충청권",
+      "scene": "sea"
     },
     {
       "id": "sejong",
@@ -98,7 +104,8 @@
         "#CBD5E1"
       ],
       "travel_points": 20,
-      "area": "충청권"
+      "area": "충청권",
+      "scene": "city"
     },
     {
       "id": "daejeon",
@@ -112,7 +119,8 @@
         "#C4B5FD"
       ],
       "travel_points": 20,
-      "area": "충청권"
+      "area": "충청권",
+      "scene": "city"
     },
     {
       "id": "jeonbuk",
@@ -126,7 +134,8 @@
         "#FEF3C7"
       ],
       "travel_points": 30,
-      "area": "호남권"
+      "area": "호남권",
+      "scene": "hanok"
     },
     {
       "id": "gwangju",
@@ -140,7 +149,8 @@
         "#FBCFE8"
       ],
       "travel_points": 20,
-      "area": "호남권"
+      "area": "호남권",
+      "scene": "mountain"
     },
     {
       "id": "jeonnam",
@@ -154,7 +164,8 @@
         "#BBF7D0"
       ],
       "travel_points": 40,
-      "area": "호남권"
+      "area": "호남권",
+      "scene": "field"
     },
     {
       "id": "gyeongbuk",
@@ -168,7 +179,8 @@
         "#FDE68A"
       ],
       "travel_points": 30,
-      "area": "영남권"
+      "area": "영남권",
+      "scene": "hanok"
     },
     {
       "id": "daegu",
@@ -182,7 +194,8 @@
         "#FECACA"
       ],
       "travel_points": 20,
-      "area": "영남권"
+      "area": "영남권",
+      "scene": "city"
     },
     {
       "id": "ulsan",
@@ -196,7 +209,8 @@
         "#BFDBFE"
       ],
       "travel_points": 20,
-      "area": "영남권"
+      "area": "영남권",
+      "scene": "sea"
     },
     {
       "id": "gyeongnam",
@@ -210,7 +224,8 @@
         "#BAE6FD"
       ],
       "travel_points": 30,
-      "area": "영남권"
+      "area": "영남권",
+      "scene": "sea"
     },
     {
       "id": "busan",
@@ -224,7 +239,8 @@
         "#F472B6"
       ],
       "travel_points": 20,
-      "area": "영남권"
+      "area": "영남권",
+      "scene": "bridge"
     },
     {
       "id": "jeju",
@@ -238,7 +254,8 @@
         "#99F6E4"
       ],
       "travel_points": 40,
-      "area": "제주권"
+      "area": "제주권",
+      "scene": "island"
     }
   ]
 }

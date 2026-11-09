@@ -5,6 +5,7 @@ from app.config import get_settings
 from app.services.challenge import ChallengeService
 from app.services.competition import CompetitionService
 from app.services.courses import CourseService
+from app.services.decor import DecorService
 from app.services.landmarks import LandmarkService
 from app.services.pipeline import get_pipeline
 from app.services.tour import TourClient
@@ -26,6 +27,11 @@ def get_challenge() -> ChallengeService:
 
 
 @lru_cache
+def get_decor() -> DecorService:
+    return DecorService(get_pipeline().store, get_competition())
+
+
+@lru_cache
 def get_landmarks() -> LandmarkService:
     return LandmarkService(get_settings(), get_tour(), get_pipeline().store, get_challenge(), get_competition())
 
@@ -36,5 +42,5 @@ def get_courses() -> CourseService:
 
 
 def clear_all() -> None:
-    for f in (get_tour, get_competition, get_challenge, get_landmarks, get_courses):
+    for f in (get_tour, get_competition, get_challenge, get_decor, get_landmarks, get_courses):
         f.cache_clear()

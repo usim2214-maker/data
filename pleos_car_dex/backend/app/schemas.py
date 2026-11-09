@@ -117,6 +117,7 @@ class Region(BaseModel):
     colors: list[str]  # 쇼룸 배경 그라데이션 [시작, 끝] (#RRGGBB)
     travel_points: int = 10  # 첫 방문 점수 (지방·인구감소지역일수록 높게)
     area: str = ""  # 권역 (수도권/충청권/호남권/영남권/강원권/제주권)
+    scene: str = "city"  # 쇼룸 배경 풍경 종류
 
 
 class Stamp(BaseModel):
@@ -303,15 +304,42 @@ class VisitResponse(BaseModel):
     message: str = ""
 
 
-MAX_STICKERS = 3
+MAX_PROPS = 8
+
+
+class DecorItem(BaseModel):
+    """쇼룸 꾸미기 아이템 (바닥/조명/전시대/간판/소품). 지역 스탬프 소품은 id = 'region:<region_id>'"""
+
+    id: str
+    slot: str  # floor | light | pedestal | sign | prop
+    key: str  # 그리기 키 (prop 은 이모지, light 는 색, sign 은 문구)
+    name: str
+    unlocked: bool = False
+    unlock_hint: str = ""  # 잠금 해제 조건 설명
+
+
+class PlacedProp(BaseModel):
+    item_id: str
+    x: float = Field(0.5, ge=0, le=1)  # 무대 기준 0~1 좌표
+    y: float = Field(0.8, ge=0, le=1)
+    scale: float = Field(1.0, ge=0.5, le=2.0)
+
+
+class PlacedPropOut(PlacedProp):
+    item: DecorItem
 
 
 class Showroom(BaseModel):
-    """카트라이더식 쇼룸: 대표 차량 1대 + 획득한 지역 스탬프로 꾸민 배경/스티커."""
+    """쇼룸(차고): 대표 차량 1대 + 획득한 아이템으로 꾸민 무대."""
 
     car: VehicleCard | None = None
-    background: Region | None = None
-    stickers: list[Region] = []
+    background: Region | None = None  # 지역 풍경 배경 (획득한 지역 스탬프)
+    floor: DecorItem | None = None
+    light: DecorItem | None = None
+    pedestal: DecorItem | None = None
+    sign: DecorItem | None = None
+    sign_text: str = "MY GARAGE"
+    props: list[PlacedPropOut] = []
     background_mastered: bool = False  # 배경 지역의 이번 달 마스터면 왕관·깃발 표시
     titles: list[str] = []  # 내가 마스터인 지역들
     badges: list["LimitedBadge"] = []  # 축제 한정 배지 (트로피 진열)
@@ -320,7 +348,17 @@ class Showroom(BaseModel):
 class ShowroomUpdate(BaseModel):
     card_id: str | None = None
     background_region_id: str | None = None
-    sticker_region_ids: list[str] = Field(default_factory=list, max_length=MAX_STICKERS)
+    floor_id: str = "floor-concrete"
+    light_id: str = "light-white"
+    pedestal_id: str = "pedestal-basic"
+    sign_id: str = "sign-garage"
+    props: list[PlacedProp] = Field(default_factory=list, max_length=MAX_PROPS)
+
+
+class DecorCatalog(BaseModel):
+    items: list[DecorItem]
+    unlocked: int
+    total: int
 
 
 CollectionResponse.model_rebuild()

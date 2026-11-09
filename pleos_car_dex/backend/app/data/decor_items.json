@@ -1,0 +1,39 @@
+{
+  "_comment": "쇼룸(차고) 꾸미기 아이템. unlock: default | region:<id> | regions:<n> | hidden:<n> | course:<n> | badge:<n> | master:<n> | synergy:<n>. 프론트는 slot/key 로 그린다 (prop 은 emoji).",
+  "items": [
+    {"id": "floor-concrete", "slot": "floor", "key": "concrete", "name": "콘크리트", "unlock": "default"},
+    {"id": "floor-asphalt", "slot": "floor", "key": "asphalt", "name": "아스팔트 차선", "unlock": "regions:2"},
+    {"id": "floor-checker", "slot": "floor", "key": "checker", "name": "체커 플래그", "unlock": "course:1"},
+    {"id": "floor-wood", "slot": "floor", "key": "wood", "name": "우드 데크", "unlock": "hidden:3"},
+    {"id": "floor-neon", "slot": "floor", "key": "neon", "name": "네온 그리드", "unlock": "synergy:300"},
+    {"id": "floor-marble", "slot": "floor", "key": "marble", "name": "골드 마블", "unlock": "master:1"},
+
+    {"id": "light-white", "slot": "light", "key": "#FFFFFF", "name": "화이트 스포트", "unlock": "default"},
+    {"id": "light-sunset", "slot": "light", "key": "#FF9E57", "name": "선셋", "unlock": "regions:3"},
+    {"id": "light-ocean", "slot": "light", "key": "#4DD0E1", "name": "오션 블루", "unlock": "hidden:1"},
+    {"id": "light-aurora", "slot": "light", "key": "#B388FF", "name": "오로라", "unlock": "badge:1"},
+    {"id": "light-gold", "slot": "light", "key": "#FFD54F", "name": "챔피언 골드", "unlock": "master:1"},
+
+    {"id": "pedestal-basic", "slot": "pedestal", "key": "basic", "name": "기본 턴테이블", "unlock": "default"},
+    {"id": "pedestal-neon", "slot": "pedestal", "key": "neon", "name": "네온 링", "unlock": "course:1"},
+    {"id": "pedestal-gold", "slot": "pedestal", "key": "gold", "name": "골드 포디움", "unlock": "master:1"},
+
+    {"id": "sign-garage", "slot": "sign", "key": "MY GARAGE", "name": "MY GARAGE", "unlock": "default"},
+    {"id": "sign-traveler", "slot": "sign", "key": "ROAD TRIPPER", "name": "ROAD TRIPPER", "unlock": "regions:5"},
+    {"id": "sign-collector", "slot": "sign", "key": "CAR COLLECTOR", "name": "CAR COLLECTOR", "unlock": "synergy:200"},
+    {"id": "sign-master", "slot": "sign", "key": "{title} MASTER", "name": "지역 마스터 간판", "unlock": "master:1"},
+
+    {"id": "prop-flag", "slot": "prop", "key": "🚩", "name": "깃발", "unlock": "default"},
+    {"id": "prop-balloon", "slot": "prop", "key": "🎈", "name": "풍선", "unlock": "default"},
+    {"id": "prop-cone", "slot": "prop", "key": "🚧", "name": "공사 표지", "unlock": "regions:1"},
+    {"id": "prop-checker", "slot": "prop", "key": "🏁", "name": "체커기", "unlock": "course:1"},
+    {"id": "prop-camera", "slot": "prop", "key": "📸", "name": "여행 카메라", "unlock": "hidden:1"},
+    {"id": "prop-map", "slot": "prop", "key": "🗺️", "name": "여행 지도", "unlock": "regions:3"},
+    {"id": "prop-blossom", "slot": "prop", "key": "🌸", "name": "벚꽃", "unlock": "hidden:5"},
+    {"id": "prop-firework", "slot": "prop", "key": "🎆", "name": "불꽃놀이", "unlock": "badge:1"},
+    {"id": "prop-medal", "slot": "prop", "key": "🎖️", "name": "축제 메달", "unlock": "badge:1"},
+    {"id": "prop-trophy", "slot": "prop", "key": "🏆", "name": "트로피", "unlock": "master:1"},
+    {"id": "prop-crown", "slot": "prop", "key": "👑", "name": "왕관", "unlock": "master:1"},
+    {"id": "prop-star", "slot": "prop", "key": "🌟", "name": "슈퍼스타", "unlock": "synergy:500"}
+  ]
+}

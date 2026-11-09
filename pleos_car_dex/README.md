@@ -14,7 +14,7 @@
 | 차종·마력 등 정보 조회 → LLM API 키 활용 | `identifier.py`(차종 식별) + `summarizer.py`(유저 키워드 동적 주입 요약), Claude API |
 | 카드: 앞면 차량 이미지 / 뒷면 정보 요약 | `FlipCard.kt` — 탭하면 뒤집힘 |
 | 주행 중 마주친 차량 도감 등록 + 시너지 점수 | `store.py`(최초 발견 위치 = Pleos FusedLocation) + `synergy.py` |
-| 카트라이더식 쇼룸 (대표 차량 전시) | `routers/showroom.py` + `ShowroomScreen.kt` — 도감에서 획득한 차량만 전시 가능 |
+| 쇼룸(차고) 꾸미기 | `routers/showroom.py`·`services/decor.py` + `ShowroomStage.kt`·`ShowroomScreen.kt` — 대표 차량 전시 + 배경/바닥/조명/전시대/네온 간판/소품(드래그 배치) 꾸미기, 아이템은 여행으로 해금 |
 | 명소 히든 스탬프 | `services/tour.py`·`landmarks.py` + `PleosVehicleContextProvider.watchLandmarks` — 한국관광공사 TourAPI 명소/축제에 Pleos 근접 알림 등록 → 반경 500m 진입 시 획득 (서버가 거리 재검증) |
 | AI 드라이브 코스 추천 | `services/courses.py` + `TravelScreen.kt` + `PleosNavi.kt` — 미획득 지역·축제·명소 후보를 서버가 모으고 LLM 이 코스 선택 → Pleos NaviHelper 로 길안내 |
 | 경쟁 ① 코스 완주 챌린지 | `services/challenge.py` — 추천 코스로 챌린지 시작 → 모든 장소(500m) 방문 시 완주 보너스 `30 + 예상점수/2` (24시간 제한) |
@@ -43,6 +43,27 @@
 - 주간 랭킹: 이번 주(KST, 월~일) 여행 점수 합계 — 전국 / 지역별
 - 지역 마스터: 이번 달 그 시·도에서 얻은 여행 점수 1위. 동점이면 기존 1위 유지 → 넘어서야 빼앗음 (재방문 유도)
 - MVP 는 단일 사용자 + 가상 경쟁자 6명. 실제 서비스는 계정·서버 DB 기반 원장으로 교체 필요
+
+## 쇼룸 디자인
+
+차고 꾸미기라는 방식만 참고한 **자체 디자인**입니다 (특정 게임의 그래픽·명칭·에셋 미사용). 모든 그래픽은 Compose Canvas 로 직접 그립니다.
+
+| 부산 마스터 (체커 바닥 · 골드 포디움 · 골드 조명) | 강원 (네온 그리드 · 네온 링 · 오로라 조명) |
+|---|---|
+| ![](docs/screenshots/showroom_busan_master.png) | ![](docs/screenshots/showroom_gangwon_neon.png) |
+
+| 슬롯 | 아이템 (해금 조건 예시) |
+|---|---|
+| 배경 | 기본 차고 + 지역 스탬프 17곳의 풍경 (도시·바다·산·한옥·섬·들판·호수·대교·성곽) |
+| 바닥 | 콘크리트 / 아스팔트 차선(스탬프 2) / 체커(코스 완주 1) / 우드(히든 3) / 네온 그리드(시너지 300) / 골드 마블(마스터 1) |
+| 조명 | 화이트 / 선셋(스탬프 3) / 오션(히든 1) / 오로라(축제 배지 1) / 챔피언 골드(마스터 1) |
+| 전시대 | 기본 턴테이블 / 네온 링(완주 1) / 골드 포디움(마스터 1) — 회전 애니메이션 |
+| 네온 간판 | MY GARAGE / ROAD TRIPPER(스탬프 5) / CAR COLLECTOR(시너지 200) / `OO MASTER`(마스터) |
+| 소품 (최대 8, 드래그·크기 조절) | 깃발·풍선·체커기·카메라·지도·벚꽃·불꽃·메달·트로피·왕관·별 + 지역 랜드마크 17종 |
+
+- 전시대 위 차량은 차체 유형(세단/SUV/쿠페)과 희귀도 색으로 그린 일러스트, 실제 도감 사진은 벽의 폴라로이드 액자
+- 마스터 칭호를 잃으면 마스터 전용 아이템은 자동으로 기본 아이템으로 돌아감 → 칭호를 지키러 다시 방문
+- 스크린샷 재생성: `cd android && ./gradlew testDebugUnitTest --tests '*ShowroomScreenshotTest*'` → `app/build/screenshots/`
 
 ## Pleos Playground 에서 쓰는 것
 
@@ -149,7 +170,8 @@ curl -F "video=@drive.mp4" http://localhost:8000/api/v1/recognize/video
 | POST | `/api/v1/recognize/video` | 주행 영상 → 차량별 카드 (최대 `VIDEO_MAX_VEHICLES`) |
 | GET | `/api/v1/collection` | 도감 + 시너지 점수 |
 | DELETE | `/api/v1/collection/{id}` | 도감 삭제 |
-| GET / PUT | `/api/v1/showroom` | 쇼룸 조회 / `{card_id, background_region_id, sticker_region_ids}` 변경 (획득한 차량·스탬프만) |
+| GET / PUT | `/api/v1/showroom` | 쇼룸 조회 / `{card_id, background_region_id, floor_id, light_id, pedestal_id, sign_id, props[{item_id,x,y,scale}]}` 변경 (해금된 것만) |
+| GET | `/api/v1/showroom/items` | 꾸미기 아이템 전체 + 해금 여부·조건 |
 | GET | `/api/v1/stamps` | 스탬프북 (17개 시·도, 미획득 포함) |
 | POST | `/api/v1/stamps/visit` | `{lat, lon}` 방문 보고 → 새 지역이면 스탬프 획득 (인식 요청에 위치가 있어도 자동 기록) |
 | GET | `/api/v1/landmarks/nearby?lat&lon&radius_m` | 주변 TourAPI 명소·진행 중 축제 (획득 여부·점수) |

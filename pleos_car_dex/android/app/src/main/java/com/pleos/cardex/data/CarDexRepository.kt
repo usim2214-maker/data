@@ -22,6 +22,7 @@ class CarDexRepository(private val api: CarDexApi = CarDexApi.create()) {
     suspend fun delete(id: String) = api.deleteEntry(id)
     suspend fun showroom() = api.showroom()
     suspend fun updateShowroom(req: ShowroomUpdate) = api.updateShowroom(req)
+    suspend fun decorItems() = api.decorItems()
     suspend fun stamps() = api.stamps()
     suspend fun visit(location: GeoPoint) = api.visit(VisitRequest(location.lat, location.lon))
     suspend fun landmarksNearby(at: GeoPoint) = api.landmarksNearby(at.lat, at.lon)

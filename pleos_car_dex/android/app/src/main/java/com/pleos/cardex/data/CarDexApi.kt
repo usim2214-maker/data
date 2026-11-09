@@ -37,6 +37,9 @@ interface CarDexApi {
     @GET("api/v1/showroom")
     suspend fun showroom(): Showroom
 
+    @GET("api/v1/showroom/items")
+    suspend fun decorItems(): DecorCatalog
+
     @PUT("api/v1/showroom")
     suspend fun updateShowroom(@Body req: ShowroomUpdate): Showroom
 
@@ -97,6 +100,6 @@ interface CarDexApi {
         }
 
         /** 백엔드가 주는 상대 경로(/static/crops/..)를 절대 URL 로 변환 */
-        fun absolute(url: String?): String? = url?.let { if (it.startsWith("http")) it else baseUrl.trimEnd('/') + it }
+        fun absolute(url: String?): String? = url?.let { if (it.contains("://")) it else baseUrl.trimEnd('/') + it }
     }
 }

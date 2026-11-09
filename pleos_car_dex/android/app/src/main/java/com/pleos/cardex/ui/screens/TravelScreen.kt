@@ -60,6 +60,7 @@ fun TravelScreen(
     onResumeNavigation: () -> Unit,
     onAbandon: () -> Unit,
     home: HomeSummary? = null,
+    courseBy: String = "",
 ) {
     var hours by remember { mutableDoubleStateOf(4.0) }
     var note by remember { mutableStateOf("") }
@@ -91,7 +92,7 @@ fun TravelScreen(
                 }
                 if (loading) CircularProgressIndicator()
             }
-            course?.let { CourseCard(it, onStartChallenge) }
+            course?.let { CourseCard(it, onStartChallenge, courseBy) }
         }
 
         Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -106,7 +107,7 @@ fun TravelScreen(
 }
 
 @Composable
-private fun CourseCard(course: DriveCourse, onStartChallenge: () -> Unit) {
+private fun CourseCard(course: DriveCourse, onStartChallenge: () -> Unit, courseBy: String = "") {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(course.title, style = MaterialTheme.typography.headlineMedium)
@@ -116,6 +117,7 @@ private fun CourseCard(course: DriveCourse, onStartChallenge: () -> Unit) {
                 AssistChip(onClick = {}, label = { Text("스탬프 +${course.expectedPoints}") })
                 AssistChip(onClick = {}, label = { Text("🏁 완주 +${course.completionBonus}") })
                 if (course.candidatesSource == "mock") AssistChip(onClick = {}, label = { Text("시연 데이터") })
+                if (courseBy.isNotEmpty()) AssistChip(onClick = {}, label = { Text("추천: $courseBy") })
             }
             course.limited?.let { lim ->
                 Text(

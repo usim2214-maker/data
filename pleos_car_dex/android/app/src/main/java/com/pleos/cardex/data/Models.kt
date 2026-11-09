@@ -200,6 +200,19 @@ data class HomeSummary(
     @SerialName("next_goal") val nextGoal: String,
 )
 
+/** Pleos LLM 이 코스를 고를 수 있도록 서버가 주는 후보·프롬프트 */
+@Serializable
+data class CourseCandidates(val prompt: String, val source: String = "")
+
+@Serializable
+data class CourseBuildRequest(
+    val request: CourseRequest,
+    val title: String,
+    val summary: String,
+    @SerialName("stop_ids") val stopIds: List<String>,
+    val reasons: List<String> = emptyList(),
+)
+
 // ---------------- 경쟁 ----------------
 @Serializable
 data class Challenge(

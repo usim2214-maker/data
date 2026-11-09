@@ -32,16 +32,24 @@ fun DrivingScreen(
     onResumeNavigation: () -> Unit,
     onToggleVoice: () -> Unit,
     onExitSimulation: (() -> Unit)?,
+    onListen: () -> Unit = {},
 ) {
     Column(Modifier.fillMaxSize().padding(horizontal = 40.dp, vertical = 28.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("🚗 주행 모드", fontSize = 44.sp, style = MaterialTheme.typography.displaySmall)
-            Row {
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                // 음성 명령 (Pleos SpeechToText): 화면을 보지 않고 '길안내', '인식', '순위', '도감'
+                androidx.compose.material3.FilledTonalButton(onClick = onListen, modifier = Modifier.height(76.dp)) {
+                    Text(if (state.listening) "🎙 듣는 중…" else "🎙 말하기", fontSize = 24.sp)
+                }
                 TextButton(onClick = onToggleVoice) { Text(if (state.voiceOn) "🔊 음성 안내 켜짐" else "🔇 음성 안내 꺼짐", fontSize = 22.sp) }
                 onExitSimulation?.let { TextButton(onClick = it) { Text("시연 종료", fontSize = 22.sp) } }
             }
         }
-        Text("정차하면 모든 기능을 이용할 수 있어요 · ${state.drivingSource}", color = Color.Gray, fontSize = 22.sp)
+        Text(
+            state.heard?.let { "🎙 “$it”" } ?: "정차하면 모든 기능을 이용할 수 있어요 · 음성: '길안내' '인식' '순위' '도감'",
+            color = Color.Gray, fontSize = 22.sp,
+        )
         // 방금 일어난 일(스탬프 획득 등)은 가장 눈에 띄는 위쪽에 크게
         state.notice?.let {
             Text(

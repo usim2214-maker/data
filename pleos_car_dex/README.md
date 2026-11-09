@@ -57,6 +57,21 @@
 > 실제 앱의 화면 코드를 샘플 데이터로 렌더링하고 버튼은 실제로 클릭해 진행한 **UI 시연 영상**입니다 (에뮬레이터 녹화 아님).
 > 다시 만들기: `./scripts/make_demo_video.sh` (JDK 17 · Android SDK · ffmpeg 필요). 장면·자막은 `android/app/src/test/.../DemoVideoFramesTest.kt` 에서 수정.
 
+## 공모전 적합성 — Pleos Playground 공개 SDK 활용
+
+공개 SDK 7종(저장소 기준: FusedLocation · NaviHelper · Vehicle · TextToSpeech · SpeechToText · LLM · placesense) 중 **6종 사용**:
+
+| SDK | 쓰는 곳 |
+|---|---|
+| FusedLocation | 지역 스탬프 · 명소 근접 알림(히든 스탬프) · 도감 '발견 위치' |
+| NaviHelper | AI 코스 · 챌린지 길안내 (목적지 + 경유지) |
+| Vehicle | 기어 상태 → 주행 모드 (+ Android Automotive 표준 UX 제한) |
+| TextToSpeech | 주행 중 음성 안내 (스탬프·카드·완주) |
+| SpeechToText | 주행 중 음성 명령 |
+| LLM | AI 드라이브 코스 선택 |
+
+`placesense` 는 내부용 인터페이스로 보여 제외. 외부: 한국관광공사 TourAPI(명소·축제), YOLOv8(차량 감지).
+
 ## 차량 카드 수집 (메인)
 
 | 도감 홈 (첫 화면) | 미발견 칸 = 실루엣 |
@@ -155,6 +170,8 @@
 | NaviHelper SDK | `ai.pleos.playground:NaviHelper:3.0.5`, 권한 `NAVI_ROUTE`·`NAVI_ROUTE_SEARCH` — AI 코스 길안내 (목적지 + 경유지 2곳) |
 | Vehicle SDK | `ai.pleos.playground:Vehicle:2.3.2`, 권한 `CAR_DRIVE` — 기어(P단) 상태 (보조: SDK 에서 기어 API 가 deprecated 되어 아래 표준 API 를 우선 사용) |
 | Android Automotive 표준 | `CarUxRestrictionsManager` — 차량이 알려주는 '주행 중 UX 제한' 으로 **주행 중 화면 잠금** (1순위) |
+| **LLM SDK** | `ai.pleos.playground:LLM:2.1.3.2`, 권한 `LLM_SERVICE` — **AI 드라이브 코스 추천을 Pleos LLM 이 선택** (서버가 후보·프롬프트 제공 → Pleos LLM 선택 → 서버가 시간·점수 재계산). 못 쓰면 서버 추천으로 대체 |
+| **SpeechToText SDK** | `ai.pleos.playground:SpeechToText:3.3.1`, 권한 `STT_SERVICE` + `RECORD_AUDIO` — **주행 중 음성 명령** ('길안내', '인식', '순위', '도감') |
 | TextToSpeech SDK | `ai.pleos.playground:TextToSpeech:3.3.1` (ON_DEVICE), 권한 `TTS_SERVICE` — 스탬프·코스 알림 **음성 안내** (실패 시 안드로이드 기본 TTS) |
 | 서라운드뷰/카메라 | 공개 API 미확인 → 영상 직접 입력으로 대체 |
 
@@ -169,6 +186,13 @@
 - **위치 정보 최소화**: 서버에는 지역 판정·명소 반경 확인에 필요한 좌표만 보내고, 이동 경로는 저장하지 않습니다(도감의 '최초 발견 위치'만 저장).
 - **이미지 미저장**: 차량 사진(번호판 등이 찍힐 수 있음)은 인식에만 쓰고 저장하지 않습니다. 카드 앞면은 일러스트라 사진이 필요 없습니다 (`SAVE_CROPS=true` 일 때만 디버그용 저장).
 - 시연용: 디버그 빌드의 여행 탭에 `🚗 주행 모드 시연` 버튼 (에뮬레이터에서 기어를 바꾸기 어려울 때)
+
+> **Playground 앱 ID/키 (LLM·음성 인식 서버 모드)**: Pleos Playground 'My Project' 에서 앱을 등록해 받은 앱 ID/키를
+> `android/local.properties` 에 `pleos.appId=...`, `pleos.appKey=...` 로 넣으면 `registerApp()` 으로 서버 모드를 씁니다 (저장소에 올리지 말 것).
+> 없으면 기기(ON_DEVICE) 모드로 동작합니다.
+>
+> **차종 판별과 Pleos LLM**: LLM 2.1.3.2 공개 API 는 텍스트 입력만 열려 있고 이미지 입력(`ImagePart`)은 SDK 내부용이라,
+> 차종 판별에는 쓰지 않았습니다 (공개되지 않은 기능 우회 사용 X). 차종 판별은 서버(28종 중 선택) → 추후 YOLO 추가 학습으로 대체 예정.
 
 > **API 키 관련 메모**: 공식 FusedLocation 샘플 기준, 차량 내 SDK(FusedLocation/Vehicle)는 별도 API 키 없이
 > Maven 의존성 + 권한으로 동작합니다. Playground 에서 발급하는 *Vehicle Data API* 키는 내 차량의 커넥티드
@@ -259,7 +283,10 @@ curl -F "video=@drive.mp4" http://localhost:8000/api/v1/recognize/video
 | POST | `/api/v1/stamps/visit` | `{lat, lon}` 방문 보고 → 새 지역이면 스탬프 획득 (인식 요청에 위치가 있어도 자동 기록) |
 | GET | `/api/v1/landmarks/nearby?lat&lon&radius_m` | 주변 TourAPI 명소·진행 중 축제 (획득 여부·점수) |
 | POST | `/api/v1/landmarks/{content_id}/visit` | `{lat, lon}` 근접 진입 보고 → 반경 검증 후 히든 스탬프 |
-| POST | `/api/v1/courses/recommend` | `{lat, lon, max_hours, date?, note?}` → AI 드라이브 코스 (이동 시간·예상 점수는 서버 계산) |
+| POST | `/api/v1/courses/recommend` | `{lat, lon, max_hours, date?, note?}` → AI 드라이브 코스 (서버 선택, 이동 시간·예상 점수는 서버 계산) |
+| POST | `/api/v1/courses/candidates` | 앱의 **Pleos LLM** 용: 후보 목록 + 프롬프트 + 규칙 기반 대체 선택 |
+| POST | `/api/v1/courses/build` | Pleos LLM 이 고른 후보 ID 로 코스 조립 (후보 밖 ID 제거, 시간·점수 서버 계산) |
+| GET | `/api/v1/preferences/fields` | 카드 뒷면에 고를 수 있는 항목 (차량 정보 목록 9항목) |
 | POST / GET / DELETE | `/api/v1/challenge` | 코스 챌린지 시작(`DriveCourse` 그대로) / 현재 상태 / 포기 |
 | GET | `/api/v1/rankings/weekly?region_id=` | 이번 주 랭킹 (내 순위, 윗 순위까지 남은 점수) |
 | GET | `/api/v1/rankings/masters` | 이번 달 시·도별 지역 마스터, 내 칭호 |

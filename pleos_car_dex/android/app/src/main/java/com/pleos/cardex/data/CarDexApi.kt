@@ -62,6 +62,12 @@ interface CarDexApi {
     @POST("api/v1/landmarks/{id}/visit")
     suspend fun visitLandmark(@Path("id") id: String, @Body req: VisitRequest): LandmarkVisitResponse
 
+    @POST("api/v1/courses/candidates")
+    suspend fun courseCandidates(@Body req: CourseRequest): CourseCandidates
+
+    @POST("api/v1/courses/build")
+    suspend fun buildCourse(@Body req: CourseBuildRequest): DriveCourse
+
     @POST("api/v1/courses/recommend")
     suspend fun recommendCourse(@Body req: CourseRequest): DriveCourse
 

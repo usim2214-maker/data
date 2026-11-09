@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -20,6 +22,13 @@ android {
         // 다른 주소로 빌드: ./gradlew assembleDebug -PapiBaseUrl=http://192.168.0.10:8000/
         val apiBaseUrl = (project.findProperty("apiBaseUrl") as String?) ?: "http://10.0.2.2:8000/"
         buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
+        // Pleos Playground 'My Project' 에서 발급받은 앱 ID/키 (LLM·음성 인식 서버 모드). 저장소에 올리지 말고 local.properties 에:
+        //   pleos.appId=...   pleos.appKey=...
+        val local = Properties().apply {
+            rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
+        }
+        buildConfigField("String", "PLEOS_APP_ID", "\"${local.getProperty("pleos.appId", "")}\"")
+        buildConfigField("String", "PLEOS_APP_KEY", "\"${local.getProperty("pleos.appKey", "")}\"")
         // true: Pleos SDK 를 쓰지 않고 목업 위치로 동작 (false 여도 isSupported()=false 면 자동으로 목업 사용)
         buildConfigField("boolean", "USE_MOCK_PLEOS", "false")
     }
@@ -71,5 +80,7 @@ dependencies {
     implementation("ai.pleos.playground:NaviHelper:3.0.5")    // AI 코스 -> Pleos 내비 길안내
     implementation("ai.pleos.playground:Vehicle:2.3.2")       // 기어(P단) -> 주행 중 화면 잠금
     implementation("ai.pleos.playground:TextToSpeech:3.3.1")  // 주행 중 음성 안내
+    implementation("ai.pleos.playground:LLM:2.1.3.2")         // 차종 판별(이미지) · AI 코스 추천
+    implementation("ai.pleos.playground:SpeechToText:3.3.1")  // 주행 중 음성 명령
     // TODO(Pleos): 서라운드뷰 등 차량 영상 API 공개 시 VideoFrameSource 를 대체
 }

@@ -28,6 +28,8 @@ import com.pleos.cardex.pleos.AssetFrameSource
 import com.pleos.cardex.pleos.DrivingSnapshot
 import com.pleos.cardex.pleos.DrivingRestriction
 import com.pleos.cardex.pleos.FrameSource
+import com.pleos.cardex.pleos.PleosAi
+import com.pleos.cardex.pleos.VoiceCommand
 import com.pleos.cardex.pleos.GearMonitor
 import com.pleos.cardex.pleos.VoiceGuide
 import com.pleos.cardex.pleos.LandmarkTarget
@@ -72,6 +74,13 @@ data class UiState(
     val landmarks: List<LandmarkNearby> = emptyList(),
     val course: DriveCourse? = null,
     val courseLoading: Boolean = false,
+    /** 코스를 고른 주체: "Pleos LLM" | "서버" */
+    val courseBy: String = "",
+    /** 음성 명령 듣는 중 / 마지막으로 들은 말 */
+    val listening: Boolean = false,
+    val heard: String? = null,
+    val aiStatus: String = "",
+    val voiceStatus: String = "",
     val challenge: Challenge? = null,
     val weekly: Leaderboard? = null,
     val rankingRegionId: String? = null,
@@ -162,6 +171,11 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
     private var provider: VehicleContextProvider? = null
     private val navi = PleosNavi(app).apply { onError = { msg -> _state.update { it.copy(error = msg) } } }
     private val voice = VoiceGuide(app)
+    private val pleosAi = PleosAi(app)
+    private val voiceCommand = VoiceCommand(app).apply {
+        onListening = { on -> _state.update { it.copy(listening = on) } }
+        onText = { text -> viewModelScope.launch { handleVoice(text) } }
+    }
     private val gear = GearMonitor(app)
     private val uxRestriction = DrivingRestriction(app)
     private var gearAvailable = false
@@ -189,6 +203,10 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
         loadChallenge()
         loadRankings()
         loadHome()
+        viewModelScope.launch { // SDK 초기화가 비동기라 잠시 뒤 상태 표시
+            delay(3_000)
+            _state.update { it.copy(aiStatus = pleosAi.modeLabel, voiceStatus = if (voiceCommand.available) "Pleos 음성 인식" else "사용 안 함") }
+        }
         // 알림은 음성으로도 (주행 중 화면을 보지 않도록)
         viewModelScope.launch {
             state.map { it.notice }.distinctUntilChanged().filterNotNull().collect { msg ->
@@ -424,18 +442,60 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // ---------------- AI 드라이브 코스 ----------------
+    /**
+     * AI 드라이브 코스: Pleos LLM 을 쓸 수 있으면 서버 후보·프롬프트 → Pleos LLM 선택 → 서버가 시간·점수 계산,
+     * 아니면 서버 추천(규칙 기반/서버 LLM).
+     */
     fun recommendCourse(maxHours: Double, note: String) {
         val at = _state.value.driving?.location ?: run {
             _state.update { it.copy(error = "현재 위치를 아직 받지 못했어요.") }; return
         }
         _state.update { it.copy(courseLoading = true, error = null) }
         viewModelScope.launch {
-            call { repo.recommendCourse(at, maxHours, note) }
-                .onSuccess { c -> _state.update { it.copy(course = c) } }
-                .onFailure { e -> _state.update { it.copy(error = "코스 추천 실패: ${e.message}") } }
+            val req = com.pleos.cardex.data.CourseRequest(at.lat, at.lon, maxHours, note)
+            val byPleos = if (pleosAi.available) {
+                call { repo.courseCandidates(req) }.getOrNull()?.let { c -> pleosAi.pickCourse(c.prompt) }?.let { pick ->
+                    call { repo.buildCourse(com.pleos.cardex.data.CourseBuildRequest(req, pick.title, pick.summary, pick.stopIds, pick.reasons)) }.getOrNull()
+                }
+            } else null
+            if (byPleos != null) {
+                _state.update { it.copy(course = byPleos, courseBy = "Pleos LLM") }
+            } else {
+                call { repo.recommendCourse(at, maxHours, note) }
+                    .onSuccess { c -> _state.update { it.copy(course = c, courseBy = "서버") } }
+                    .onFailure { e -> _state.update { it.copy(error = "코스 추천 실패: ${e.message}") } }
+            }
             _state.update { it.copy(courseLoading = false) }
         }
     }
+
+    // ---------------- 음성 명령 (Pleos SpeechToText) ----------------
+    fun listenVoice() {
+        if (!voiceCommand.listen()) _state.update { it.copy(notice = "음성 인식을 사용할 수 없어요") }
+    }
+
+    /** 운전 중에 쓸 짧은 명령만 (화면 조작 없이) */
+    private fun handleVoice(text: String) {
+        val t = text.replace(" ", "")
+        _state.update { it.copy(heard = text) }
+        val s = _state.value
+        when {
+            listOf("안내", "길안내", "가자", "출발").any { it in t } -> {
+                if (s.challenge?.status == "active") { resumeNavigation(); say("남은 곳으로 길안내를 시작할게요") }
+                else say("진행 중인 코스가 없어요. 정차 후 코스를 추천받아 주세요")
+            }
+            listOf("인식", "수집", "찍어").any { it in t } -> { scanOnce(); say("차량을 인식할게요") }
+            listOf("순위", "점수", "랭킹").any { it in t } -> s.weekly?.me?.let { me ->
+                say("이번 주 ${me.rank}위, ${me.points}점이에요" + (s.weekly.gapToNext?.let { ", 한 계단 위까지 ${it}점" } ?: ""))
+            } ?: say("순위를 불러오는 중이에요")
+            listOf("도감", "몇종", "카드").any { it in t } -> s.home?.let { say("도감 ${it.dexOwned}종, 전설 ${it.legendaryOwned}종을 모았어요") }
+                ?: say("도감을 불러오는 중이에요")
+            listOf("조용", "음성꺼", "그만").any { it in t } -> { _state.update { it.copy(voiceOn = false) } }
+            else -> say("'길안내', '인식', '순위', '도감' 이라고 말해 보세요")
+        }
+    }
+
+    private fun say(msg: String) = _state.update { it.copy(notice = msg) }
 
     /** 추천 코스로 완주 챌린지를 시작하고 Pleos 내비게이션 길안내 */
     fun startChallengeAndNavigate() {
@@ -585,6 +645,8 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
     override fun onCleared() {
         navi.release()
         voice.release()
+        pleosAi.release()
+        voiceCommand.release()
         gear.release()
         uxRestriction.release()
         frames.release()

@@ -14,6 +14,10 @@
     <uses-permission android:name="pleos.car.permission.FUSED_LOCATION" />
     <!-- Pleos Vehicle SDK: 기어 상태(P단) -> 주행 중 화면 잠금 -->
     <uses-permission android:name="pleos.car.permission.CAR_DRIVE" />
+    <!-- Pleos LLM: 차종 판별(이미지) · AI 코스 추천 / Pleos SpeechToText: 주행 중 음성 명령 -->
+    <uses-permission android:name="pleos.car.permission.LLM_SERVICE" />
+    <uses-permission android:name="pleos.car.permission.STT_SERVICE" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Pleos TextToSpeech: 주행 중 음성 안내 -->
     <uses-permission android:name="pleos.car.permission.TTS_SERVICE" />
     <!-- Pleos NaviHelper: 경로 요청(requestRoute / requestRouteWithWaypoints) -->

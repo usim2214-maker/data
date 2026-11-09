@@ -92,6 +92,7 @@ class MainActivity : ComponentActivity() {
                                 state = state,
                                 onResumeNavigation = vm::resumeNavigation,
                                 onToggleVoice = vm::toggleVoice,
+                                onListen = vm::listenVoice,
                                 onExitSimulation = if (state.drivingSource == "시연 전환") ({ vm.simulateDriving(null) }) else null,
                             )
                         }
@@ -145,6 +146,7 @@ class MainActivity : ComponentActivity() {
                                     loading = state.courseLoading,
                                     landmarks = state.landmarks,
                                     challenge = state.challenge,
+                                    courseBy = state.courseBy,
                                     onRecommend = vm::recommendCourse,
                                     onStartChallenge = vm::startChallengeAndNavigate,
                                     onResumeNavigation = vm::resumeNavigation,
@@ -167,6 +169,8 @@ class MainActivity : ComponentActivity() {
                                     keywords = state.keywords,
                                     voiceOn = state.voiceOn,
                                     fields = state.fields,
+                                    aiStatus = state.aiStatus,
+                                    voiceStatus = state.voiceStatus,
                                     showDemoTools = BuildConfig.DEBUG,
                                     onSaveKeywords = vm::saveKeywords,
                                     onToggleVoice = vm::toggleVoice,
@@ -221,4 +225,7 @@ private val PLEOS_NAVI_PERMISSIONS = arrayOf(
     "pleos.car.permission.NAVI_ROUTE",
     "pleos.car.permission.NAVI_ROUTE_SEARCH",
     "pleos.car.permission.TTS_SERVICE", // 음성 안내
+    "pleos.car.permission.LLM_SERVICE", // AI 코스 추천
+    "pleos.car.permission.STT_SERVICE", // 음성 명령
+    "android.permission.RECORD_AUDIO",
 )

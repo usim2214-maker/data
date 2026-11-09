@@ -29,6 +29,8 @@ fun SettingsScreen(
     keywords: List<String>,
     voiceOn: Boolean,
     fields: List<String> = DEFAULT_FIELDS,
+    aiStatus: String = "",
+    voiceStatus: String = "",
     showDemoTools: Boolean,
     onSaveKeywords: (List<String>) -> Unit,
     onToggleVoice: () -> Unit,
@@ -46,6 +48,14 @@ fun SettingsScreen(
                         Text("스탬프·코스 알림을 소리로 들려줘요", color = Color.Gray)
                     }
                     Switch(checked = voiceOn, onCheckedChange = { onToggleVoice() })
+                }
+            }
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Pleos AI", style = MaterialTheme.typography.titleLarge)
+                    Text("AI 코스 추천: ${aiStatus.ifEmpty { "확인 중…" }}", color = Color.Gray)
+                    Text("음성 명령: ${voiceStatus.ifEmpty { "확인 중…" }}", color = Color.Gray)
+                    Text("Playground 앱 ID/키는 local.properties 의 pleos.appId / pleos.appKey", color = Color.Gray, fontSize = 13.sp)
                 }
             }
             if (showDemoTools) {

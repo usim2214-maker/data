@@ -12,7 +12,17 @@ from datetime import date, datetime
 import anthropic
 
 from app.config import Settings
-from app.schemas import Attraction, CourseRequest, CourseStop, DriveCourse, LimitedEvent, LLMCoursePick
+from app.schemas import (
+    Attraction,
+    CourseBuildRequest,
+    CourseCandidate,
+    CourseCandidates,
+    CourseRequest,
+    CourseStop,
+    DriveCourse,
+    LimitedEvent,
+    LLMCoursePick,
+)
 from app.services.challenge import completion_bonus
 from app.services import llm, regions
 from app.services.landmarks import points_for
@@ -35,6 +45,10 @@ SYSTEM_PROMPT = (
 )
 
 
+def _date_of(req: CourseRequest) -> date:
+    return datetime.strptime(req.date, "%Y%m%d").date() if req.date else date.today()
+
+
 def _road_hours(points: list[tuple[float, float]]) -> float:
     km = sum(distance_m(*points[i], *points[i + 1]) for i in range(len(points) - 1)) / 1000 * ROAD_FACTOR
     return round(km / AVG_KMH, 1)
@@ -45,16 +59,55 @@ class CourseService:
         self.settings, self.tour, self.store = settings, tour, store
 
     def recommend(self, req: CourseRequest) -> DriveCourse:
-        on = datetime.strptime(req.date, "%Y%m%d").date() if req.date else date.today()
+        """서버가 후보 수집 + 선택(LLM 또는 규칙) + 조립까지"""
+        on = _date_of(req)
         cands = self._candidates(req, on)
         if not cands:
-            return DriveCourse(title="추천할 코스가 없어요", summary="희망 시간을 늘려 보세요.", stops=[],
-                               est_drive_hours=0, expected_points=0, candidates_source=self.tour.source)
-
+            return self._empty()
         pick = self._llm_pick(req, cands, on) if self.settings.llm_enabled else None
         if pick is None:
             pick = self._greedy_pick(req, cands)
+        return self._build(req, cands, pick)
 
+    # ---- 앱의 Pleos LLM 이 코스를 고르는 흐름: 후보 받기 -> (앱) 선택 -> 조립 ----
+    def candidates(self, req: CourseRequest) -> CourseCandidates:
+        on = _date_of(req)
+        cands = self._candidates(req, on)
+        return CourseCandidates(
+            candidates=[CourseCandidate(**c.model_dump(exclude={"points"})) for c in cands],
+            fallback=self._greedy_pick(req, cands) if cands else None,
+            prompt=self.prompt_for(req, cands, on),
+            source=self.tour.source,
+        )
+
+    def build(self, req: CourseBuildRequest) -> DriveCourse:
+        """앱(Pleos LLM)이 고른 후보 ID 로 코스를 조립. 후보에 없는 ID 는 버리고, 시간·점수는 서버가 계산"""
+        cands = self._candidates(req.request, _date_of(req.request))
+        if not cands:
+            return self._empty()
+        pick = LLMCoursePick(title=req.title, summary=req.summary, stop_ids=req.stop_ids, reasons=req.reasons)
+        if not any(sid in {c.content_id for c in cands} for sid in pick.stop_ids):
+            pick = self._greedy_pick(req.request, cands)
+        return self._build(req.request, cands, pick)
+
+    def prompt_for(self, req: CourseRequest, cands: list["_Cand"], on: date) -> str:
+        payload = [
+            {"id": c.content_id, "name": c.name, "kind": c.kind, "region": c.region_id, "dist_km": c.dist_km,
+             "new_region": c.new_region_stamp, "event": c.event}
+            for c in cands
+        ]
+        return (
+            SYSTEM_PROMPT + "\n\n"
+            f"날짜: {on.isoformat()}\n희망 왕복 시간: {req.max_hours}시간\n취향: {req.note or '없음'}\n"
+            f"후보:\n{json.dumps(payload, ensure_ascii=False)}\n\n"
+            '반드시 JSON 한 개로만 답하세요: {"title": "...", "summary": "...", "stop_ids": ["..."], "reasons": ["..."]}'
+        )
+
+    def _empty(self) -> DriveCourse:
+        return DriveCourse(title="추천할 코스가 없어요", summary="희망 시간을 늘려 보세요.", stops=[],
+                           est_drive_hours=0, expected_points=0, candidates_source=self.tour.source)
+
+    def _build(self, req: CourseRequest, cands: list["_Cand"], pick: LLMCoursePick) -> DriveCourse:
         by_id = {c.content_id: c for c in cands}
         stops = []
         for cid, reason in zip(pick.stop_ids, pick.reasons + [""] * len(pick.stop_ids)):

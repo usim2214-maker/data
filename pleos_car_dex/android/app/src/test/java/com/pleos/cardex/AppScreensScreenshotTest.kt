@@ -157,7 +157,7 @@ class AppScreensScreenshotTest {
                 challenge = Challenge(course, "2026-11-09T00:00:00Z", "2026-11-10T00:00:00Z", visited = listOf("mock-nami")),
                 driving = DrivingSnapshot(GeoPoint(37.9, 127.9), source = "Pleos FusedLocation"),
                 weekly = Leaderboard("2026-W46", null, emptyList(), RankRow(3, "me", "나", 95, true), 6),
-                notice = "✨ 히든 스탬프 '남이섬' 획득! +35 · 코스 1/3",
+                notice = "✨ 히든 스탬프 '남이섬' 획득! +35 · 코스 1/3", heard = "남은 곳 안내해줘",
             ),
             onResumeNavigation = {}, onToggleVoice = {}, onExitSimulation = null,
         )

@@ -335,3 +335,15 @@ def test_card_info_comes_from_catalog_list(client):
     card = client.post("/api/v1/recognize", files={"image": ("kia-carnival.jpg", _jpeg(), "image/jpeg")}).json()["card"]
     assert card["one_liner"] == "가족 나들이의 대표 미니밴"
     assert card["facts"] == [{"keyword": "차급", "value": "대형 MPV"}, {"keyword": "승차인원", "value": "7~11인승"}]
+
+
+def test_course_candidates_and_build_for_pleos_llm(client):
+    req = {"lat": 37.5665, "lon": 126.978, "max_hours": 6, "date": "20261108"}
+    c = client.post("/api/v1/courses/candidates", json=req).json()
+    assert c["candidates"] and c["fallback"]["stop_ids"] and '"stop_ids"' in c["prompt"]
+    pick_id = max(c["candidates"], key=lambda x: x["dist_km"])["content_id"]  # 먼 곳 (운전 시간 > 0)
+    course = client.post("/api/v1/courses/build", json={
+        "request": req, "title": "Pleos LLM 코스", "summary": "s", "stop_ids": [pick_id, "bogus-id"], "reasons": ["r", "x"],
+    }).json()
+    assert course["title"] == "Pleos LLM 코스" and [s["content_id"] for s in course["stops"]] == [pick_id]
+    assert course["est_drive_hours"] > 0

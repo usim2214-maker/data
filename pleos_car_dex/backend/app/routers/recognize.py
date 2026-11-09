@@ -67,3 +67,4 @@ async def recognize_video(
         raise HTTPException(status_code=400, detail=str(e))
     finally:
         path.unlink(missing_ok=True)
+

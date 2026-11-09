@@ -12,8 +12,15 @@ from pathlib import Path
 from PIL import Image
 
 from app.config import get_settings
-from app.schemas import Detection, GeoPoint, RecognitionResponse, VehicleCard, VehicleIdentity, VideoRecognitionResponse
-from app.services.catalog import find_vehicle, slugify
+from app.schemas import (
+    Detection,
+    GeoPoint,
+    RecognitionResponse,
+    VehicleCard,
+    VehicleIdentity,
+    VideoRecognitionResponse,
+)
+from app.services.catalog import find_vehicle
 from app.services.detector import VehicleDetector, _iou
 from app.services.identifier import VehicleIdentifier
 from app.services.store import JsonStore
@@ -107,14 +114,18 @@ class RecognitionPipeline:
                 detected=True, detection=detection, identity=identity,
                 message=f"{identity.brand} {identity.model} — 도감에 없는 차량이에요",
             )
+        if self.settings.save_crops:  # 기본은 저장하지 않음 (개인정보)
+            crop.save(self.settings.crops_dir / f"{ref['id']}-{uuid.uuid4().hex[:8]}.jpg", quality=90)
+        return self._card_from(ref, identity, detection, keywords, location, register)
+
+    def _card_from(self, ref: dict, identity: VehicleIdentity, detection: Detection | None,
+                   keywords: list[str] | None, location: GeoPoint | None, register: bool) -> RecognitionResponse:
+        prefs = self.store.get_preferences()
+        keywords = keywords or prefs.keywords
         card_id = ref["id"]
         card = self._reusable_card(card_id, keywords)
         if card is None:
             image_url = None
-            if self.settings.save_crops:  # 기본은 저장하지 않음 (개인정보)
-                crop_name = f"{card_id}-{uuid.uuid4().hex[:8]}.jpg"
-                crop.save(self.settings.crops_dir / crop_name, quality=90)
-                image_url = f"/static/crops/{crop_name}"
             summary = self.summarizer.summarize(identity, keywords, prefs.language)
             card = VehicleCard(
                 id=card_id,

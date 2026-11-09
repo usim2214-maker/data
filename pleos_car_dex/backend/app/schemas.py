@@ -285,6 +285,28 @@ class ChallengeUpdate(BaseModel):
     badge: LimitedBadge | None = None
 
 
+class CourseCandidate(CourseStop):
+    dist_km: float = 0
+    event: str = ""
+
+
+class CourseCandidates(BaseModel):
+    """앱의 Pleos LLM 이 코스를 고를 수 있도록 주는 후보 + 프롬프트 (+ LLM 이 없을 때 쓸 규칙 기반 선택)"""
+
+    candidates: list[CourseCandidate]
+    fallback: "LLMCoursePick | None" = None
+    prompt: str
+    source: str
+
+
+class CourseBuildRequest(BaseModel):
+    request: CourseRequest
+    title: str
+    summary: str
+    stop_ids: list[str]
+    reasons: list[str] = []
+
+
 class LLMCoursePick(BaseModel):
     """LLM 구조화 출력: 후보 ID 중에서 고른 코스"""
 
@@ -396,5 +418,6 @@ class HomeSummary(BaseModel):
 
 
 CollectionResponse.model_rebuild()
+CourseCandidates.model_rebuild()
 LandmarkVisitResponse.model_rebuild()
 Showroom.model_rebuild()

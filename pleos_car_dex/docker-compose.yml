@@ -1,0 +1,17 @@
+# 백엔드 한 번에 실행:  docker compose up -d --build   →  http://localhost:8000/docs
+# 실제 YOLO 감지를 쓰려면 아래 VISION 을 "1" 로 (이미지가 커짐)
+services:
+  backend:
+    build:
+      context: ./backend
+      args:
+        VISION: "0"
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env        # backend/.env.example 을 복사해 만든다 (API 키는 여기에만)
+    volumes:
+      - cardex-data:/data     # 도감·스탬프 등 저장 데이터
+    restart: unless-stopped
+volumes:
+  cardex-data:

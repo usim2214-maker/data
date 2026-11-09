@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.schemas import CatalogVehicle, CollectionResponse
 from app.services.catalog import load_catalog
+from app.services import mycar
 from app.services.progress import synergy_for
 from app.services.pipeline import RecognitionPipeline, get_pipeline
 
@@ -11,6 +12,8 @@ router = APIRouter(prefix="/api/v1/collection", tags=["collection"])
 @router.get("", response_model=CollectionResponse)
 def list_collection(pipeline: RecognitionPipeline = Depends(get_pipeline)):
     entries = pipeline.store.list_entries()
+    my_car = pipeline.store.get_preferences().my_car_id
+    entries = [e.model_copy(update={"card": mycar.annotate(e.card, my_car)}) for e in entries]  # 내 차 비교는 조회 시 계산
     return CollectionResponse(total=len(entries), entries=entries, synergy=synergy_for(pipeline.store))
 
 

@@ -33,11 +33,14 @@ data class VehicleCard(
     @SerialName("one_liner") val oneLiner: String,
     val facts: List<KeywordFact>,
     val rarity: String = "common",
+    @SerialName("is_my_car") val isMyCar: Boolean = false,
+    @SerialName("vs_my_car") val vsMyCar: List<String> = emptyList(), // 카드 뒷면 '내 차와 비교'
 )
 
 @Serializable
 data class RecognitionResponse(
     val detected: Boolean,
+    val twin: Boolean = false, // 내 차와 같은 차(쌍둥이)
     val detection: Detection? = null, // 카드로 만든 차량
     val detections: List<Detection> = emptyList(), // 화면 속 모든 차량
     val identity: VehicleIdentity? = null,
@@ -47,7 +50,7 @@ data class RecognitionResponse(
 )
 
 @Serializable
-data class Preferences(val keywords: List<String>, val language: String = "ko")
+data class Preferences(val keywords: List<String>, val language: String = "ko", @SerialName("my_car_id") val myCarId: String? = null)
 
 @Serializable
 data class GeoPoint(val lat: Double, val lon: Double)

@@ -366,3 +366,17 @@ def test_kids_quiz_kind_and_color(client):
 
     for color, name in [((250, 250, 250), "흰색"), ((15, 15, 15), "검은색"), ((40, 160, 60), "초록색"), ((240, 220, 40), "노란색")]:
         assert client.post("/api/v1/quiz/question", files={"image": ("c.jpg", img(color), "image/jpeg")}, data={"type": "color"}).json()["question"]["answer"] == name
+
+
+def test_my_car_twin_and_compare(client):
+    client.put("/api/v1/preferences", json={"keywords": ["가격"], "my_car_id": "hyundai-avante"})
+    assert client.get("/api/v1/preferences").json()["my_car_id"] == "hyundai-avante"
+    assert client.put("/api/v1/preferences", json={"keywords": ["가격"], "my_car_id": "tesla"}).json()["my_car_id"] is None
+    client.put("/api/v1/preferences", json={"keywords": ["가격"], "my_car_id": "hyundai-avante"})
+
+    twin = client.post("/api/v1/recognize", files={"image": ("hyundai-avante.jpg", _jpeg(), "image/jpeg")}).json()
+    assert twin["twin"] and twin["card"]["is_my_car"] and "쌍둥이" in twin["message"]
+    g90 = client.post("/api/v1/recognize", files={"image": ("genesis-g90.jpg", _jpeg((5, 5, 5)), "image/jpeg")}).json()["card"]
+    assert g90["vs_my_car"] == ["가격 +7,500만 원", "마력 +257마력", "차급 대형 세단 · 내 차 준중형 세단"]
+    syn = {b["name"]: b["points"] for b in client.get("/api/v1/collection").json()["synergy"]["bonuses"]}
+    assert syn["쌍둥이 차"] == 10

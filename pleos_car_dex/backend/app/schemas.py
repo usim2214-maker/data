@@ -54,10 +54,13 @@ class VehicleCard(BaseModel):
     one_liner: str
     facts: list[KeywordFact]  # 카드 뒷면
     rarity: str = "common"  # common | rare | legendary (도감 게이미피케이션)
+    is_my_car: bool = False  # 내 차와 같은 모델
+    vs_my_car: list[str] = []  # 카드 뒷면 '내 차와 비교' (조회 시 계산)
 
 
 class RecognitionResponse(BaseModel):
     detected: bool
+    twin: bool = False  # 내 차와 같은 차(쌍둥이)를 만남
     detection: Detection | None = None  # 카드로 만든 차량 (가장 가깝게 보인 차)
     detections: list[Detection] = []  # 화면 속 모든 차량 (앱에서 박스 표시)
     identity: VehicleIdentity | None = None
@@ -69,6 +72,7 @@ class RecognitionResponse(BaseModel):
 class Preferences(BaseModel):
     keywords: list[str] = Field(default_factory=lambda: list(DEFAULT_KEYWORDS), max_length=8)
     language: str = "ko"
+    my_car_id: str | None = None  # 내 차 (도감 28종 중)
 
 
 class GeoPoint(BaseModel):

@@ -18,7 +18,10 @@ def get_tour() -> TourClient:
 
 @lru_cache
 def get_competition() -> CompetitionService:
-    return CompetitionService(get_pipeline().store)
+    comp = CompetitionService(get_pipeline().store)
+    from app.services.mycar import TWIN_POINTS
+    get_pipeline().on_twin = lambda card: comp.record(TWIN_POINTS, None, "twin", card.model)  # 쌍둥이 차 보너스
+    return comp
 
 
 @lru_cache

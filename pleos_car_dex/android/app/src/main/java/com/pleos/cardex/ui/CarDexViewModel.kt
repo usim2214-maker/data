@@ -68,6 +68,7 @@ data class UiState(
     /** 새 스탬프 획득 등 잠깐 띄울 알림 */
     val notice: String? = null,
     val keywords: List<String> = emptyList(),
+    val myCarId: String? = null,
     val fields: List<String> = com.pleos.cardex.ui.screens.DEFAULT_FIELDS,
     val driving: DrivingSnapshot? = null,
     val demoVideo: Uri? = null,
@@ -316,7 +317,8 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
                         // 차량이 없는 프레임은 직전 카드를 유지 (박스는 이번 프레임 기준)
                         lastResult = if (card != null || it.lastResult == null) r else it.lastResult?.copy(detections = r.detections),
                         // 새 카드: 희귀·전설은 축하 연출, 일반은 알림 (주행 중엔 음성만)
-                        celebration = if (card != null && r.isNewEntry) when (card.rarity) {
+                        celebration = if (card != null && r.twin) Celebration("👯", "쌍둥이 차 발견!", r.message)
+                        else if (card != null && r.isNewEntry) when (card.rarity) {
                             "legendary" -> Celebration("🌟", "LEGENDARY 카드 획득!", "${card.brand} ${card.model}")
                             "rare" -> Celebration("💎", "희귀 카드 획득!", "${card.brand} ${card.model}")
                             else -> it.celebration
@@ -675,14 +677,23 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
     // ---------------- 키워드 ----------------
     private fun loadPreferences() {
         viewModelScope.launch {
-            call { repo.preferences() }.onSuccess { p -> _state.update { it.copy(keywords = p.keywords) } }
+            call { repo.preferences() }.onSuccess { p -> _state.update { it.copy(keywords = p.keywords, myCarId = p.myCarId) } }
             call { repo.fields() }.onSuccess { f -> _state.update { it.copy(fields = f) } }
+        }
+    }
+
+    /** 내 차 등록 (도감 28종 중) — 쌍둥이 차 보너스, 카드 뒷면 '내 차와 비교' */
+    fun saveMyCar(id: String?) {
+        viewModelScope.launch {
+            call { repo.savePreferences(Preferences(_state.value.keywords, myCarId = id)) }
+                .onSuccess { p -> _state.update { it.copy(myCarId = p.myCarId) }; refreshCollection() }
+                .onFailure { e -> _state.update { it.copy(error = "저장 실패: ${e.message}") } }
         }
     }
 
     fun saveKeywords(keywords: List<String>) {
         viewModelScope.launch {
-            call { repo.savePreferences(Preferences(keywords)) }
+            call { repo.savePreferences(Preferences(keywords, myCarId = _state.value.myCarId)) }
                 .onSuccess { p -> _state.update { it.copy(keywords = p.keywords) } }
                 .onFailure { e -> _state.update { it.copy(error = "저장 실패: ${e.message}") } }
         }

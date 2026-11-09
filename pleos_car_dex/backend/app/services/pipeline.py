@@ -20,6 +20,7 @@ from app.schemas import (
     VehicleIdentity,
     VideoRecognitionResponse,
 )
+from app.services import mycar
 from app.services.catalog import find_vehicle
 from app.services.detector import VehicleDetector, _iou
 from app.services.identifier import VehicleIdentifier
@@ -47,6 +48,7 @@ class RecognitionPipeline:
         self.identifier = VehicleIdentifier(s)
         self.summarizer = CardSummarizer(s)
         self.store = JsonStore(s.data_dir)
+        self.on_twin = None  # 쌍둥이 차를 만났을 때 콜백 (deps 에서 원장 기록 연결)
         # 최근 판별 결과 캐시: (시각, 박스, 이미지 해시, 판별 결과)
         self._recent: list[tuple[float, Detection, int, VehicleIdentity]] = []
 
@@ -141,13 +143,21 @@ class RecognitionPipeline:
         is_new = False
         if register:
             _, is_new = self.store.register(card, location)
+        my_car = prefs.my_car_id
+        twin = bool(my_car) and card_id == my_car
+        if twin and register and self.on_twin:
+            self.on_twin(card)  # 쌍둥이 보너스 (원장 기록)
+        message = ("새로운 차량을 도감에 등록했어요!" if is_new else "이미 수집한 차량이에요.") if register else "카드를 만들었어요 (도감 미등록)"
+        if twin:
+            message = f"내 차와 같은 {card.model}를 만났어요! 쌍둥이 +{mycar.TWIN_POINTS}"
         return RecognitionResponse(
             detected=True,
             detection=detection,
             identity=identity,
-            card=card,
+            card=mycar.annotate(card, my_car),
             is_new_entry=is_new,
-            message=("새로운 차량을 도감에 등록했어요!" if is_new else "이미 수집한 차량이에요.") if register else "카드를 만들었어요 (도감 미등록)",
+            twin=twin,
+            message=message,
         )
 
     def _cache_enabled(self) -> bool:

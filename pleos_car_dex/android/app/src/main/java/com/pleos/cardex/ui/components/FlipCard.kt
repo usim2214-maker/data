@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,6 +30,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.pleos.cardex.data.VehicleCard
 import com.pleos.cardex.ui.theme.rarityColor
 
@@ -71,7 +73,7 @@ private fun CardFront(card: VehicleCard, accent: Color) {
                 .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(accent.copy(alpha = 0.35f), Color(0xFF161B22)))),
         )
         Column(Modifier.padding(20.dp)) {
-            Text(card.rarity.uppercase(), color = accent, style = MaterialTheme.typography.labelLarge)
+            Text(card.rarity.uppercase() + if (card.isMyCar) "  ·  🚗 MY CAR" else "", color = accent, style = MaterialTheme.typography.labelLarge)
             Text("${card.brand} ${card.model}", style = MaterialTheme.typography.headlineMedium)
             Text(card.oneLiner, style = MaterialTheme.typography.bodyLarge, color = Color.LightGray)
         }
@@ -80,7 +82,7 @@ private fun CardFront(card: VehicleCard, accent: Color) {
 
 @Composable
 private fun CardBack(card: VehicleCard, accent: Color) {
-    Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("${card.brand} ${card.model}", style = MaterialTheme.typography.titleLarge, color = accent)
         Text("📋 내가 고른 정보", style = MaterialTheme.typography.labelLarge, color = Color.Gray)
         HorizontalDivider(color = accent.copy(alpha = 0.4f))
@@ -89,6 +91,12 @@ private fun CardBack(card: VehicleCard, accent: Color) {
                 Text(fact.keyword, Modifier.weight(0.35f), style = MaterialTheme.typography.labelLarge, color = Color.Gray)
                 Text(fact.value, Modifier.weight(0.65f), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
             }
+        }
+        if (card.isMyCar) Text("🚗 내 차와 같은 모델이에요", color = Color(0xFF7CE38B), style = MaterialTheme.typography.labelLarge)
+        if (card.vsMyCar.isNotEmpty()) {
+            HorizontalDivider(color = accent.copy(alpha = 0.25f))
+            Text("🚗 내 차와 비교", style = MaterialTheme.typography.labelLarge, color = Color.Gray)
+            card.vsMyCar.forEach { Text(it, fontSize = 17.sp, color = Color(0xFFB3E5FC), fontWeight = FontWeight.SemiBold) }
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.pleos.cardex.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,6 +17,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -31,6 +34,9 @@ fun SettingsScreen(
     fields: List<String> = DEFAULT_FIELDS,
     aiStatus: String = "",
     voiceStatus: String = "",
+    catalog: List<com.pleos.cardex.data.CatalogVehicle> = emptyList(),
+    myCarId: String? = null,
+    onMyCar: (String?) -> Unit = {},
     showDemoTools: Boolean,
     onSaveKeywords: (List<String>) -> Unit,
     onToggleVoice: () -> Unit,
@@ -40,7 +46,27 @@ fun SettingsScreen(
 ) {
     Row(Modifier.fillMaxSize()) {
         Box(Modifier.weight(1.4f).fillMaxHeight()) { KeywordSettingsScreen(keywords, onSaveKeywords, fields) }
-        Column(Modifier.weight(1f).fillMaxHeight().padding(32.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(32.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            // 내 차: 쌍둥이 차 보너스 + 카드 뒷면 '내 차와 비교'
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("내 차", style = MaterialTheme.typography.titleLarge)
+                    var open by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+                    val mine = catalog.firstOrNull { it.id == myCarId }
+                    Box {
+                        OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth().height(64.dp)) {
+                            Text(mine?.let { "🚗 ${it.brand} ${it.model}" } ?: "내 차 고르기 ▾", fontSize = 20.sp)
+                        }
+                        androidx.compose.material3.DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                            androidx.compose.material3.DropdownMenuItem(text = { Text("선택 안 함") }, onClick = { onMyCar(null); open = false })
+                            catalog.sortedWith(compareBy({ it.brand }, { it.model })).forEach { v ->
+                                androidx.compose.material3.DropdownMenuItem(text = { Text("${v.brand} ${v.model}") }, onClick = { onMyCar(v.id); open = false })
+                            }
+                        }
+                    }
+                    Text("같은 차를 만나면 쌍둥이 보너스, 다른 차 카드엔 '내 차와 비교'", color = Color.Gray, fontSize = 14.sp)
+                }
+            }
             Card(Modifier.fillMaxWidth()) {
                 Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {

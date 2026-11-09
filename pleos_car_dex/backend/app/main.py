@@ -24,6 +24,10 @@ app.include_router(challenge.router)
 app.include_router(rankings.router)
 app.include_router(demo.router)
 app.include_router(quiz.router)
+from app.services.deps import get_competition  # noqa: E402
+
+get_competition()  # 쌍둥이 보너스 콜백 연결
+
 app.mount("/static/crops", StaticFiles(directory=settings.crops_dir), name="crops")
 
 

@@ -102,7 +102,7 @@ class AppScreensScreenshotTest {
             com.pleos.cardex.ui.screens.ScanScreen(
                 UiState(
                     keywords = listOf("가격", "브랜드", "마력", "연비"), lastFrameJpeg = img.readBytes(),
-                    lastResult = com.pleos.cardex.data.RecognitionResponse(true, det(o.getJSONObject("primary")), dets, null, card, isNewEntry = true),
+                    lastResult = com.pleos.cardex.data.RecognitionResponse(detected = true, detection = det(o.getJSONObject("primary")), detections = dets, card = card, isNewEntry = true),
                 ),
                 java.util.concurrent.atomic.AtomicLong(0), {}, {},
             )
@@ -136,6 +136,20 @@ class AppScreensScreenshotTest {
     @Test fun quizAsk() { val st = quizState(null); org.junit.Assume.assumeTrue(st != null); shot("quiz_ask") { com.pleos.cardex.ui.screens.QuizScreen(st!!, {}, {}, {}) } }
 
     @Test fun quizReveal() { val st = quizState("파란색"); org.junit.Assume.assumeTrue(st != null); shot("quiz_reveal") { com.pleos.cardex.ui.screens.QuizScreen(st!!, {}, {}, {}) } }
+
+    /** 1회차: 내 차(아반떼) 등록 -> 쌍둥이 표시 / 다른 차 카드엔 '내 차와 비교' */
+    @Test fun myCar() = shot("my_car_compare") {
+        androidx.compose.foundation.layout.Row(androidx.compose.ui.Modifier.padding(32.dp), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(32.dp)) {
+            val mine = com.pleos.cardex.data.VehicleCard("hyundai-avante", "현대", "아반떼", "세단", null, "국민 준중형 세단",
+                listOf(com.pleos.cardex.data.KeywordFact("가격", "약 2,000만 원대~")), rarity = "common", isMyCar = true)
+            val g90 = com.pleos.cardex.data.VehicleCard("genesis-g90", "제네시스", "G90", "세단", null, "제네시스의 플래그십 세단",
+                listOf(com.pleos.cardex.data.KeywordFact("가격", "약 9,500만 원대~"), com.pleos.cardex.data.KeywordFact("마력", "약 380~415마력")),
+                rarity = "legendary", vsMyCar = listOf("가격 +7,500만 원", "마력 +257마력", "차급 대형 세단 · 내 차 준중형 세단"))
+            com.pleos.cardex.ui.components.FlipCard(mine, androidx.compose.ui.Modifier.size(330.dp, 470.dp))
+            com.pleos.cardex.ui.components.FlipCard(g90, androidx.compose.ui.Modifier.size(330.dp, 470.dp))
+            com.pleos.cardex.ui.components.FlipCard(g90, androidx.compose.ui.Modifier.size(330.dp, 470.dp), flipped = true)
+        }
+    }
 
     @Test fun onboarding() = shot("onboarding") { OnboardingScreen(onFinish = {}) }
 

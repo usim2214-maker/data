@@ -283,6 +283,7 @@ private const val PLEOS_GEAR_PERMISSION = "pleos.car.permission.CAR_DRIVE" // Ve
 private val PLEOS_NAVI_PERMISSIONS = arrayOf(
     "pleos.car.permission.NAVI_ROUTE",
     "pleos.car.permission.NAVI_ROUTE_SEARCH",
+    "pleos.car.permission.NAVI_CUSTOM_MAP", // 메인 검색창 → 내비 장소 검색 화면
     "pleos.car.permission.TTS_SERVICE", // 음성 안내
     "pleos.car.permission.LLM_SERVICE", // AI 코스 추천
     "pleos.car.permission.STT_SERVICE", // 음성 명령

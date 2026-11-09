@@ -37,7 +37,14 @@ import androidx.navigation.compose.rememberNavController
 import com.pleos.cardex.ui.CarDexViewModel
 import com.pleos.cardex.ui.screens.CollectionScreen
 import com.pleos.cardex.ui.screens.DrivingScreen
-import com.pleos.cardex.ui.screens.KeywordSettingsScreen
+import com.pleos.cardex.ui.screens.OnboardingScreen
+import com.pleos.cardex.ui.screens.SettingsScreen
+import com.pleos.cardex.ui.components.CelebrationOverlay
+import com.pleos.cardex.data.CarDexApi
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 import com.pleos.cardex.ui.screens.ScanScreen
 import com.pleos.cardex.ui.screens.RankingScreen
 import com.pleos.cardex.ui.screens.ShowroomScreen
@@ -50,7 +57,7 @@ private enum class Dest(val route: String, val label: String, val icon: ImageVec
     Showroom("showroom", "쇼룸", Icons.Filled.DirectionsCar),
     Collection("collection", "도감", Icons.Filled.CollectionsBookmark),
     Scan("scan", "인식(베타)", Icons.Filled.CameraAlt), // 차량 인식: 차량 영상 API 공개 후 확장 예정
-    Settings("settings", "키워드", Icons.Filled.Tune),
+    Settings("settings", "설정", Icons.Filled.Tune),
 }
 
 class MainActivity : ComponentActivity() {
@@ -63,9 +70,12 @@ class MainActivity : ComponentActivity() {
             vm.startGear(result[PLEOS_GEAR_PERMISSION] == true)
         }
 
+    private fun requestPleosPermissions() =
+        pleosPermissions.launch(arrayOf(PLEOS_LOCATION_PERMISSION, PLEOS_GEAR_PERMISSION, *PLEOS_NAVI_PERMISSIONS))
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        pleosPermissions.launch(arrayOf(PLEOS_LOCATION_PERMISSION, PLEOS_GEAR_PERMISSION, *PLEOS_NAVI_PERMISSIONS))
+        if (vm.state.value.onboardingDone) requestPleosPermissions() // 첫 실행이면 안내 화면을 본 뒤 요청
         setContent {
             CarDexTheme {
                 val state by vm.state.collectAsStateWithLifecycle()
@@ -74,7 +84,9 @@ class MainActivity : ComponentActivity() {
 
                 Surface(Modifier.fillMaxSize()) {
                     // 차량 가로형 디스플레이: 좌측 내비게이션 레일
-                    if (state.isDriving) {
+                    if (!state.onboardingDone) {
+                        OnboardingScreen(onFinish = { vm.finishOnboarding(); requestPleosPermissions() })
+                    } else if (state.isDriving) {
                         Box(Modifier.fillMaxSize()) {
                             DrivingScreen(
                                 state = state,
@@ -135,7 +147,7 @@ class MainActivity : ComponentActivity() {
                                     onStartChallenge = vm::startChallengeAndNavigate,
                                     onResumeNavigation = vm::resumeNavigation,
                                     onAbandon = vm::abandonChallenge,
-                                    onSimulateDriving = if (BuildConfig.DEBUG) ({ vm.simulateDriving(true) }) else null,
+                                    home = state.home,
                                 )
                             }
                             composable(Dest.Ranking.route) {
@@ -148,7 +160,37 @@ class MainActivity : ComponentActivity() {
                                     onLoad = { vm.loadRankings(it) },
                                 )
                             }
-                            composable(Dest.Settings.route) { KeywordSettingsScreen(state.keywords, vm::saveKeywords) }
+                            composable(Dest.Settings.route) {
+                                SettingsScreen(
+                                    keywords = state.keywords,
+                                    voiceOn = state.voiceOn,
+                                    showDemoTools = BuildConfig.DEBUG,
+                                    onSaveKeywords = vm::saveKeywords,
+                                    onToggleVoice = vm::toggleVoice,
+                                    onSeedDemo = vm::seedDemo,
+                                    onResetDemo = vm::resetDemo,
+                                    onSimulateDriving = { vm.simulateDriving(true) },
+                                )
+                            }
+                        }
+                        // 서버 연결 끊김 배너
+                        if (state.serverDown) {
+                            Surface(
+                                color = Color(0xFF5C1E1E), shape = RoundedCornerShape(16.dp),
+                                modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
+                            ) {
+                                Row(Modifier.padding(horizontal = 20.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Text("⚠️ 서버에 연결할 수 없어요 (${CarDexApi.baseUrl})", color = Color.White, fontSize = 18.sp)
+                                    TextButton(onClick = vm::refreshAll) { Text("다시 시도", fontSize = 18.sp) }
+                                }
+                            }
+                        }
+                        // 화면별 오류는 하단에 잠깐 (서버 끊김 배너와 겹치지 않게)
+                        state.error?.takeIf { !state.serverDown }?.let { msg ->
+                            LaunchedEffect(msg) { delay(5_000); vm.clearError() }
+                            Surface(color = Color(0xFF3A2A12), shape = RoundedCornerShape(16.dp), modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)) {
+                                Text("⚠️ $msg", color = Color.White, fontSize = 18.sp, modifier = Modifier.padding(16.dp))
+                            }
                         }
                         // 전역 알림 배너: 스탬프 획득, 길안내 요청 등 (4초 후 사라짐)
                         state.notice?.let { msg -> // 4초 후 ViewModel 이 자동으로 지움
@@ -162,6 +204,8 @@ class MainActivity : ComponentActivity() {
                         }
                         }
                     }
+                    // 큰 성취 축하 (주행 중엔 음성만, 화면 연출은 정차 후)
+                    if (!state.isDriving) state.celebration?.let { CelebrationOverlay(it, vm::dismissCelebration) }
                 }
             }
         }

@@ -8,6 +8,7 @@ import com.pleos.cardex.BuildConfig
 import com.pleos.cardex.data.CarDexRepository
 import com.pleos.cardex.data.Challenge
 import com.pleos.cardex.data.CollectionEntry
+import com.pleos.cardex.data.HomeSummary
 import com.pleos.cardex.data.DecorCatalog
 import com.pleos.cardex.data.MAX_PROPS
 import com.pleos.cardex.data.PlacedProp
@@ -75,17 +76,81 @@ data class UiState(
     val drivingSource: String = "",
     val speedKmh: Float? = null,
     val voiceOn: Boolean = true,
+    val home: HomeSummary? = null,
+    /** 서버에 연결할 수 없음 -> 상단 배너 + 다시 시도 */
+    val serverDown: Boolean = false,
+    /** 큰 성취 축하 연출 (코스 완주·한정 배지·지역 마스터) */
+    val celebration: Celebration? = null,
+    val onboardingDone: Boolean = true,
     val error: String? = null,
 )
 
+data class Celebration(val emoji: String, val title: String, val subtitle: String)
+
 class CarDexViewModel(app: Application) : AndroidViewModel(app) {
+    private val prefs = app.getSharedPreferences("cardex", android.content.Context.MODE_PRIVATE)
+
+    /** 네트워크/서버 오류를 사용자 문구로 바꾸고 서버 연결 상태를 갱신 */
+    private suspend fun <T> call(block: suspend () -> T): Result<T> = runCatching { block() }
+        .onSuccess { if (_state.value.serverDown) _state.update { it.copy(serverDown = false) } }
+        .recoverCatching { e -> throw Exception(friendly(e), e) }
+
+    private fun friendly(e: Throwable): String = when (e) {
+        is java.net.ConnectException, is java.net.UnknownHostException, is java.net.SocketTimeoutException -> {
+            _state.update { it.copy(serverDown = true) }
+            "서버에 연결할 수 없어요. 백엔드가 켜져 있는지 확인해 주세요."
+        }
+        is retrofit2.HttpException -> runCatching {
+            val body = e.response()?.errorBody()?.string().orEmpty()
+            kotlinx.serialization.json.Json.parseToJsonElement(body)
+                .let { (it as kotlinx.serialization.json.JsonObject)["detail"].toString().trim('"') }
+        }.getOrDefault("요청을 처리하지 못했어요 (${e.code()})")
+        else -> e.message ?: "알 수 없는 오류"
+    }
+
+    /** 모든 화면 데이터 다시 불러오기 (다시 시도 버튼, 시연 데이터 채우기 후) */
+    fun refreshAll() {
+        refreshCollection(); loadShowroom(); loadStamps(); loadChallenge(); loadRankings(); loadHome()
+        lastLandmarkFetch = null
+    }
+
+    fun loadHome() {
+        viewModelScope.launch { call { repo.home() }.onSuccess { h -> _state.update { it.copy(home = h) } } }
+    }
+
+    fun seedDemo() {
+        viewModelScope.launch {
+            call { repo.demoSeed() }
+                .onSuccess { _state.update { it.copy(notice = "시연 데이터를 채웠어요 (차량 4 · 스탬프 3 · 히든 2)") }; refreshAll() }
+                .onFailure { e -> _state.update { it.copy(error = e.message) } }
+        }
+    }
+
+    fun resetDemo() {
+        viewModelScope.launch {
+            call { repo.demoReset() }
+                .onSuccess { _state.update { it.copy(notice = "모든 진행 데이터를 초기화했어요", lastResult = null, course = null) }; refreshAll() }
+                .onFailure { e -> _state.update { it.copy(error = e.message) } }
+        }
+    }
+
+    fun finishOnboarding() {
+        prefs.edit().putBoolean("onboarding_done", true).apply()
+        _state.update { it.copy(onboardingDone = true) }
+    }
+
+    fun dismissCelebration() = _state.update { it.copy(celebration = null) }
+    fun clearError() = _state.update { it.copy(error = null) }
+
+    private var knownTitles: Set<String>? = null
+
     private val repo = CarDexRepository()
 
     /** 화면의 VideoView 가 갱신하는 현재 재생 위치 */
     val videoPositionMs = AtomicLong(0)
     private var frames: FrameSource = AssetFrameSource(app)
 
-    private val _state = MutableStateFlow(UiState())
+    private val _state = MutableStateFlow(UiState(onboardingDone = prefs.getBoolean("onboarding_done", false)))
     val state: StateFlow<UiState> = _state.asStateFlow()
     private var scanJob: Job? = null
     private var locationJob: Job? = null
@@ -118,6 +183,7 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
         loadStamps()
         loadChallenge()
         loadRankings()
+        loadHome()
         // 알림은 음성으로도 (주행 중 화면을 보지 않도록)
         viewModelScope.launch {
             state.map { it.notice }.distinctUntilChanged().filterNotNull().collect { msg ->
@@ -212,7 +278,7 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
             _state.update { it.copy(error = "시연 영상(assets/demo_video/demo_drive.mp4) 또는 이미지를 넣어주세요.") }; return
         }
         _state.update { it.copy(busy = true, error = null) }
-        runCatching { repo.recognize(frame.jpeg, frame.name, _state.value.driving?.location) }
+        call { repo.recognize(frame.jpeg, frame.name, _state.value.driving?.location) }
             .onSuccess { r ->
                 // 차량이 없는 프레임은 직전 카드를 유지
                 _state.update { it.copy(lastResult = if (r.card != null || it.lastResult == null) r else it.lastResult) }
@@ -225,14 +291,14 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
     // ---------------- 도감 / 시너지 ----------------
     fun refreshCollection() {
         viewModelScope.launch {
-            runCatching { repo.collection() }
+            call { repo.collection() }
                 .onSuccess { c -> _state.update { it.copy(collection = c.entries, synergy = c.synergy) } }
         }
     }
 
     fun deleteEntry(id: String) {
         viewModelScope.launch {
-            runCatching { repo.delete(id) }; refreshCollection(); loadShowroom()
+            call { repo.delete(id) }; refreshCollection(); loadShowroom()
         }
     }
 
@@ -245,7 +311,7 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
         if (now - lastVisitReportMs < VISIT_REPORT_INTERVAL_MS) return
         lastVisitReportMs = now
         viewModelScope.launch {
-            runCatching { repo.visit(location) }.onSuccess { r ->
+            call { repo.visit(location) }.onSuccess { r ->
                 if (r.isNew) {
                     _state.update { it.copy(notice = r.message) }
                     loadStamps(); loadRankings()
@@ -256,7 +322,7 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
 
     fun loadStamps() {
         viewModelScope.launch {
-            runCatching { repo.stamps() }.onSuccess { b -> _state.update { it.copy(stampBook = b) } }
+            call { repo.stamps() }.onSuccess { b -> _state.update { it.copy(stampBook = b) } }
         }
     }
 
@@ -273,7 +339,7 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
         if (!force && last != null && distanceM(last.first, at) < 3_000 && now - last.second < 10 * 60_000) return
         lastLandmarkFetch = at to now
         viewModelScope.launch {
-            runCatching { repo.landmarksNearby(at) }.onSuccess { list ->
+            call { repo.landmarksNearby(at) }.onSuccess { list ->
                 _state.update { it.copy(landmarks = list) }
                 registerProximity()
             }
@@ -308,11 +374,21 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
         val at = _state.value.driving?.location ?: return
         if (!visiting.add(id)) return
         viewModelScope.launch {
-            runCatching { repo.visitLandmark(id, at) }.onSuccess { r ->
+            call { repo.visitLandmark(id, at) }.onSuccess { r ->
                 r.challenge?.let { u ->
                     _state.update { it.copy(challenge = u.challenge, notice = r.message) }
                     registerProximity()
-                    if (u.justCompleted) { loadRankings(); loadShowroom(); refreshCollection() }
+                    if (u.justCompleted) {
+                        val badge = u.badge
+                        _state.update {
+                            it.copy(
+                                celebration = if (badge != null) Celebration("🎖️", "축제 한정 배지 획득!", "${badge.title} · 완주 +${u.bonusPoints} · 배지 +50")
+                                else Celebration("🏁", "코스 완주!", "${u.challenge.course.title} · +${u.bonusPoints}점"),
+                            )
+                        }
+                        loadRankings(); loadShowroom(); refreshCollection()
+                    }
+                    loadHome()
                 }
                 if (r.isNew) {
                     _state.update { s ->
@@ -335,7 +411,7 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
         }
         _state.update { it.copy(courseLoading = true, error = null) }
         viewModelScope.launch {
-            runCatching { repo.recommendCourse(at, maxHours, note) }
+            call { repo.recommendCourse(at, maxHours, note) }
                 .onSuccess { c -> _state.update { it.copy(course = c) } }
                 .onFailure { e -> _state.update { it.copy(error = "코스 추천 실패: ${e.message}") } }
             _state.update { it.copy(courseLoading = false) }
@@ -347,7 +423,7 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
         val course = _state.value.course ?: return
         if (course.stops.isEmpty()) return
         viewModelScope.launch {
-            runCatching { repo.startChallenge(course) }
+            call { repo.startChallenge(course) }
                 .onSuccess { ch ->
                     _state.update { it.copy(challenge = ch, notice = "🏁 챌린지 시작! 완주하면 +${course.completionBonus}") }
                     registerProximity()
@@ -365,37 +441,49 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
 
     fun abandonChallenge() {
         viewModelScope.launch {
-            runCatching { repo.abandonChallenge() }.onSuccess { _state.update { it.copy(challenge = null) }; registerProximity() }
+            call { repo.abandonChallenge() }.onSuccess { _state.update { it.copy(challenge = null) }; registerProximity() }
         }
     }
 
     private fun loadChallenge() {
         viewModelScope.launch {
-            runCatching { repo.challenge() }.onSuccess { ch -> _state.update { it.copy(challenge = ch) } }
+            call { repo.challenge() }.onSuccess { ch -> _state.update { it.copy(challenge = ch) } }
         }
     }
 
     // ---------------- 랭킹 / 지역 마스터 ----------------
     fun loadRankings(regionId: String? = _state.value.rankingRegionId) {
         viewModelScope.launch {
-            runCatching { repo.weeklyRanking(regionId) }
+            call { repo.weeklyRanking(regionId) }
                 .onSuccess { lb -> _state.update { it.copy(weekly = lb, rankingRegionId = regionId) } }
-            runCatching { repo.masters() }.onSuccess { m -> _state.update { it.copy(masters = m) } }
+            call { repo.masters() }.onSuccess { m ->
+                val prev = knownTitles
+                val gained = if (prev == null) emptyList() else m.myTitles.filterNot { it in prev }
+                knownTitles = m.myTitles.toSet()
+                _state.update {
+                    it.copy(
+                        masters = m,
+                        celebration = gained.firstOrNull()?.let { t -> Celebration("👑", "$t 마스터 등극!", "쇼룸에 왕관·골드 아이템이 열렸어요") } ?: it.celebration,
+                    )
+                }
+                if (gained.isNotEmpty()) loadShowroom()
+            }
+            loadHome()
         }
     }
 
     // ---------------- 쇼룸 ----------------
     fun loadShowroom() {
         viewModelScope.launch {
-            runCatching { repo.showroom() }.onSuccess { r -> _state.update { it.copy(showroom = r) } }
-            runCatching { repo.decorItems() }.onSuccess { c -> _state.update { it.copy(decor = c) } }
+            call { repo.showroom() }.onSuccess { r -> _state.update { it.copy(showroom = r) } }
+            call { repo.decorItems() }.onSuccess { c -> _state.update { it.copy(decor = c) } }
         }
     }
 
     private fun updateShowroom(transform: (ShowroomUpdate) -> ShowroomUpdate) {
         val req = transform(_state.value.showroom.toUpdate())
         viewModelScope.launch {
-            runCatching { repo.updateShowroom(req) }
+            call { repo.updateShowroom(req) }
                 .onSuccess { r -> _state.update { it.copy(showroom = r) }; refreshCollection() }
                 .onFailure { e -> _state.update { it.copy(error = "쇼룸 변경 실패: ${e.message}") } }
         }
@@ -448,13 +536,13 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
     // ---------------- 키워드 ----------------
     private fun loadPreferences() {
         viewModelScope.launch {
-            runCatching { repo.preferences() }.onSuccess { p -> _state.update { it.copy(keywords = p.keywords) } }
+            call { repo.preferences() }.onSuccess { p -> _state.update { it.copy(keywords = p.keywords) } }
         }
     }
 
     fun saveKeywords(keywords: List<String>) {
         viewModelScope.launch {
-            runCatching { repo.savePreferences(Preferences(keywords)) }
+            call { repo.savePreferences(Preferences(keywords)) }
                 .onSuccess { p -> _state.update { it.copy(keywords = p.keywords) } }
                 .onFailure { e -> _state.update { it.copy(error = "저장 실패: ${e.message}") } }
         }

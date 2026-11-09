@@ -65,12 +65,16 @@ fun FlipCard(card: VehicleCard, modifier: Modifier = Modifier, startFlipped: Boo
 @Composable
 private fun CardFront(card: VehicleCard, accent: Color) {
     Column(Modifier.fillMaxSize()) {
-        AsyncImage(
-            model = CarDexApi.absolute(card.imageUrl),
-            contentDescription = card.model,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxWidth().weight(1f).background(Color.Black),
-        )
+        if (card.imageUrl != null) {
+            AsyncImage(
+                model = CarDexApi.absolute(card.imageUrl),
+                contentDescription = card.model,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxWidth().weight(1f).background(Color.Black),
+            )
+        } else { // 사진이 없으면(시연 데이터 등) 카툰 일러스트
+            CarIllustration(card.id, card.bodyType, card.rarity, Modifier.fillMaxWidth().weight(1f).background(Color(0xFF232A36)))
+        }
         Column(Modifier.padding(20.dp)) {
             Text(card.rarity.uppercase(), color = accent, style = MaterialTheme.typography.labelLarge)
             Text("${card.brand} ${card.model}", style = MaterialTheme.typography.headlineMedium)

@@ -172,6 +172,25 @@ data class DriveCourse(
     @SerialName("completion_bonus") val completionBonus: Int = 0,
 )
 
+/** 여행 탭 상단 '한눈에 보기' */
+@Serializable
+data class HomeSummary(
+    @SerialName("synergy_total") val synergyTotal: Int,
+    @SerialName("weekly_rank") val weeklyRank: Int,
+    @SerialName("weekly_points") val weeklyPoints: Int,
+    @SerialName("gap_to_next") val gapToNext: Int? = null,
+    @SerialName("region_stamps") val regionStamps: Int,
+    @SerialName("region_total") val regionTotal: Int,
+    @SerialName("hidden_stamps") val hiddenStamps: Int,
+    val collection: Int,
+    @SerialName("items_unlocked") val itemsUnlocked: Int,
+    @SerialName("items_total") val itemsTotal: Int,
+    val titles: List<String> = emptyList(),
+    @SerialName("challenge_title") val challengeTitle: String? = null,
+    @SerialName("challenge_progress") val challengeProgress: String? = null,
+    @SerialName("next_goal") val nextGoal: String,
+)
+
 // ---------------- 경쟁 ----------------
 @Serializable
 data class Challenge(

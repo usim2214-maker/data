@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     # 히든 스탬프: 명소 반경(m) 안에 들어와야 획득 인정 (앱의 근접 알림 반경과 맞출 것)
     landmark_radius_m: int = 500
 
+    # 시연 도구 (/api/v1/demo/seed, /reset). 실제 배포에서는 false
+    demo_mode: bool = False
+
     # Storage
     data_dir: Path = Path("./storage")
 

@@ -53,7 +53,10 @@ fun CollectionScreen(
         }
         if (entries.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("아직 수집한 차량이 없어요", style = MaterialTheme.typography.titleLarge, color = Color.Gray)
+                Text(
+                    "아직 수집한 차량이 없어요\n주행 중 마주친 차량이 여기에 카드로 모여요 (차량 인식은 베타)",
+                    style = MaterialTheme.typography.titleLarge, color = Color.Gray, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
             }
             return@Column
         }

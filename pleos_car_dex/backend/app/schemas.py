@@ -361,6 +361,25 @@ class DecorCatalog(BaseModel):
     total: int
 
 
+class HomeSummary(BaseModel):
+    """여행 탭 상단 '한눈에 보기' 카드"""
+
+    synergy_total: int
+    weekly_rank: int
+    weekly_points: int
+    gap_to_next: int | None = None
+    region_stamps: int
+    region_total: int
+    hidden_stamps: int
+    collection: int
+    items_unlocked: int
+    items_total: int
+    titles: list[str] = []
+    challenge_title: str | None = None
+    challenge_progress: str | None = None  # 예: "1/3"
+    next_goal: str  # 다음 목표 한 줄 (예: "부산 마스터까지 35점")
+
+
 CollectionResponse.model_rebuild()
 LandmarkVisitResponse.model_rebuild()
 Showroom.model_rebuild()

@@ -76,7 +76,7 @@ fun RankingScreen(
             }
             Text("그 지역 이번 달 여행 점수 1위가 마스터 — 넘어서면 칭호를 빼앗아요", color = Color.Gray)
             LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 220.dp),
+                columns = GridCells.Adaptive(minSize = 280.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
@@ -103,7 +103,7 @@ private fun RankLine(row: RankRow) {
 
 @Composable
 private fun MasterCard(m: RegionMaster) {
-    Card(colors = CardDefaults.cardColors(containerColor = if (m.isMe) Color(0xFF3B2F00) else MaterialTheme.colorScheme.surface)) {
+    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = if (m.isMe) Color(0xFF3B2F00) else MaterialTheme.colorScheme.surface)) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("${m.region.emoji} ${m.region.name}" + if (m.isMe) "  👑" else "", style = MaterialTheme.typography.titleLarge)
             Text(m.master?.let { "마스터: ${it.nickname} (${it.points})" } ?: "마스터 없음 — 첫 방문자가 차지!", color = Color.Gray)

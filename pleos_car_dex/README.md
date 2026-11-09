@@ -44,6 +44,22 @@
 - 지역 마스터: 이번 달 그 시·도에서 얻은 여행 점수 1위. 동점이면 기존 1위 유지 → 넘어서야 빼앗음 (재방문 유도)
 - MVP 는 단일 사용자 + 가상 경쟁자 6명. 실제 서비스는 계정·서버 DB 기반 원장으로 교체 필요
 
+## 화면
+
+| 여행 홈 (한눈에 보기 + 챌린지 + 히든 스탬프) | 주행 모드 (화면 잠금 + 음성 안내) |
+|---|---|
+| ![](docs/screenshots/travel_home.png) | ![](docs/screenshots/driving_mode.png) |
+| **랭킹 · 지역 마스터** | **성취 축하** |
+| ![](docs/screenshots/ranking.png) | ![](docs/screenshots/celebration.png) |
+| **첫 실행 안내 (권한 사용 목적 설명)** | **AI 코스 추천** |
+| ![](docs/screenshots/onboarding.png) | ![](docs/screenshots/travel_course.png) |
+
+- 첫 실행: 안내 3장(서비스 소개 · 쇼룸 · 안전/위치 사용 목적) → 마지막에 Pleos 권한 요청
+- 여행 탭 상단 '나의 여행': 시너지·주간 순위·스탬프·쇼룸 아이템 + **다음 목표 한 줄**(진행 중 코스 → 가장 가까운 지역 마스터 → 다음 순위)
+- 코스 완주 · 축제 배지 · 지역 마스터 등극 시 축하 연출 (주행 중엔 음성만, 화면 연출은 정차 후)
+- 서버 연결이 끊기면 하단 배너 + 다시 시도, 오류는 사용자 문구로 표시
+- 스크린샷 재생성: `cd android && ./gradlew testDebugUnitTest --tests '*ScreenshotTest*'` → `app/build/screenshots/`
+
 ## 쇼룸 디자인
 
 차고 꾸미기라는 방식만 참고한 **자체 디자인**입니다 (특정 게임의 그래픽·명칭·에셋 미사용). 모든 그래픽은 Compose Canvas 로 직접 그립니다.
@@ -74,7 +90,6 @@
   | 기아 쏘렌토 | SUV, 세로 램프, 투톤 지붕, 루프랙 |
   | 현대 아이오닉 5 N (전설) | 낮은 차체, 리어 윙, 빨간 포인트 라인·캘리퍼, 큰 휠 |
 - 마스터 칭호를 잃으면 마스터 전용 아이템은 자동으로 기본 아이템으로 돌아감 → 칭호를 지키러 다시 방문
-- 스크린샷 재생성: `cd android && ./gradlew testDebugUnitTest --tests '*ShowroomScreenshotTest*'` → `app/build/screenshots/`
 
 ## Pleos Playground 에서 쓰는 것
 
@@ -150,6 +165,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 curl -F "video=@drive.mp4" http://localhost:8000/api/v1/recognize/video
 ```
 완전 오프라인 시연: `DETECTOR_MODE=mock IDENTIFIER_MODE=mock USE_MOCK_LLM=true` (파일명으로 차종 결정).
+**시연 도구** (`DEMO_MODE=true`): 앱 **설정 탭 → 시연 데이터 채우기**(차량 4 · 지역 스탬프 3 · 히든 2) / **전체 초기화**(영상 재촬영용) / 주행 모드 시연. API: `POST /api/v1/demo/seed`, `POST /api/v1/demo/reset`
 테스트: `python -m pytest -q`
 
 **TourAPI 키 발급**: 공공데이터포털(data.go.kr)에서 '한국관광공사_국문 관광정보 서비스_GW' 활용신청 → 일반 인증키(Decoding)를 `TOUR_API_KEY` 에 입력.
@@ -191,6 +207,8 @@ curl -F "video=@drive.mp4" http://localhost:8000/api/v1/recognize/video
 | POST / GET / DELETE | `/api/v1/challenge` | 코스 챌린지 시작(`DriveCourse` 그대로) / 현재 상태 / 포기 |
 | GET | `/api/v1/rankings/weekly?region_id=` | 이번 주 랭킹 (내 순위, 윗 순위까지 남은 점수) |
 | GET | `/api/v1/rankings/masters` | 이번 달 시·도별 지역 마스터, 내 칭호 |
+| GET | `/api/v1/home` | 여행 탭 요약 (점수·순위·스탬프·다음 목표) |
+| POST | `/api/v1/demo/seed` · `/api/v1/demo/reset` | 시연 데이터 채우기 / 초기화 (`DEMO_MODE=true` 일 때만) |
 | GET / PUT | `/api/v1/preferences` | 유저 키워드(최대 8개) |
 
 ## LLM 설정 메모

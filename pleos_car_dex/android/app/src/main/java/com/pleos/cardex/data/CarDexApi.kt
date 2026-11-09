@@ -77,6 +77,15 @@ interface CarDexApi {
     @GET("api/v1/rankings/masters")
     suspend fun masters(): MastersResponse
 
+    @GET("api/v1/home")
+    suspend fun home(): HomeSummary
+
+    @POST("api/v1/demo/seed")
+    suspend fun demoSeed(): kotlinx.serialization.json.JsonObject
+
+    @POST("api/v1/demo/reset")
+    suspend fun demoReset(): kotlinx.serialization.json.JsonObject
+
     @GET("api/v1/preferences")
     suspend fun preferences(): Preferences
 

@@ -34,6 +34,9 @@ class CarDexRepository(private val api: CarDexApi = CarDexApi.create()) {
     suspend fun abandonChallenge() = api.abandonChallenge()
     suspend fun weeklyRanking(regionId: String?) = api.weeklyRanking(regionId)
     suspend fun masters() = api.masters()
+    suspend fun home() = api.home()
+    suspend fun demoSeed() = api.demoSeed()
+    suspend fun demoReset() = api.demoReset()
     suspend fun preferences() = api.preferences()
     suspend fun savePreferences(prefs: Preferences) = api.savePreferences(prefs)
 }

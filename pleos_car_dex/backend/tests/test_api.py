@@ -239,3 +239,31 @@ def test_decor_unlocks(client):
         "props": [{"item_id": "prop-trophy", "x": 0.15, "y": 0.85, "scale": 1.5}],
     }).json()
     assert sr["sign_text"] == "부산 MASTER" and sr["pedestal"]["key"] == "gold" and sr["props"][0]["scale"] == 1.5
+
+
+def test_home_and_demo_tools(client):
+    h = client.get("/api/v1/home").json()
+    assert h["collection"] == 0 and h["region_total"] == 17
+    assert "한 계단" in h["next_goal"] or "첫 지역 스탬프" in h["next_goal"]
+
+    seeded = client.post("/api/v1/demo/seed").json()
+    assert seeded["cars"] == 4 and set(seeded["region_names"]) == {"서울", "경기", "강원"}
+    h = client.get("/api/v1/home").json()
+    assert h["collection"] == 4 and h["region_stamps"] == 3 and h["hidden_stamps"] == 2
+    assert h["synergy_total"] > 0 and h["weekly_points"] > 0
+    assert "마스터까지" in h["next_goal"]  # 점수가 있는 지역 중 가장 가까운 마스터 목표
+    assert client.get("/api/v1/showroom").json()["car"]["id"] == "hyundai-ioniq-5"
+
+    client.post("/api/v1/challenge", json=_course())
+    assert "코스 완주까지 2곳" in client.get("/api/v1/home").json()["next_goal"]
+
+    assert client.post("/api/v1/demo/reset").json()["reset"]
+    assert client.get("/api/v1/home").json()["collection"] == 0
+
+
+def test_demo_tools_disabled_by_default(client, monkeypatch):
+    from app.config import get_settings
+
+    get_settings().demo_mode = False
+    assert client.post("/api/v1/demo/seed").status_code == 403
+    get_settings().demo_mode = True

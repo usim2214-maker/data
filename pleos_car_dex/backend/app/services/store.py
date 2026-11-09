@@ -73,6 +73,13 @@ class JsonStore:
             self._dump(entries)
         return entry, is_new
 
+    def reset_all(self) -> None:
+        """시연 초기화: 저장된 진행 데이터를 모두 지운다 (크롭 이미지는 유지)"""
+        with self._lock:
+            for p in (self._collection_path, self._prefs_path, self._showroom_path, self._stamps_path,
+                      self._hidden_path, self._events_path, self._challenge_path, self._badges_path):
+                p.unlink(missing_ok=True)
+
     def get_entry(self, card_id: str) -> CollectionEntry | None:
         return self._load().get(card_id)
 

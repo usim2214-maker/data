@@ -178,7 +178,7 @@ private fun BackgroundPicker(stampBook: StampBook?, selectedId: String?, onBackg
                 selected = selectedId == r.id, locked = !s.acquired, onClick = { if (s.acquired) onBackground(r.id) },
                 brush = Brush.verticalGradient(r.colors.map(::hexColor)),
             ) {
-                Text(if (s.acquired) r.emoji else "🔒", fontSize = 26.sp)
+                if (s.acquired) com.pleos.cardex.ui.components.EmojiIcon(r.emoji, 32.dp) else Text("🔒", fontSize = 26.sp)
                 Text(r.name, fontSize = 14.sp, color = Color.White, fontWeight = FontWeight.SemiBold)
                 if (!s.acquired) Text("${r.name} 방문", fontSize = 11.sp, color = Color.White.copy(alpha = 0.8f))
             }
@@ -192,10 +192,18 @@ private fun ItemGrid(items: List<DecorItem>, selectedId: String?, columns: Int =
         items(items, key = { it.id }) { it ->
             Tile(selected = it.id == selectedId, locked = !it.unlocked, onClick = { if (it.unlocked) onPick(it) }, brush = previewBrush(it)) {
                 when (it.slot) {
-                    "prop" -> Text(it.key, fontSize = 30.sp)
+                    "prop" -> com.pleos.cardex.ui.components.EmojiIcon(it.key, 38.dp)
                     "light" -> Box(Modifier.size(28.dp).clip(CircleShape).background(hexColor(it.key)))
                     "sign" -> Text(it.key.replace("{title}", "OO"), fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Black, textAlign = TextAlign.Center, maxLines = 2)
-                    "pedestal" -> Text(when (it.key) { "gold" -> "🥇"; "neon" -> "💠"; else -> "⚙️" }, fontSize = 26.sp)
+                    "floor" -> {
+                        val ctx = androidx.compose.ui.platform.LocalContext.current
+                        val tex = androidx.compose.runtime.remember(it.key) { com.pleos.cardex.ui.components.ShowroomAssets.floorTexture(ctx, it.key) }
+                        if (tex != null && it.key != "checker") androidx.compose.foundation.Image(
+                            tex, null, contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                            modifier = Modifier.size(64.dp, 36.dp).clip(RoundedCornerShape(6.dp)),
+                        )
+                    }
+                    "pedestal" -> com.pleos.cardex.ui.components.EmojiIcon(when (it.key) { "gold" -> "🥇"; "neon" -> "💠"; else -> "⚙️" }, 32.dp)
                     else -> {}
                 }
                 Text(it.name, fontSize = 13.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)

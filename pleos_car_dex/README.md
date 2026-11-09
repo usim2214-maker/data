@@ -186,6 +186,12 @@
 
 ## 쇼룸 디자인
 
+> **무료 에셋 적용**: 바닥은 Poly Haven 실사 질감(CC0)을 원근 변환으로 타일링, 소품·스탬프 아이콘은 Twemoji(CC BY 4.0)로 통일 → 기기 폰트와 상관없이 같은 그림체. 출처: [`docs/ASSET_CREDITS.md`](docs/ASSET_CREDITS.md)
+
+| 우드 데크 + 친환경 소품 | 골드 마블 + 지역 마스터 |
+|---|---|
+| ![](docs/screenshots/showroom_floor_wood.png) | ![](docs/screenshots/showroom_floor_marble.png) |
+
 차고 꾸미기라는 방식만 참고한 **자체 디자인**입니다 (특정 게임의 그래픽·명칭·에셋 미사용). 모든 그래픽은 Compose Canvas 로 직접 그립니다.
 
 | 부산 마스터 (체커 바닥 · 골드 포디움 · 골드 조명) | 강원 (네온 그리드 · 네온 링 · 오로라 조명) |

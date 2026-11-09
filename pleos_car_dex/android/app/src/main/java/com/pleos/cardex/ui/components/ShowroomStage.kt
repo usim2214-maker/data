@@ -38,6 +38,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -85,6 +87,9 @@ fun ShowroomStage(
     val pedestalKey = showroom.pedestal?.key ?: "basic"
     val accent = showroom.car?.let { rarityColor(it.rarity) } ?: Color(0xFF4DA3FF)
 
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val floorTex = androidx.compose.runtime.remember(floorKey) { ShowroomAssets.floorTexture(ctx, floorKey) }
+
     BoxWithConstraints(
         modifier
             .clip(RoundedCornerShape(28.dp))
@@ -99,12 +104,13 @@ fun ShowroomStage(
             drawRect(Brush.verticalGradient(sky + listOf(sky.last().darken(0.5f)), endY = horizon))
             drawScene(bg?.scene ?: "garage", horizon, sky.first())
             drawBackWall(horizon)
-            drawFloor(floorKey, horizon, glow)
+            drawFloor(floorKey, horizon, glow, floorTex)
             drawSpotlights(light, horizon, glow)
             drawPedestal(pedestalKey, horizon, spin, accent, glow)
             showroom.car?.let {
                 val ground = horizon + (size.height - horizon) * 0.5f - (size.height - horizon) * 0.02f
-                drawCartoonCar(carStyleFor(it.id, it.bodyType, it.rarity), size.width / 2, ground, size.width * 0.4f, light)
+                val style = carStyleFor(it.id, it.bodyType, it.rarity)
+                drawCartoonCar(style, size.width / 2, ground, size.width * 0.4f, light)
             }
         }
 
@@ -171,7 +177,7 @@ fun ShowroomStage(
                     .pointerInputIf(editMode, "tap$i") { detectTapGestures { onSelectProp(i) } },
                 contentAlignment = Alignment.Center,
             ) {
-                Text(p.item.key, fontSize = (34 * p.scale).sp)
+                EmojiIcon(p.item.key, (44 * p.scale).dp)
             }
         }
     }
@@ -303,7 +309,7 @@ private fun DrawScope.drawBackWall(horizon: Float) {
     drawRect(Color.Black.copy(alpha = 0.35f), Offset(0f, horizon - 6f), Size(size.width, 10f))
 }
 
-private fun DrawScope.drawFloor(key: String, horizon: Float, glow: Float) {
+private fun DrawScope.drawFloor(key: String, horizon: Float, glow: Float, texture: androidx.compose.ui.graphics.ImageBitmap? = null) {
     val w = size.width; val h = size.height
     val floor = Path().apply { moveTo(w * 0.18f, horizon); lineTo(w * 0.82f, horizon); lineTo(w * 1.2f, h); lineTo(-w * 0.2f, h); close() }
     val base = when (key) {
@@ -316,6 +322,28 @@ private fun DrawScope.drawFloor(key: String, horizon: Float, glow: Float) {
     }
     drawRect(base.darken(0.25f), Offset(0f, horizon), Size(w, h - horizon)) // 바닥 바깥
     drawPath(floor, Brush.verticalGradient(listOf(base.darken(0.35f), base), startY = horizon, endY = h))
+    if (texture != null) {
+        // 실사 질감(Poly Haven CC0)을 원근 변환으로 바닥 사다리꼴에 타일링
+        val tw = texture.width.toFloat(); val th = texture.height.toFloat()
+        val cols = 4f; val rows = 3f
+        val m = android.graphics.Matrix().apply {
+            setPolyToPoly(
+                floatArrayOf(0f, 0f, tw * cols, 0f, tw * cols, th * rows, 0f, th * rows), 0,
+                floatArrayOf(w * 0.18f, horizon, w * 0.82f, horizon, w * 1.2f, h, -w * 0.2f, h), 0, 4,
+            )
+        }
+        val shader = android.graphics.BitmapShader(
+            texture.asAndroidBitmap(), android.graphics.Shader.TileMode.REPEAT, android.graphics.Shader.TileMode.REPEAT,
+        ).apply { setLocalMatrix(m) }
+        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG or android.graphics.Paint.FILTER_BITMAP_FLAG).apply { this.shader = shader }
+        // 같은 원근 평면을 바닥 전체 폭으로 (양옆 빈 삼각형 없이)
+        drawContext.canvas.nativeCanvas.drawRect(0f, horizon, w, h, paint)
+        val all = Offset(0f, horizon); val allSize = Size(w, h - horizon)
+        if (key == "marble") drawRect(Color(0xFFFFD54F).copy(alpha = 0.12f), all, allSize) // 골드 마블 톤
+        // 원근 깊이감: 안쪽(지평선)일수록 어둡게 + 앞쪽 하이라이트(광택)
+        drawRect(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.55f), Color.Transparent), startY = horizon, endY = horizon + (h - horizon) * 0.6f), all, allSize)
+        drawPath(floor, Brush.radialGradient(listOf(Color.White.copy(alpha = 0.10f), Color.Transparent), center = Offset(w / 2, horizon + (h - horizon) * 0.55f), radius = w * 0.45f))
+    }
     clipPath(floor) {
         fun lerpX(t: Float, side: Float) = w * (0.5f + (side - 0.5f) * (0.64f + 0.76f * t)) // 원근 x
         fun yAt(t: Float) = horizon + (h - horizon) * t
@@ -338,7 +366,7 @@ private fun DrawScope.drawFloor(key: String, horizon: Float, glow: Float) {
                 }
                 listOf(0.08f, 0.92f).forEach { s -> drawLine(Color.White.copy(alpha = 0.8f), Offset(lerpX(0f, s), yAt(0f)), Offset(lerpX(1f, s), yAt(1f)), 6f) }
             }
-            "wood" -> for (k in 1 until 14) {
+            "wood" -> if (texture == null) for (k in 1 until 14) {
                 val s = k / 14f
                 drawLine(Color.Black.copy(alpha = 0.18f), Offset(lerpX(0f, s), yAt(0f)), Offset(lerpX(1f, s), yAt(1f)), 3f)
             }
@@ -351,7 +379,7 @@ private fun DrawScope.drawFloor(key: String, horizon: Float, glow: Float) {
                 val s = k / 7f
                 drawLine(Color(0xFFC9A227).copy(alpha = 0.55f), Offset(lerpX(0f, s), yAt(0f)), Offset(lerpX(1f, s + 0.12f), yAt(1f)), 2f)
             }
-            else -> for (k in 1 until 6) {
+            else -> if (texture == null) for (k in 1 until 6) {
                 val t = (k / 6f).let { it * it }
                 drawLine(Color.Black.copy(alpha = 0.12f), Offset(0f, yAt(t)), Offset(w, yAt(t)), 2f)
             }

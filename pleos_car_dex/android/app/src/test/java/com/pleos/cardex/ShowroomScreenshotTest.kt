@@ -120,6 +120,26 @@ class ShowroomScreenshotTest {
         tab = 6,
     )
 
+    @Test fun woodFloor() = shot(
+        "showroom_floor_wood",
+        Showroom(
+            car = car, background = jeju, floor = item("floor-wood", "floor", "wood", "우드 데크"), light = item("light-sunset", "light", "#FF9E57", "선셋"),
+            pedestal = item("pedestal-basic", "pedestal", "basic", "기본 턴테이블"), signText = "GREEN GARAGE",
+            props = props(Triple("🌳", 0.1f, 0.8f), Triple("🚲", 0.88f, 0.86f), Triple("🍊", 0.78f, 0.62f)),
+        ),
+        tab = 2,
+    )
+
+    @Test fun marbleFloor() = shot(
+        "showroom_floor_marble",
+        Showroom(
+            car = ioniq5n, background = seoul, floor = item("floor-marble", "floor", "marble", "골드 마블"), light = item("light-gold", "light", "#FFD54F", "챔피언 골드"),
+            pedestal = item("pedestal-gold", "pedestal", "gold", "골드 포디움"), signText = "서울 MASTER",
+            props = props(Triple("👑", 0.12f, 0.84f), Triple("🏆", 0.88f, 0.84f)), backgroundMastered = true,
+        ),
+        tab = 2,
+    )
+
     @Test fun defaultGarage() = shot("showroom_default", Showroom(car = null), tab = 1)
 
     private fun sampleImage(): String? =

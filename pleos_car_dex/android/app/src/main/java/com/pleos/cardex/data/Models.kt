@@ -41,6 +41,7 @@ data class VehicleCard(
 data class RecognitionResponse(
     val detected: Boolean,
     val twin: Boolean = false, // 내 차와 같은 차(쌍둥이)
+    @SerialName("daily_bonus") val dailyBonus: Int = 0, // 오늘의 차 보너스
     val detection: Detection? = null, // 카드로 만든 차량
     val detections: List<Detection> = emptyList(), // 화면 속 모든 차량
     val identity: VehicleIdentity? = null,
@@ -201,6 +202,18 @@ data class HomeSummary(
     @SerialName("challenge_title") val challengeTitle: String? = null,
     @SerialName("challenge_progress") val challengeProgress: String? = null,
     @SerialName("next_goal") val nextGoal: String,
+    val daily: DailyMission? = null,
+)
+
+/** 오늘의 차 미션 + 연속 출석 */
+@Serializable
+data class DailyMission(
+    val date: String,
+    val target: CatalogVehicle,
+    val found: Boolean,
+    val bonus: Int,
+    val streak: Int,
+    @SerialName("best_streak") val bestStreak: Int,
 )
 
 /** 아이용 차 맞히기 퀴즈 (YOLO 결과로 출제, 정답 포함 → 앱이 채점) */

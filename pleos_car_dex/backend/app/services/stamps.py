@@ -22,6 +22,8 @@ def record_visit(store: JsonStore, lat: float, lon: float, competition=None) -> 
     if region is None:
         return VisitResponse(message="스탬프 지역 밖이에요.")
     rec, is_new, revisit = store.visit(region.id)
+    from app.services.deps import get_daily
+    get_daily().mark_active()  # 방문도 출석
     if competition is not None:  # 랭킹·지역 마스터용 원장 기록 (synergy 의 재방문 상한과 동일하게)
         from app.services.synergy import REVISIT_CAP, REVISIT_POINTS
 

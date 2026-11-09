@@ -245,14 +245,14 @@ def test_decor_unlocks(client):
 def test_home_and_demo_tools(client):
     h = client.get("/api/v1/home").json()
     assert h["collection"] == 0 and h["region_total"] == 17
-    assert "첫 카드" in h["next_goal"]  # 도감 중심: 첫 목표는 첫 카드
+    assert "첫 카드" in h["next_goal"] and h["daily"]["found"] is False  # 첫 목표 + 오늘의 차 미션은 daily 필드
 
     seeded = client.post("/api/v1/demo/seed").json()
     assert seeded["cars"] == 4 and set(seeded["region_names"]) == {"서울", "경기", "강원"}
     h = client.get("/api/v1/home").json()
     assert h["collection"] == 4 and h["region_stamps"] == 3 and h["hidden_stamps"] == 2
     assert h["synergy_total"] > 0 and h["weekly_points"] > 0
-    assert "현대 차량 1종 더" in h["next_goal"]  # 시드: 현대 2종(아이오닉 5·그랜저) -> 브랜드 컬렉터 목표
+    assert "현대 차량 1종 더" in h["next_goal"]  # 시드: 현대 2종 -> 브랜드 컬렉터 목표 (오늘의 차는 별도 daily 필드)
     assert client.get("/api/v1/showroom").json()["car"]["id"] == "hyundai-ioniq-5"
 
     client.post("/api/v1/challenge", json=_course())
@@ -289,7 +289,7 @@ def test_catalog_and_dex_home(client):
     assert len(cat) == 28 and cat[0]["rarity"] == "legendary"
     assert {c["id"] for c in cat} >= {"hyundai-ioniq-5-n", "hyundai-avante-n", "genesis-g90"}
     h = client.get("/api/v1/home").json()
-    assert h["dex_total"] == 28 and h["legendary_total"] == 3 and "첫 카드" in h["next_goal"]
+    assert h["dex_total"] == 28 and h["legendary_total"] == 3 and h["daily"]["target"]["rarity"] != "legendary"
 
     for name in ["hyundai-avante-n.jpg", "hyundai-avante.jpg", "hyundai-sonata.jpg"]:
         client.post("/api/v1/recognize", files={"image": (name, _jpeg(), "image/jpeg")})
@@ -380,3 +380,29 @@ def test_my_car_twin_and_compare(client):
     assert g90["vs_my_car"] == ["가격 +7,500만 원", "마력 +257마력", "차급 대형 세단 · 내 차 준중형 세단"]
     syn = {b["name"]: b["points"] for b in client.get("/api/v1/collection").json()["synergy"]["bonuses"]}
     assert syn["쌍둥이 차"] == 10
+
+
+def test_daily_mission_and_streak(client, monkeypatch):
+    from datetime import date as _date
+    from app.services import daily as daily_mod
+
+    m = client.get("/api/v1/daily").json()
+    target = m["target"]["id"]
+    assert m["target"]["rarity"] != "legendary" and m["found"] is False and m["streak"] == 0
+    r = client.post("/api/v1/recognize", files={"image": (f"{target}.jpg", _jpeg(), "image/jpeg")}).json()
+    assert r["daily_bonus"] in (20, 30) and "오늘의 차" in r["message"]
+    again = client.post("/api/v1/recognize", files={"image": (f"{target}.jpg", _jpeg(), "image/jpeg")}).json()
+    assert again["daily_bonus"] == 0  # 하루 1번
+    m = client.get("/api/v1/daily").json()
+    assert m["found"] and m["streak"] == 1
+    syn = {b["name"]: b["points"] for b in client.get("/api/v1/collection").json()["synergy"]["bonuses"]}
+    assert syn["오늘의 차"] == r["daily_bonus"]
+
+    # 다음 날 방문 -> 연속 2일, 하루 건너뛰면 끊김
+    monkeypatch.setattr(daily_mod, "today", lambda: _date.fromisoformat(m["date"]) + __import__("datetime").timedelta(days=1))
+    client.post("/api/v1/stamps/visit", json={"lat": 37.57, "lon": 126.98})
+    assert client.get("/api/v1/daily").json()["streak"] == 2
+    monkeypatch.setattr(daily_mod, "today", lambda: _date.fromisoformat(m["date"]) + __import__("datetime").timedelta(days=4))
+    d = client.get("/api/v1/daily").json()
+    assert d["streak"] == 0 and d["best_streak"] == 2
+    assert daily_mod.target_for(_date(2026, 11, 9))["id"] == daily_mod.target_for(_date(2026, 11, 9))["id"]  # 날짜로 결정

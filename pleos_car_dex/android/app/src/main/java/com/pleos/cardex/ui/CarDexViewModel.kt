@@ -317,7 +317,8 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
                         // 차량이 없는 프레임은 직전 카드를 유지 (박스는 이번 프레임 기준)
                         lastResult = if (card != null || it.lastResult == null) r else it.lastResult?.copy(detections = r.detections),
                         // 새 카드: 희귀·전설은 축하 연출, 일반은 알림 (주행 중엔 음성만)
-                        celebration = if (card != null && r.twin) Celebration("👯", "쌍둥이 차 발견!", r.message)
+                        celebration = if (card != null && r.dailyBonus > 0) Celebration("📅", "오늘의 차 발견!", "${card.brand} ${card.model} · +${r.dailyBonus}")
+                        else if (card != null && r.twin) Celebration("👯", "쌍둥이 차 발견!", r.message)
                         else if (card != null && r.isNewEntry) when (card.rarity) {
                             "legendary" -> Celebration("🌟", "LEGENDARY 카드 획득!", "${card.brand} ${card.model}")
                             "rare" -> Celebration("💎", "희귀 카드 획득!", "${card.brand} ${card.model}")

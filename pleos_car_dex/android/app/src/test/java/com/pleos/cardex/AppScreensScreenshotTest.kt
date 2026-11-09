@@ -151,6 +151,18 @@ class AppScreensScreenshotTest {
         }
     }
 
+    @Test fun homeDaily() = shot("home_daily") {
+        androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.padding(16.dp)) {
+            com.pleos.cardex.ui.components.HomeSummaryCard(
+                home.copy(
+                    dexOwned = 6, dexTotal = 28, legendaryOwned = 1, legendaryTotal = 3,
+                    nextGoal = "현대 차량 1종 더 모으면 '현대 컬렉터' +50",
+                    daily = com.pleos.cardex.data.DailyMission("2026-11-09", com.pleos.cardex.data.CatalogVehicle("kia-ev9", "기아", "EV9", "SUV", "rare"), false, 30, 4, 7),
+                ),
+            )
+        }
+    }
+
     @Test fun onboarding() = shot("onboarding") { OnboardingScreen(onFinish = {}) }
 
     @Test fun celebration() = shot("celebration") {

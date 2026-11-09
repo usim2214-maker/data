@@ -27,6 +27,8 @@ def summary(store: JsonStore, competition: CompetitionService, challenge: Challe
 
     # 다음 목표: 진행 중 챌린지 > 첫 카드 > 브랜드 세트 > 가장 가까운 지역 마스터 > 다음 순위
     reachable = [m for m in masters.masters if not m.is_me and m.my_points > 0]
+    from app.services.deps import get_daily
+    daily = get_daily().mission()
     if active:
         left = len(active.course.stops) - len(active.visited)
         goal = f"코스 완주까지 {left}곳 남음 · 완주 +{active.course.completion_bonus}"
@@ -61,4 +63,5 @@ def summary(store: JsonStore, competition: CompetitionService, challenge: Challe
         challenge_title=active.course.title if active else None,
         challenge_progress=f"{len(active.visited)}/{len(active.course.stops)}" if active else None,
         next_goal=goal,
+        daily=daily,
     )

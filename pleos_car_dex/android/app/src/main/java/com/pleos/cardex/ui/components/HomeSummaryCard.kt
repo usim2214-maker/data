@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -17,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.pleos.cardex.data.DailyMission
 import com.pleos.cardex.data.HomeSummary
 
 /** 첫 화면 '한눈에 보기': 점수·순위·수집 현황 + 다음 목표 한 줄 */
@@ -42,12 +44,41 @@ fun HomeSummaryCard(home: HomeSummary?, modifier: Modifier = Modifier) {
             Stat("이번 주", "${home.weeklyRank}위")
             Stat("지역 스탬프", "${home.regionStamps}/${home.regionTotal}")
         }
-        Row(
+        home.daily?.let { DailyRow(it) }
+        // 오늘의 차가 목표일 땐 위 줄과 중복이므로 생략
+        if (home.daily == null || !home.nextGoal.startsWith("오늘의 차")) Row(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color.Black.copy(alpha = 0.25f)).padding(14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("🎯 ", fontSize = 22.sp)
             Text(home.nextGoal, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+/** 오늘의 차: 찾기 전엔 실루엣, 찾으면 일러스트 + 연속 출석 */
+@Composable
+private fun DailyRow(d: DailyMission) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color.White.copy(alpha = 0.12f)).padding(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        CarIllustration(
+            d.target.id, d.target.bodyType, d.target.rarity,
+            Modifier.size(width = 120.dp, height = 72.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFFE2E8F0)),
+            silhouette = !d.found,
+        )
+        Column(Modifier.weight(1f)) {
+            Text("📅 오늘의 차", color = Color(0xFFFFD54F), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text(
+                if (d.found) "${d.target.brand} ${d.target.model} 발견 완료 ✅" else "${d.target.brand} ${d.target.model} 를 찾아보세요 (+${d.bonus})",
+                color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.SemiBold,
+            )
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("🔥 ${d.streak}일", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black)
+            Text("연속 · 최고 ${d.bestStreak}", color = Color.White.copy(alpha = 0.75f), fontSize = 13.sp)
         }
     }
 }

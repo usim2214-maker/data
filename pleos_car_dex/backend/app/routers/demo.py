@@ -1,12 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.config import get_settings
-from app.schemas import HomeSummary
+from app.schemas import DailyMission, HomeSummary
 from app.services import demo, home
 from app.services.deps import get_challenge, get_competition, get_decor, get_landmarks
 from app.services.pipeline import RecognitionPipeline, get_pipeline
 
 router = APIRouter(prefix="/api/v1", tags=["home / demo"])
+
+
+@router.get("/daily", response_model=DailyMission)
+def daily_mission():
+    """오늘의 차 미션 + 연속 출석"""
+    from app.services.deps import get_daily
+    return get_daily().mission()
 
 
 @router.get("/home", response_model=HomeSummary)

@@ -61,6 +61,7 @@ class VehicleCard(BaseModel):
 class RecognitionResponse(BaseModel):
     detected: bool
     twin: bool = False  # 내 차와 같은 차(쌍둥이)를 만남
+    daily_bonus: int = 0  # 오늘의 차를 찾았으면 보너스 점수
     detection: Detection | None = None  # 카드로 만든 차량 (가장 가깝게 보인 차)
     detections: list[Detection] = []  # 화면 속 모든 차량 (앱에서 박스 표시)
     identity: VehicleIdentity | None = None
@@ -398,6 +399,17 @@ class CatalogVehicle(BaseModel):
     rarity: str
 
 
+class DailyMission(BaseModel):
+    """오늘의 차 미션 + 연속 출석"""
+
+    date: str
+    target: CatalogVehicle
+    found: bool
+    bonus: int
+    streak: int
+    best_streak: int
+
+
 class HomeSummary(BaseModel):
     """도감/여행 탭 상단 '한눈에 보기' 카드"""
 
@@ -419,6 +431,7 @@ class HomeSummary(BaseModel):
     challenge_title: str | None = None
     challenge_progress: str | None = None  # 예: "1/3"
     next_goal: str  # 다음 목표 한 줄 (예: "부산 마스터까지 35점")
+    daily: DailyMission | None = None
 
 
 class QuizQuestion(BaseModel):

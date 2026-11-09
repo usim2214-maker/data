@@ -9,7 +9,7 @@ def synergy_for(store: JsonStore) -> SynergyScore:
     entries = store.list_entries()
     featured_id = store.get_showroom().card_id
     featured = next((e.card for e in entries if e.card.id == featured_id), None)
-    kinds = points_by_kind(store, {"course_complete", "limited_badge", "twin"})
+    kinds = points_by_kind(store, {"course_complete", "limited_badge", "twin", "daily"})
     return synergy.compute(
         entries,
         featured_brand=featured.brand if featured else None,
@@ -20,4 +20,5 @@ def synergy_for(store: JsonStore) -> SynergyScore:
         course_points=kinds["course_complete"],
         badge_points=kinds["limited_badge"],
         twin_points=kinds["twin"],
+        daily_points=kinds["daily"],
     )

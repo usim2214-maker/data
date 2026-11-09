@@ -142,13 +142,12 @@ class DemoVideoFramesTest {
     private data class Dex(val entries: List<VehicleCard>, val home: HomeSummary) : Scene
     private data object LegendaryGet : Scene
 
-    // scripts/generate_ai_cards.py 가 만든 '실제 Claude 요약'이 있으면 사용, 없으면 시연 데이터
-    private val aiCards: org.json.JSONObject? = File("../../docs/demo/ai_cards.json").takeIf { it.exists() }
-        ?.let { org.json.JSONObject(it.readText()) }
+    // 카드 정보는 차량 정보 목록에서 가져온다 (AI 요약 미사용)
+    private val aiCards: org.json.JSONObject? = null
     private val myKeywords: List<String> = aiCards?.getJSONArray("keywords")?.let { a -> (0 until a.length()).map { a.getString(it) } }
         ?: listOf("가격", "브랜드", "마력", "연비")
     private val aiNote: String = aiCards?.let { "※ 뒷면 요약: ${it.getString("model")} 실제 생성 결과 (${it.getString("generated_at").take(10)})" }
-        ?: "※ 요약 문구는 시연 데이터 — AI(LLM) 연동 시 자동 생성"
+        ?: "※ 정보: 차량 정보 목록 (수치는 예시값 · 검수 필요)"
 
     private fun card(id: String, brand: String, model: String, body: String, rarity: String, oneLiner: String, sample: List<Pair<String, String>>): VehicleCard {
         val ai = aiCards?.getJSONObject("cards")?.optJSONObject(id)
@@ -252,7 +251,7 @@ class DemoVideoFramesTest {
         caption = "아직 못 만난 차는 '???' 실루엣 — 전설 차량은 어디서 만날까?"; tick()
         hold(2.8)
 
-        // 4. 차량 인식 -> 키워드 -> AI 요약 -> 카드
+        // 4. 차량 인식 -> 키워드 -> 정보 목록 -> 카드
         if (roadImage != null && roadDets.isNotEmpty()) {
             val cap = "YOLOv8 로 차량 인식 — 화면 속 차량을 찾아요 (박스는 실제 감지 결과)"
             show(Recognize(0), cap, "3"); hold(1.0)
@@ -260,11 +259,11 @@ class DemoVideoFramesTest {
             show(Recognize(roadDets.size + 1), "가장 가깝게 보인 차를 골라 카드로 만들어요", "3")
             hold(2.0)
         }
-        show(Keywords, "카드 뒷면에 담을 정보는 내가 직접 골라요 — 고른 키워드가 그대로 AI 프롬프트가 돼요", "4")
+        show(Keywords, "카드 뒷면에 담을 정보는 내가 직접 골라요 — 도감의 차량 정보 목록에서 꺼내 보여줘요", "4")
         hold(3.0)
         show(CardMake(false, ev9Card), "카드 앞면 — 차량 일러스트", "5")
         hold(2.2)
-        animatedScene(CardMake(true, ev9Card), "카드 뒷면 — 내가 고른 정보를 AI 가 요약", "5", 3.0)
+        animatedScene(CardMake(true, ev9Card), "카드 뒷면 — 내가 고른 정보", "5", 3.0)
 
         // 5. 전설 차량 등장
         show(CardMake(false, ioniq5nCard, legendary = true), "희귀도가 있어요 — 일반 · 희귀 · 전설", "6")
@@ -309,7 +308,7 @@ class DemoVideoFramesTest {
 
         // 10. 마무리
         show(Title("CarDex", "달릴수록 채워지는 나만의 차량 도감", listOf(
-            "YOLOv8 차량 인식 · 사용자 키워드 기반 AI 요약 카드 · 28종 도감 · 쇼룸",
+            "YOLOv8 차량 인식 · 내가 고른 정보 카드 · 28종 도감 · 쇼룸",
             "Pleos SDK: FusedLocation · NaviHelper · Vehicle · TextToSpeech  |  한국관광공사 TourAPI",
         )), "", "")
         hold(4.0)
@@ -359,7 +358,7 @@ class DemoVideoFramesTest {
                     )
                 }
                 is Recognize -> RecognizeScene(s.revealed)
-                Keywords -> com.pleos.cardex.ui.screens.KeywordSettingsScreen(myKeywords) {}
+                Keywords -> com.pleos.cardex.ui.screens.KeywordSettingsScreen(myKeywords, {})
                 is CardMake -> CardMakeScene(s.flipped, s.card, s.legendary)
                 LegendaryGet -> {
                     CardMakeScene(false, ioniq5nCard, true)
@@ -433,7 +432,7 @@ class DemoVideoFramesTest {
                         Modifier.size(220.dp, (220f * roadCrop.height / roadCrop.width).dp).clip(RoundedCornerShape(12.dp)),
                     )
                 }
-                Step("③", "내가 고른 정보로 AI 요약", if (done) "키워드를 프롬프트에 넣어 생성" else "", false)
+                Step("③", "차종 판별 → 정보 목록 조회", if (done) "내가 고른 항목만 꺼내기" else "", false)
                 Step("④", "카드 완성 → 도감 등록", if (done) "앞면 일러스트 · 뒷면 요약" else "", false)
             }
         }
@@ -446,7 +445,7 @@ class DemoVideoFramesTest {
                 Text(if (legendary) "전설 차량 발견!" else "새 차량 카드!", color = if (legendary) Color(0xFFFFB300) else Color(0xFFFFC94D), fontSize = 40.sp, fontWeight = FontWeight.Black)
                 Step("①", "YOLOv8 차량 인식", "car ${"%.2f".format(roadDets.minOfOrNull { it.conf } ?: 0.4)}", true)
                 Step("②", "내가 고른 정보", myKeywords.joinToString(" · "), true)
-                Step("③", "AI 요약 (프롬프트 = 차량 + 내 키워드)", if (flipped) "카드 뒷면에 표시" else "생성 중…", flipped)
+                Step("③", "차량 정보 목록에서 꺼내기", if (flipped) "카드 뒷면에 표시" else "준비 중…", flipped)
                 Text(aiNote, color = Color.Gray, fontSize = 15.sp)
             }
             com.pleos.cardex.ui.components.FlipCard(card, Modifier.padding(bottom = 60.dp).size(330.dp, 470.dp), flipped = flipped)

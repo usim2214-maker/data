@@ -39,5 +39,6 @@ class CarDexRepository(private val api: CarDexApi = CarDexApi.create()) {
     suspend fun demoSeed() = api.demoSeed()
     suspend fun demoReset() = api.demoReset()
     suspend fun preferences() = api.preferences()
+    suspend fun fields() = api.fields()
     suspend fun savePreferences(prefs: Preferences) = api.savePreferences(prefs)
 }

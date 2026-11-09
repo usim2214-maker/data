@@ -53,7 +53,7 @@ import com.pleos.cardex.ui.theme.CarDexTheme
 
 private enum class Dest(val route: String, val label: String, val icon: ImageVector) {
     Collection("collection", "도감", Icons.Filled.CollectionsBookmark), // 메인: 주행 중 마주친 차량 카드 수집
-    Scan("scan", "수집", Icons.Filled.CameraAlt), // YOLOv8 인식 -> AI 카드 (영상 입력 경로는 차량 영상 API 공개 시 연결)
+    Scan("scan", "수집", Icons.Filled.CameraAlt), // YOLOv8 인식 -> 차량 정보 카드 (영상 입력 경로는 차량 영상 API 공개 시 연결)
     Showroom("showroom", "쇼룸", Icons.Filled.DirectionsCar),
     Travel("travel", "여행", Icons.Filled.Map), // 희귀 차량을 만나러 새 지역으로
     Ranking("ranking", "랭킹", Icons.Filled.EmojiEvents),
@@ -166,6 +166,7 @@ class MainActivity : ComponentActivity() {
                                 SettingsScreen(
                                     keywords = state.keywords,
                                     voiceOn = state.voiceOn,
+                                    fields = state.fields,
                                     showDemoTools = BuildConfig.DEBUG,
                                     onSaveKeywords = vm::saveKeywords,
                                     onToggleVoice = vm::toggleVoice,

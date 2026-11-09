@@ -39,7 +39,7 @@ class KeywordFact(BaseModel):
 
 
 class CardSummary(BaseModel):
-    """LLM 요약 결과 (Claude 구조화 출력 스키마로도 사용)."""
+    """카드 뒷면: 차량 정보 목록에서 사용자가 고른 항목"""
 
     one_liner: str
     facts: list[KeywordFact]
@@ -54,7 +54,6 @@ class VehicleCard(BaseModel):
     one_liner: str
     facts: list[KeywordFact]  # 카드 뒷면
     rarity: str = "common"  # common | rare | legendary (도감 게이미피케이션)
-    grounded: bool = True  # 카탈로그 근거 데이터로 요약했는지. False 면 앱에 'AI 추정' 표시
 
 
 class RecognitionResponse(BaseModel):

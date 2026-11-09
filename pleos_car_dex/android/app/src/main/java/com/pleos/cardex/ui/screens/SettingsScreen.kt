@@ -28,6 +28,7 @@ import com.pleos.cardex.data.CarDexApi
 fun SettingsScreen(
     keywords: List<String>,
     voiceOn: Boolean,
+    fields: List<String> = DEFAULT_FIELDS,
     showDemoTools: Boolean,
     onSaveKeywords: (List<String>) -> Unit,
     onToggleVoice: () -> Unit,
@@ -36,7 +37,7 @@ fun SettingsScreen(
     onSimulateDriving: () -> Unit,
 ) {
     Row(Modifier.fillMaxSize()) {
-        Box(Modifier.weight(1.4f).fillMaxHeight()) { KeywordSettingsScreen(keywords, onSaveKeywords) }
+        Box(Modifier.weight(1.4f).fillMaxHeight()) { KeywordSettingsScreen(keywords, onSaveKeywords, fields) }
         Column(Modifier.weight(1f).fillMaxHeight().padding(32.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Card(Modifier.fillMaxWidth()) {
                 Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {

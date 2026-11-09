@@ -26,7 +26,7 @@ def test_recognize_registers_and_uses_keywords(client):
     assert [f["keyword"] for f in body["card"]["facts"]] == ["가격", "마력"]
     assert body["is_new_entry"] is True
     assert body["card"]["image_url"] is None  # 개인정보: 크롭 이미지 미저장 (기본)
-    assert len(body["detections"]) == 1 and body["card"]["grounded"] is True
+    assert len(body["detections"]) == 1
 
     # 재발견 -> 신규 아님, seen_count 증가
     again = client.post("/api/v1/recognize", files={"image": ("ioniq-5.jpg", _jpeg(), "image/jpeg")}).json()
@@ -298,7 +298,7 @@ def test_catalog_and_dex_home(client):
     assert "현대" in h["next_goal"] or "마스터" in h["next_goal"] or "계단" in h["next_goal"]
 
 
-def test_identity_cache_and_ungrounded_card(client, monkeypatch):
+def test_identity_cache_and_non_catalog_car(client, monkeypatch):
     from app.schemas import VehicleIdentity
     from app.services.pipeline import get_pipeline
 
@@ -318,9 +318,20 @@ def test_identity_cache_and_ungrounded_card(client, monkeypatch):
     client.post("/api/v1/recognize", files={"image": ("kia-ev9.jpg", buf.getvalue(), "image/jpeg")})
     assert len(calls) == 2
 
-    # 카탈로그에 없는 차 -> 'AI 추정' (grounded=False)
+    # 정보 목록에 없는 차 -> 카드를 만들지 않음
     pipe._recent.clear()
     monkeypatch.setattr(pipe.identifier, "identify", lambda crop, hint="": VehicleIdentity(
         is_vehicle=True, brand="테슬라", model="모델 Y", body_type="SUV", confidence=0.9))
     r = client.post("/api/v1/recognize", files={"image": ("x.jpg", _jpeg((10, 200, 10)), "image/jpeg")}).json()
-    assert r["card"]["id"] == "테슬라-모델-y" and r["card"]["grounded"] is False and r["card"]["rarity"] == "common"
+    assert r["card"] is None and "도감에 없는 차량" in r["message"]
+
+
+def test_card_info_comes_from_catalog_list(client):
+    fields = client.get("/api/v1/preferences/fields").json()
+    assert fields == ["가격", "브랜드", "차급", "마력", "연비", "연료", "출시연도", "구동방식", "승차인원"]
+    # 목록에 없는 항목(제로백)은 저장되지 않음
+    p = client.put("/api/v1/preferences", json={"keywords": ["차급", "제로백", "승차인원"]}).json()
+    assert p["keywords"] == ["차급", "승차인원"]
+    card = client.post("/api/v1/recognize", files={"image": ("kia-carnival.jpg", _jpeg(), "image/jpeg")}).json()["card"]
+    assert card["one_liner"] == "가족 나들이의 대표 미니밴"
+    assert card["facts"] == [{"keyword": "차급", "value": "대형 MPV"}, {"keyword": "승차인원", "value": "7~11인승"}]

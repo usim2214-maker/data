@@ -55,7 +55,7 @@ import kotlinx.coroutines.delay
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * 수집 탭: YOLOv8 차량 인식 -> 내가 고른 정보(키워드)로 AI 요약 -> 카드 (앞: 일러스트 / 뒤: 요약) -> 도감
+ * 수집 탭: YOLOv8 차량 인식 -> 차종 판별 -> 차량 정보 목록에서 내가 고른 항목 -> 카드 (앞: 일러스트 / 뒤: 요약) -> 도감
  * 입력 경로(차량 영상 API 등)는 미정이라, 지금은 시연 영상/이미지 프레임을 보낸다.
  */
 @OptIn(ExperimentalLayoutApi::class)
@@ -71,7 +71,7 @@ fun ScanScreen(
         Column(Modifier.weight(1.35f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("차량 수집", style = MaterialTheme.typography.displaySmall)
-                Text("YOLOv8 인식 → 내가 고른 정보로 AI 카드", color = Color.Gray, fontSize = 18.sp)
+                Text("YOLOv8 인식 → 내가 고른 정보로 카드", color = Color.Gray, fontSize = 18.sp)
             }
             FramePreview(state.lastFrameJpeg, result?.detections.orEmpty(), result?.detection, state.demoVideo, videoPositionMs, state.busy)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -83,7 +83,7 @@ fun ScanScreen(
                 }
                 if (state.busy) CircularProgressIndicator()
             }
-            // 내가 고른 정보 = AI 프롬프트에 들어가는 키워드
+            // 내가 고른 정보 = 카드 뒷면에 차량 정보 목록에서 꺼내 보여줄 항목
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("카드에 담을 정보", color = Color.Gray, fontSize = 16.sp)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -102,7 +102,7 @@ fun ScanScreen(
                         color = if (result.isNewEntry) Color(0xFFFFC94D) else Color.Gray, fontSize = 24.sp, fontWeight = FontWeight.Bold,
                     )
                     FlipCard(card, Modifier.fillMaxHeight(0.86f).aspectRatio(0.72f))
-                    Text("카드를 탭하면 뒷면(AI 요약)", color = Color.Gray, fontSize = 14.sp)
+                    Text("카드를 탭하면 뒷면(내가 고른 정보)", color = Color.Gray, fontSize = 14.sp)
                 }
             } else {
                 Text(

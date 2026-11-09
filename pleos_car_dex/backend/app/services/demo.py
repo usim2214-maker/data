@@ -20,7 +20,7 @@ def seed(store: JsonStore, competition: CompetitionService, landmarks: LandmarkS
     for cid in SEED_CARS:
         v = by_id[cid]
         ident = VehicleIdentity(is_vehicle=True, brand=v["brand"], model=v["model"], body_type=v["body_type"], confidence=1.0)
-        summary = summarizer._mock(ident, keywords)  # 시연 데이터는 LLM 호출 없이 카탈로그 근거로
+        summary = summarizer.summarize(ident, keywords)  # 차량 정보 목록에서 고른 항목
         card = VehicleCard(id=cid, brand=v["brand"], model=v["model"], body_type=v["body_type"],
                            one_liner=summary.one_liner, facts=summary.facts, rarity=v["rarity"])
         store.register(card, None)

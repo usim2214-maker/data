@@ -66,6 +66,7 @@ data class UiState(
     /** 새 스탬프 획득 등 잠깐 띄울 알림 */
     val notice: String? = null,
     val keywords: List<String> = emptyList(),
+    val fields: List<String> = com.pleos.cardex.ui.screens.DEFAULT_FIELDS,
     val driving: DrivingSnapshot? = null,
     val demoVideo: Uri? = null,
     val landmarks: List<LandmarkNearby> = emptyList(),
@@ -555,6 +556,7 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
     private fun loadPreferences() {
         viewModelScope.launch {
             call { repo.preferences() }.onSuccess { p -> _state.update { it.copy(keywords = p.keywords) } }
+            call { repo.fields() }.onSuccess { f -> _state.update { it.copy(fields = f) } }
         }
     }
 

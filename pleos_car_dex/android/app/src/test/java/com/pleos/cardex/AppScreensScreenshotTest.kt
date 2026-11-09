@@ -109,13 +109,16 @@ class AppScreensScreenshotTest {
         }
     }
 
-    @Test fun aiEstimateCard() = shot("card_ai_estimate") {
-        androidx.compose.foundation.layout.Row(androidx.compose.ui.Modifier.padding(40.dp), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(40.dp)) {
-            val est = com.pleos.cardex.data.VehicleCard("테슬라-모델-y", "테슬라", "모델 Y", "SUV", null, "AI 가 추정한 정보예요",
-                listOf(com.pleos.cardex.data.KeywordFact("가격", "약 5,000만 원대 (추정)"), com.pleos.cardex.data.KeywordFact("마력", "약 300마력대 (추정)")),
-                rarity = "common", grounded = false)
-            com.pleos.cardex.ui.components.FlipCard(est, androidx.compose.ui.Modifier.size(330.dp, 470.dp), flipped = false)
-            com.pleos.cardex.ui.components.FlipCard(est, androidx.compose.ui.Modifier.size(330.dp, 470.dp), flipped = true)
+    /** 카드 뒷면 = 차량 정보 목록에서 고른 항목 (AI 생성 아님) */
+    @Test fun cardInfo() = shot("card_info") {
+        androidx.compose.foundation.layout.Row {
+            androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.weight(1.3f)) {
+                com.pleos.cardex.ui.screens.KeywordSettingsScreen(listOf("가격", "차급", "마력", "승차인원"), {})
+            }
+            val card = com.pleos.cardex.data.VehicleCard("kia-carnival", "기아", "카니발", "MPV", null, "가족 나들이의 대표 미니밴",
+                listOf(com.pleos.cardex.data.KeywordFact("가격", "약 3,500만 원대~"), com.pleos.cardex.data.KeywordFact("차급", "대형 MPV"),
+                    com.pleos.cardex.data.KeywordFact("마력", "약 245~294마력"), com.pleos.cardex.data.KeywordFact("승차인원", "7~11인승")))
+            com.pleos.cardex.ui.components.FlipCard(card, androidx.compose.ui.Modifier.padding(32.dp).size(330.dp, 470.dp), flipped = true)
         }
     }
 

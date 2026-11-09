@@ -92,6 +92,9 @@ interface CarDexApi {
     @GET("api/v1/preferences")
     suspend fun preferences(): Preferences
 
+    @GET("api/v1/preferences/fields")
+    suspend fun fields(): List<String>
+
     @PUT("api/v1/preferences")
     suspend fun savePreferences(@Body prefs: Preferences): Preferences
 

@@ -34,7 +34,7 @@ private data class Page(val emoji: String, val title: String, val lines: List<St
 private val PAGES = listOf(
     Page("🚗", "도로 위 차량을 카드로 모아요", listOf(
         "주행 중 마주친 차량을 YOLOv8 이 인식하면 나만의 차량 카드가 생겨요",
-        "앞면은 차량 일러스트, 뒷면은 내가 고른 정보(가격·마력 등)를 AI 가 요약",
+        "앞면은 차량 일러스트, 뒷면은 내가 고른 정보(가격·마력·연비 등)",
         "28종 도감을 채우고 전설 차량을 찾아보세요",
     )),
     Page("🏆", "쇼룸에 자랑하고, 새 지역으로", listOf(

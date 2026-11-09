@@ -22,10 +22,11 @@ log = logging.getLogger(__name__)
 def _system_prompt() -> str:
     names = ", ".join(f"{v['brand']} {v['model']}" for v in load_catalog())
     return (
-        "당신은 자동차 식별 전문가입니다. 이미지 속 차량의 브랜드와 모델을 식별하세요.\n"
-        f"시연용 우선 후보 차종: {names}\n"
-        "후보 중 하나로 보이면 후보 표기(한글)를 그대로 쓰고, 아니면 가장 가능성 높은 모델을 한글로 쓰세요.\n"
-        "차량이 아니거나 판별이 불가능하면 is_vehicle=false, confidence 를 낮게 주세요."
+        "당신은 자동차 식별 전문가입니다. 이미지 속 차량이 아래 도감 목록 중 어떤 차인지만 고르세요.\n"
+        f"도감 목록: {names}\n"
+        "목록 중 하나로 보이면 그 표기(한글)를 그대로 brand/model 에 쓰세요. 차량 정보(가격·성능 등)는 쓰지 않습니다.\n"
+        "목록에 없는 차량이면 가장 가까운 실제 브랜드/모델을 쓰되 confidence 를 낮게, "
+        "차량이 아니거나 판별이 불가능하면 is_vehicle=false 로 주세요."
     )
 
 

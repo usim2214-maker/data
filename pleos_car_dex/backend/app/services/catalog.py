@@ -8,9 +8,18 @@ _CATALOG_PATH = Path(__file__).resolve().parent.parent / "data" / "vehicle_catal
 
 
 @lru_cache
-def load_catalog() -> list[dict]:
+def _data() -> dict:
     with open(_CATALOG_PATH, encoding="utf-8") as f:
-        return json.load(f)["vehicles"]
+        return json.load(f)
+
+
+def load_catalog() -> list[dict]:
+    return _data()["vehicles"]
+
+
+def available_fields() -> list[str]:
+    """사용자가 카드 뒷면에 고를 수 있는 항목 (목록에 실제로 있는 정보만)"""
+    return _data()["fields"]
 
 
 def _norm(text: str) -> str:

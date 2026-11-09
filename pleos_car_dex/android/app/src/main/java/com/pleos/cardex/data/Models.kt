@@ -33,7 +33,6 @@ data class VehicleCard(
     @SerialName("one_liner") val oneLiner: String,
     val facts: List<KeywordFact>,
     val rarity: String = "common",
-    val grounded: Boolean = true, // false = 카탈로그 밖 차량 -> 'AI 추정' 표시
 )
 
 @Serializable

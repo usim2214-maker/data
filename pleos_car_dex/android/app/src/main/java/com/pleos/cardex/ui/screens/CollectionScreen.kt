@@ -48,7 +48,7 @@ private enum class DexFilter(val label: String) { All("전체"), Owned("수집")
 
 /**
  * 차량 도감 (앱의 첫 화면).
- * 모은 차량은 카드(앞: 일러스트 / 뒤: 내가 고른 정보 AI 요약), 아직 못 만난 차량은 '???' 실루엣 칸.
+ * 모은 차량은 카드(앞: 일러스트 / 뒤: 차량 정보 목록에서 내가 고른 항목), 아직 못 만난 차량은 '???' 실루엣 칸.
  */
 @Composable
 fun CollectionScreen(

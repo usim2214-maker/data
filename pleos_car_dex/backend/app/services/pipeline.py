@@ -1,7 +1,7 @@
-"""인식 파이프라인: 감지 -> 크롭 -> 식별 -> 키워드 요약 -> 카드 생성 -> 도감 등록.
+"""인식 파이프라인: 감지 -> 크롭 -> 차종 판별 -> 차량 정보 목록에서 고른 항목 -> 카드 생성 -> 도감 등록.
 
 - 개인정보: 크롭 이미지는 메모리에서만 쓰고 저장하지 않는다 (SAVE_CROPS=true 일 때만 저장)
-- 비용/지연: 같은 차를 짧은 시간 안에 다시 보면 차종 판별(Claude 비전)과 요약을 재사용
+- 비용/지연: 같은 차를 짧은 시간 안에 다시 보면 차종 판별(Claude 비전)을 재사용
 """
 import time
 import uuid
@@ -101,7 +101,13 @@ class RecognitionPipeline:
                 detected=True, detection=detection, identity=identity, message="차종을 확신할 수 없어요."
             )
 
-        card_id = slugify(identity.brand, identity.model)
+        ref = find_vehicle(identity.brand, identity.model)
+        if ref is None:  # 정보 목록(28종)에 없는 차량은 카드로 만들지 않는다
+            return RecognitionResponse(
+                detected=True, detection=detection, identity=identity,
+                message=f"{identity.brand} {identity.model} — 도감에 없는 차량이에요",
+            )
+        card_id = ref["id"]
         card = self._reusable_card(card_id, keywords)
         if card is None:
             image_url = None
@@ -110,17 +116,15 @@ class RecognitionPipeline:
                 crop.save(self.settings.crops_dir / crop_name, quality=90)
                 image_url = f"/static/crops/{crop_name}"
             summary = self.summarizer.summarize(identity, keywords, prefs.language)
-            ref = find_vehicle(identity.brand, identity.model)
             card = VehicleCard(
                 id=card_id,
-                brand=identity.brand,
-                model=identity.model,
-                body_type=identity.body_type,
+                brand=ref["brand"],
+                model=ref["model"],
+                body_type=ref["body_type"],
                 image_url=image_url,
                 one_liner=summary.one_liner,
                 facts=summary.facts,
-                rarity=(ref or {}).get("rarity", "common"),
-                grounded=ref is not None,  # 카탈로그 밖 차량은 AI 추정
+                rarity=ref.get("rarity", "common"),
             )
 
         is_new = False

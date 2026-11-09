@@ -319,7 +319,7 @@ internal fun AppDrawer(current: String?, onSelect: (Dest) -> Unit) {
 
 /** 메뉴 화면 틀: 상단 바(☰ · 제목 · 홈) + 내용 */
 @androidx.compose.runtime.Composable
-private fun SubScreen(title: String, onMenu: () -> Unit, onHome: () -> Unit, content: @androidx.compose.runtime.Composable () -> Unit) {
+internal fun SubScreen(title: String, onMenu: () -> Unit, onHome: () -> Unit, content: @androidx.compose.runtime.Composable () -> Unit) {
     androidx.compose.foundation.layout.Column(Modifier.fillMaxSize()) {
         Row(Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             androidx.compose.material3.IconButton(onClick = onMenu) { Icon(Icons.Filled.Menu, "메뉴") }

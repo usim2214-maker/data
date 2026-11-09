@@ -40,6 +40,15 @@ def get_daily():
 
 
 @lru_cache
+def get_trips():
+    from app.services import home
+    from app.services.trips import TripService
+    store = get_pipeline().store
+    return TripService(store, get_daily(),
+                       lambda: home.summary(store, get_competition(), get_challenge(), get_decor()).next_goal)
+
+
+@lru_cache
 def get_challenge() -> ChallengeService:
     return ChallengeService(get_pipeline().store, get_competition())
 
@@ -60,5 +69,5 @@ def get_courses() -> CourseService:
 
 
 def clear_all() -> None:
-    for f in (get_tour, get_daily, get_competition, get_challenge, get_decor, get_landmarks, get_courses):
+    for f in (get_tour, get_daily, get_trips, get_competition, get_challenge, get_decor, get_landmarks, get_courses):
         f.cache_clear()

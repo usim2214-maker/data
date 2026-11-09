@@ -428,3 +428,24 @@ def test_brand_spot_legendary_item(client):
 
     cands = client.post("/api/v1/courses/candidates", json={"lat": 37.40, "lon": 127.10, "max_hours": 3}).json()
     assert any(c["kind"] == "brand" for c in cands["candidates"])
+
+
+def test_trip_report(client):
+    """주차 시 주행 리포트: Odometer 거리·시간 + 이번 주행에서 모은 카드·스탬프·점수"""
+    from datetime import datetime, timedelta, timezone
+
+    start = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
+    client.post("/api/v1/recognize", files={"image": ("hyundai-ioniq-5-n.jpg", _jpeg(), "image/jpeg")})
+    client.post("/api/v1/stamps/visit", json={"lat": 35.16, "lon": 129.16})  # 부산
+    client.post("/api/v1/landmarks/brand-hms-busan/visit", json={"lat": 35.1767, "lon": 129.1145})
+    r = client.post("/api/v1/trips/report", json={"started_at": start, "distance_km": 23.44, "drive_minutes": 41}).json()
+    assert r["distance_km"] == 23.4 and r["drive_minutes"] == 41
+    assert r["new_cards"] == ["현대 아이오닉 5 N"] and r["new_legendary"] == 1
+    assert any("부산" in s for s in r["stamps"]) and any(s.startswith("🏢") for s in r["stamps"])
+    assert r["points"] >= 40 and r["trips"] == 1 and r["total_km"] == 23.4
+    assert "새 카드 1장" in r["headline"] and "킬로미터" in r["tts"] and r["next_goal"]
+
+    # 이후 주행: 모은 게 없으면 격려 문구, 짧은 이동은 누적 제외
+    later = datetime.now(timezone.utc).isoformat()
+    r2 = client.post("/api/v1/trips/report", json={"started_at": later, "distance_km": 0.2, "drive_minutes": 2}).json()
+    assert r2["new_cards"] == [] and r2["points"] == 0 and r2["trips"] == 1 and "다음엔" in r2["tts"]

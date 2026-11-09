@@ -461,3 +461,30 @@ CollectionResponse.model_rebuild()
 CourseCandidates.model_rebuild()
 LandmarkVisitResponse.model_rebuild()
 Showroom.model_rebuild()
+
+
+class TripReportRequest(BaseModel):
+    """주차(P단) 시 앱이 보내는 주행 기록. 거리·시간은 Pleos Vehicle SDK Odometer(이번 주행) 값"""
+
+    started_at: datetime  # 이번 주행 시작 (앱이 주행 기어 진입 시각을 기억)
+    distance_km: float = Field(0, ge=0, le=2000)
+    drive_minutes: int = Field(0, ge=0, le=24 * 60)
+    source: str = "pleos_odometer"  # pleos_odometer | estimate
+
+
+class TripReport(BaseModel):
+    """주행 리포트: 이번 드라이브에서 모은 것 (속도·운전 습관 평가는 하지 않음)"""
+
+    distance_km: float
+    drive_minutes: int
+    new_cards: list[str] = []  # "현대 아이오닉 5"
+    new_legendary: int = 0
+    stamps: list[str] = []  # 지역/히든/브랜드 스탬프 이름
+    points: int = 0
+    daily_found: bool = False
+    streak: int = 0
+    total_km: float = 0  # 앱과 함께한 누적 거리
+    trips: int = 0
+    headline: str  # 한 줄 제목
+    tts: str  # 음성 요약 (짧게)
+    next_goal: str = ""

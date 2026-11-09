@@ -90,6 +90,9 @@ interface CarDexApi {
     @GET("api/v1/rankings/masters")
     suspend fun masters(): MastersResponse
 
+    @POST("api/v1/trips/report")
+    suspend fun tripReport(@Body req: TripReportRequest): TripReport
+
     @GET("api/v1/home")
     suspend fun home(): HomeSummary
 

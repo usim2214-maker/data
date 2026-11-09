@@ -41,6 +41,7 @@ import com.pleos.cardex.ui.screens.DrivingScreen
 import com.pleos.cardex.ui.screens.OnboardingScreen
 import com.pleos.cardex.ui.screens.SettingsScreen
 import com.pleos.cardex.ui.components.CelebrationOverlay
+import com.pleos.cardex.ui.components.TripReportCard
 import com.pleos.cardex.data.CarDexApi
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
@@ -221,6 +222,8 @@ class MainActivity : ComponentActivity() {
                     }
                     // 큰 성취 축하 (주행 중엔 음성만, 화면 연출은 정차 후)
                     if (!state.isDriving) state.celebration?.let { CelebrationOverlay(it, vm::dismissCelebration) }
+                    // 주차 후 주행 리포트 (축하 연출이 끝난 뒤)
+                    if (!state.isDriving && state.celebration == null) state.tripReport?.let { TripReportCard(it, vm::dismissTripReport) }
                 }
             }
         }

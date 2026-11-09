@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
-from app.routers import challenge, collection, courses, demo, landmarks, preferences, quiz, rankings, recognize, showroom, stamps
+from app.routers import challenge, collection, courses, demo, landmarks, preferences, quiz, rankings, recognize, showroom, stamps, trips
 
 logging.basicConfig(level=logging.INFO)
 
@@ -24,6 +24,7 @@ app.include_router(challenge.router)
 app.include_router(rankings.router)
 app.include_router(demo.router)
 app.include_router(quiz.router)
+app.include_router(trips.router)
 from app.services.deps import get_competition  # noqa: E402
 
 get_competition()  # 쌍둥이 보너스 콜백 연결

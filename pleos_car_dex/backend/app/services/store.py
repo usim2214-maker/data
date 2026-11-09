@@ -77,8 +77,13 @@ class JsonStore:
         """시연 초기화: 저장된 진행 데이터를 모두 지운다 (크롭 이미지는 유지)"""
         with self._lock:
             for p in (self._collection_path, self._prefs_path, self._showroom_path, self._stamps_path,
-                      self._hidden_path, self._events_path, self._challenge_path, self._badges_path):
+                      self._hidden_path, self._events_path, self._challenge_path, self._badges_path,
+                      self.extra_path("daily.json"), self.extra_path("trips.json"), self.extra_path("quiz.json")):
                 p.unlink(missing_ok=True)
+
+    def extra_path(self, name: str) -> Path:
+        """부가 기능(오늘의 차·주행 리포트·퀴즈)용 파일 경로"""
+        return self._collection_path.with_name(name)
 
     def get_entry(self, card_id: str) -> CollectionEntry | None:
         return self._load().get(card_id)

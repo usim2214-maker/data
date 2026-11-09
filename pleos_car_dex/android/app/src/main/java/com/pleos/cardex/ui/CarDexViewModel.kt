@@ -10,6 +10,8 @@ import com.pleos.cardex.data.Challenge
 import com.pleos.cardex.data.CatalogVehicle
 import com.pleos.cardex.data.CollectionEntry
 import com.pleos.cardex.data.HomeSummary
+import com.pleos.cardex.data.TripReport
+import com.pleos.cardex.data.TripReportRequest
 import com.pleos.cardex.data.DecorCatalog
 import com.pleos.cardex.data.MAX_PROPS
 import com.pleos.cardex.data.PlacedProp
@@ -31,6 +33,7 @@ import com.pleos.cardex.pleos.FrameSource
 import com.pleos.cardex.pleos.PleosAi
 import com.pleos.cardex.pleos.VoiceCommand
 import com.pleos.cardex.pleos.GearMonitor
+import com.pleos.cardex.pleos.TripMeter
 import com.pleos.cardex.pleos.VoiceGuide
 import com.pleos.cardex.pleos.LandmarkTarget
 import com.pleos.cardex.pleos.PleosNavi
@@ -103,6 +106,8 @@ data class UiState(
     val serverDown: Boolean = false,
     /** 큰 성취 축하 연출 (코스 완주·한정 배지·지역 마스터) */
     val celebration: Celebration? = null,
+    /** 주차(P단) 후 주행 리포트 */
+    val tripReport: TripReport? = null,
     val onboardingDone: Boolean = true,
     val error: String? = null,
 )
@@ -186,6 +191,11 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
     }
     private val gear = GearMonitor(app)
     private val uxRestriction = DrivingRestriction(app)
+    private val tripMeter = TripMeter(app)
+    private var tripMeterAvailable = false
+    private var tripStartMs: Long? = null
+    private var tripEstimateM = 0f // Odometer 를 못 쓸 때 위치로 누적한 거리
+    private var lastTripFix: GeoPoint? = null
     private var gearAvailable = false
     private var uxAvailable = false
     private var simulated: Boolean? = null
@@ -231,17 +241,45 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
     /** Pleos Vehicle SDK 기어 상태 구독. 권한이 없거나 미지원이면 위치 속도로 추정 */
     fun startGear(permissionGranted: Boolean) {
         if (!permissionGranted || BuildConfig.USE_MOCK_PLEOS) return
+        if (!tripMeterAvailable) tripMeterAvailable = tripMeter.start()
         if (uxAvailable) return // 표준 UX 제한을 쓸 수 있으면 그걸 우선
+        tripMeterAvailable = tripMeter.start()
         gearAvailable = gear.start { parked ->
             if (simulated == null && parked != null) setDriving(!parked, "Pleos 기어")
         }
     }
 
     private fun setDriving(driving: Boolean, source: String) {
-        if (_state.value.isDriving != driving || _state.value.drivingSource != source) {
+        val was = _state.value.isDriving
+        if (was != driving || _state.value.drivingSource != source) {
             _state.update { it.copy(isDriving = driving, drivingSource = source) }
         }
+        if (!was && driving) { // 출발: 주행 기록 시작
+            tripStartMs = System.currentTimeMillis(); tripEstimateM = 0f; lastTripFix = _state.value.driving?.location
+            _state.update { it.copy(tripReport = null) }
+        } else if (was && !driving) finishTrip() // 주차: 리포트
     }
+
+    /** 주차 시 이번 주행 리포트 (Pleos Odometer 우선, 없으면 위치 추정) */
+    private fun finishTrip() {
+        val start = tripStartMs ?: return
+        tripStartMs = null
+        viewModelScope.launch {
+            val odo = if (tripMeterAvailable) tripMeter.read() else null
+            val req = TripReportRequest(
+                startedAt = java.time.Instant.ofEpochMilli(start).toString(),
+                distanceKm = odo?.first ?: (tripEstimateM / 1000f),
+                driveMinutes = odo?.second ?: ((System.currentTimeMillis() - start) / 60_000).toInt(),
+                source = if (odo != null) "pleos_odometer" else "estimate",
+            )
+            call { repo.tripReport(req) }.onSuccess { r ->
+                _state.update { it.copy(tripReport = r, notice = r.tts) }
+                loadHome()
+            }
+        }
+    }
+
+    fun dismissTripReport() = _state.update { it.copy(tripReport = null) }
 
     /** Vehicle SDK 가 없을 때: 위치 변화로 속도 추정 (8km/h 이상 주행, 3km/h 이하 정차) */
     private fun estimateSpeed(at: GeoPoint) {
@@ -253,6 +291,7 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
         val kmh = distanceM(prev.first, at) / ((now - prev.second) / 1000f) * 3.6f
         if (kmh > 250f) { fixes.clear(); fixes.addLast(at to now); return } // adb geo fix 등 순간이동은 무시
         _state.update { it.copy(speedKmh = kmh) }
+        if (tripStartMs != null) { lastTripFix?.let { tripEstimateM += distanceM(it, at) }; lastTripFix = at }
         if (uxAvailable || gearAvailable || simulated != null) return
         when {
             kmh >= 8f -> setDriving(true, "위치 속도 추정")
@@ -722,6 +761,7 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
         pleosAi.release()
         voiceCommand.release()
         gear.release()
+        tripMeter.release()
         uxRestriction.release()
         frames.release()
     }

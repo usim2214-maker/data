@@ -30,7 +30,7 @@ def target_for(d: date) -> dict:
 class DailyService:
     def __init__(self, store: JsonStore):
         self.store = store
-        self._path = store._collection_path.with_name("daily.json")
+        self._path = store.extra_path("daily.json")
 
     def _load(self) -> dict:
         return json.loads(self._path.read_text(encoding="utf-8")) if self._path.exists() else {"found": [], "active": []}

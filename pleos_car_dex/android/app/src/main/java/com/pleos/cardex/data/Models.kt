@@ -381,3 +381,30 @@ data class ShowroomUpdate(
 )
 
 const val MAX_PROPS = 8
+
+/** 주차 시 주행 리포트 요청 (거리·시간: Pleos Odometer 또는 위치 추정) */
+@Serializable
+data class TripReportRequest(
+    @SerialName("started_at") val startedAt: String,
+    @SerialName("distance_km") val distanceKm: Float,
+    @SerialName("drive_minutes") val driveMinutes: Int,
+    val source: String,
+)
+
+/** 주행 리포트: 이번 드라이브에서 모은 것 */
+@Serializable
+data class TripReport(
+    @SerialName("distance_km") val distanceKm: Float,
+    @SerialName("drive_minutes") val driveMinutes: Int,
+    @SerialName("new_cards") val newCards: List<String> = emptyList(),
+    @SerialName("new_legendary") val newLegendary: Int = 0,
+    val stamps: List<String> = emptyList(),
+    val points: Int = 0,
+    @SerialName("daily_found") val dailyFound: Boolean = false,
+    val streak: Int = 0,
+    @SerialName("total_km") val totalKm: Float = 0f,
+    val trips: Int = 0,
+    val headline: String,
+    val tts: String,
+    @SerialName("next_goal") val nextGoal: String = "",
+)

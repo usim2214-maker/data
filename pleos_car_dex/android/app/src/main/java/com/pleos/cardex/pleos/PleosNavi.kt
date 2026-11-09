@@ -88,6 +88,7 @@ class PleosNavi(context: Context) {
             runCatching {
                 if (waypoints.isEmpty()) {
                     h.requestRoute(dest.toRouteInfo())
+                    showNavigation(h)
                 } else {
                     h.requestRouteWithWaypoints(
                         RouteWithWaypointsRequest(
@@ -95,11 +96,17 @@ class PleosNavi(context: Context) {
                             waypoints = waypoints.mapIndexed { i, s -> s.toWaypoint(if (i == 0) WaypointIndex.FIRST else WaypointIndex.SECOND) },
                         ),
                     )
+                    showNavigation(h)
                 }
             }.onFailure { e ->
                 onError(if (e is SecurityException) "내비 권한이 없어요." else "경로 요청 실패: ${e.message}")
             }
         }
+    }
+
+    /** 경로를 보낸 뒤 Pleos 내비 화면을 앞으로 띄운다 (요청만으로 화면이 바뀌는지는 내비 앱 구현에 따라 다를 수 있어 명시적으로 요청) */
+    private fun showNavigation(h: NaviHelper) {
+        runCatching { h.requestNavigationScreen(NavigationScreenRequest.Foreground) }
     }
 
     /** 최근 목적지·즐겨찾기 요청 (결과는 onPlaces) */
@@ -116,6 +123,7 @@ class PleosNavi(context: Context) {
         runCatching {
             h.requestRoute(RouteInfo(latitude = place.lat, longitude = place.lon, displayLatitude = null, displayLongitude = null,
                 poiName = place.name, poiId = place.poiId, poiSubId = "0", address = place.address, routeOption = RouteOption.RECOMMENDED))
+            showNavigation(h)
         }.onFailure { e -> onError("경로 요청 실패: ${e.message}") }
     }
 

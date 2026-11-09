@@ -85,6 +85,7 @@ data class UiState(
     val quizFrameJpeg: ByteArray? = null,
     val quizPicked: String? = null, // null = 답 기다리는 중
     val quizStars: Int = 0,
+    val quizSticker: com.pleos.cardex.data.QuizStars? = null, // 다음 스티커까지 진행
     val quizLoading: Boolean = false,
     val quizMessage: String? = null,
     /** 음성 명령 듣는 중 / 마지막으로 들은 말 */
@@ -137,7 +138,7 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
 
     /** 모든 화면 데이터 다시 불러오기 (다시 시도 버튼, 시연 데이터 채우기 후) */
     fun refreshAll() {
-        refreshCollection(); loadShowroom(); loadStamps(); loadChallenge(); loadRankings(); loadHome()
+        refreshCollection(); loadShowroom(); loadStamps(); loadChallenge(); loadRankings(); loadHome(); loadQuizStars()
         lastLandmarkFetch = null
     }
 
@@ -221,6 +222,7 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
         loadChallenge()
         loadRankings()
         loadHome()
+        loadQuizStars()
         viewModelScope.launch { // SDK 초기화가 비동기라 잠시 뒤 상태 표시
             delay(3_000)
             _state.update { it.copy(aiStatus = pleosAi.modeLabel, voiceStatus = if (voiceCommand.available) "Pleos 음성 인식" else "사용 안 함") }
@@ -551,6 +553,25 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
         prefs.edit().putInt("quiz_stars", stars).apply()
         _state.update { it.copy(quizPicked = choice, quizStars = stars) }
         say(if (correct) "정답이에요! 별 하나 받았어요" else "아쉬워요. 정답은 ${q.answer}이에요")
+        if (correct) viewModelScope.launch {
+            // 별은 서버에도 쌓여 쇼룸 스티커를 연다 (랭킹 점수와는 별개)
+            call { repo.quizStar(q.id) }.onSuccess { r ->
+                prefs.edit().putInt("quiz_stars", r.stars).apply()
+                _state.update {
+                    it.copy(
+                        quizStars = r.stars, quizSticker = r,
+                        celebration = r.unlockedSticker?.let { name -> Celebration("🎁", "스티커 획득!", "$name · 쇼룸 소품에 붙여 보세요") } ?: it.celebration,
+                    )
+                }
+                if (r.unlockedSticker != null) loadShowroom()
+            }
+        }
+    }
+
+    fun loadQuizStars() {
+        viewModelScope.launch {
+            call { repo.quizStars() }.onSuccess { r -> _state.update { it.copy(quizStars = r.stars, quizSticker = r) } }
+        }
     }
 
     /** 말로 한 대답을 보기 중 하나로 (번호 / 색·종류 이름) */

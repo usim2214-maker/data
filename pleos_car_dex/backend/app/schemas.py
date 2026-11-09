@@ -450,6 +450,21 @@ class QuizQuestion(BaseModel):
     detection: Detection
 
 
+class QuizStars(BaseModel):
+    """퀴즈 별 + 쇼룸 스티커 진행"""
+
+    stars: int
+    unlocked_sticker: str | None = None  # 이번 별로 열린 스티커
+    next_sticker: str | None = None
+    stars_to_next: int = 0
+    stickers_owned: int = 0
+    stickers_total: int = 0
+
+
+class QuizStarRequest(BaseModel):
+    question_id: str
+
+
 class QuizResponse(BaseModel):
     found: bool
     question: QuizQuestion | None = None

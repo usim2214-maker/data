@@ -4,13 +4,14 @@
 - 색깔: 잘라낸 차량 이미지 가운데(차체) 영역의 대표 색 (HSV)
 """
 import colorsys
+import json
 import random
 import uuid
 from collections import Counter
 
 from PIL import Image
 
-from app.schemas import Detection, QuizQuestion
+from app.schemas import Detection, QuizQuestion, QuizStars
 
 KIND_NAMES = {"car": "승용차", "bus": "버스", "truck": "트럭", "motorcycle": "오토바이"}
 KIND_EMOJI = {"승용차": "🚗", "버스": "🚌", "트럭": "🚚", "오토바이": "🏍️"}
@@ -59,4 +60,48 @@ def make_question(detection: Detection, crop: Image.Image, kind_or_color: str | 
         id=uuid.uuid4().hex[:8], type=qtype, prompt=prompt, choices=choices, answer=answer,
         choice_icons=[KIND_EMOJI.get(c, "") if qtype == "kind" else COLOR_HEX[c] for c in choices],
         detection=detection,
+    )
+
+
+# ---------------- 별 / 스티커 ----------------
+# 채점은 앱이 한다(정답 포함 출제). 별은 랭킹 점수와 분리 — 아이용 보상은 쇼룸 스티커로만.
+
+
+def _path(store):
+    return store.extra_path("quiz.json")
+
+
+def _load(store) -> dict:
+    p = _path(store)
+    return json.loads(p.read_text(encoding="utf-8")) if p.exists() else {"stars": 0, "answered": []}
+
+
+def stars(store) -> int:
+    return _load(store)["stars"]
+
+
+def sticker_rules() -> list[tuple[int, str]]:
+    """(필요 별, 스티커 이름) 오름차순 — decor_items.json 의 quiz:<n> 아이템"""
+    from app.services.decor import _raw
+    out = [(int(i["unlock"].split(":")[1]), i["name"]) for i in _raw() if i["unlock"].startswith("quiz:")]
+    return sorted(out)
+
+
+def add_star(store, question_id: str) -> QuizStars:
+    d = _load(store)
+    if question_id not in d["answered"]:  # 같은 문제로 별 중복 금지
+        d["answered"] = (d["answered"] + [question_id])[-500:]
+        d["stars"] += 1
+        _path(store).write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+        new = True
+    else:
+        new = False
+    n = d["stars"]
+    rules = sticker_rules()
+    unlocked = next((name for need, name in rules if need == n), None) if new else None
+    nxt = next(((need, name) for need, name in rules if need > n), None)
+    return QuizStars(
+        stars=n, unlocked_sticker=unlocked,
+        next_sticker=nxt[1] if nxt else None, stars_to_next=(nxt[0] - n) if nxt else 0,
+        stickers_owned=sum(need <= n for need, _ in rules), stickers_total=len(rules),
     )

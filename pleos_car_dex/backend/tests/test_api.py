@@ -449,3 +449,18 @@ def test_trip_report(client):
     later = datetime.now(timezone.utc).isoformat()
     r2 = client.post("/api/v1/trips/report", json={"started_at": later, "distance_km": 0.2, "drive_minutes": 2}).json()
     assert r2["new_cards"] == [] and r2["points"] == 0 and r2["trips"] == 1 and "다음엔" in r2["tts"]
+
+
+def test_quiz_stars_unlock_stickers(client):
+    """아이 퀴즈 별 -> 쇼룸 스티커 (랭킹 점수와 분리, 문제당 별 1개)"""
+    before = client.get("/api/v1/home").json()["weekly_points"]
+    s0 = client.get("/api/v1/quiz/stars").json()
+    assert s0["stars"] == 0 and s0["next_sticker"] == "강아지 스티커" and s0["stars_to_next"] == 1
+    r = client.post("/api/v1/quiz/star", json={"question_id": "q1"}).json()
+    assert r["stars"] == 1 and r["unlocked_sticker"] == "강아지 스티커" and r["next_sticker"] == "소방차 스티커"
+    again = client.post("/api/v1/quiz/star", json={"question_id": "q1"}).json()
+    assert again["stars"] == 1 and again["unlocked_sticker"] is None
+    items = {i["id"]: i for i in client.get("/api/v1/showroom/items").json()["items"]}
+    assert items["sticker-puppy"]["unlocked"] and not items["sticker-firetruck"]["unlocked"]
+    assert items["sticker-firetruck"]["unlock_hint"] == "퀴즈 별 3개"
+    assert client.get("/api/v1/home").json()["weekly_points"] == before  # 랭킹 원장에 기록 안 함

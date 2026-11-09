@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from PIL import Image, UnidentifiedImageError
 from starlette.concurrency import run_in_threadpool
 
-from app.schemas import QuizResponse
+from app.schemas import QuizResponse, QuizStarRequest, QuizStars
 from app.services import quiz
 from app.services.pipeline import RecognitionPipeline, get_pipeline
 
@@ -32,3 +32,18 @@ async def question(
         return QuizResponse(found=True, question=quiz.make_question(primary, crop, type), detections=dets)
 
     return await run_in_threadpool(run)
+
+
+@router.get("/stars", response_model=QuizStars)
+def get_stars(pipeline: RecognitionPipeline = Depends(get_pipeline)):
+    s = quiz.stars(pipeline.store)
+    rules = quiz.sticker_rules()
+    nxt = next(((need, name) for need, name in rules if need > s), None)
+    return QuizStars(stars=s, next_sticker=nxt[1] if nxt else None, stars_to_next=(nxt[0] - s) if nxt else 0,
+                     stickers_owned=sum(need <= s for need, _ in rules), stickers_total=len(rules))
+
+
+@router.post("/star", response_model=QuizStars)
+def add_star(req: QuizStarRequest, pipeline: RecognitionPipeline = Depends(get_pipeline)):
+    """정답이면 앱이 호출 → 별 +1 (문제당 1번). 별이 모이면 쇼룸 스티커가 열린다 (랭킹 점수와 무관)"""
+    return quiz.add_star(pipeline.store, req.question_id)

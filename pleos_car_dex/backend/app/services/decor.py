@@ -11,6 +11,7 @@ from app.services import brand_spots, regions
 from app.services.competition import CompetitionService, points_by_kind
 from app.services.progress import synergy_for
 from app.services.store import JsonStore
+from app.services.quiz import stars as quiz_stars
 
 _PATH = Path(__file__).resolve().parent.parent / "data" / "decor_items.json"
 REGION_PREFIX = "region:"
@@ -35,6 +36,7 @@ def _hint(rule: str) -> str:
         "badge": f"축제 한정 배지 {arg}개",
         "master": f"지역 마스터 {arg}곳",
         "synergy": f"시너지 {arg}점",
+        "quiz": f"퀴즈 별 {arg}개",
     }.get(kind, rule)
 
 
@@ -51,6 +53,7 @@ class DecorService:
             "badge": len(self.store.get_badges()),
             "master": len(self.competition.my_master_region_ids()),
             "synergy": synergy_for(self.store).total,
+            "quiz": quiz_stars(self.store),
         }
 
     def catalog(self) -> list[DecorItem]:

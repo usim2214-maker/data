@@ -130,7 +130,8 @@ class AppScreensScreenshotTest {
         val det = com.pleos.cardex.data.Detection("car", 0.4f, com.pleos.cardex.data.BoundingBox(b.getInt("x1"), b.getInt("y1"), b.getInt("x2"), b.getInt("y2")))
         val q = com.pleos.cardex.data.QuizQuestion("q1", "color", "방금 지나간 차는 무슨 색일까요?", listOf("빨간색", "파란색", "흰색"),
             listOf("#E53935", "#1E88E5", "#FAFAFA"), "파란색", det)
-        return UiState(quiz = q, quizFrameJpeg = img.readBytes(), quizPicked = picked, quizStars = if (picked == null) 4 else 5)
+        return UiState(quiz = q, quizFrameJpeg = img.readBytes(), quizPicked = picked, quizStars = if (picked == null) 4 else 5,
+            quizSticker = com.pleos.cardex.data.QuizStars(if (picked == null) 4 else 5, nextSticker = "꼬마 버스 스티커", starsToNext = if (picked == null) 4 else 3))
     }
 
     @Test fun quizAsk() { val st = quizState(null); org.junit.Assume.assumeTrue(st != null); shot("quiz_ask") { com.pleos.cardex.ui.screens.QuizScreen(st!!, {}, {}, {}) } }

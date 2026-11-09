@@ -408,3 +408,17 @@ data class TripReport(
     val tts: String,
     @SerialName("next_goal") val nextGoal: String = "",
 )
+
+/** 퀴즈 별 + 쇼룸 스티커 진행 */
+@Serializable
+data class QuizStars(
+    val stars: Int,
+    @SerialName("unlocked_sticker") val unlockedSticker: String? = null,
+    @SerialName("next_sticker") val nextSticker: String? = null,
+    @SerialName("stars_to_next") val starsToNext: Int = 0,
+    @SerialName("stickers_owned") val stickersOwned: Int = 0,
+    @SerialName("stickers_total") val stickersTotal: Int = 0,
+)
+
+@Serializable
+data class QuizStarRequest(@SerialName("question_id") val questionId: String)

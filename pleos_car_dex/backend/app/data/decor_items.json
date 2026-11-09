@@ -1,5 +1,5 @@
 {
-  "_comment": "쇼룸(차고) 꾸미기 아이템. unlock: default | region:<id> | regions:<n> | hidden:<n> | course:<n> | badge:<n> | master:<n> | synergy:<n>. 프론트는 slot/key 로 그린다 (prop 은 emoji).",
+  "_comment": "쇼룸(차고) 꾸미기 아이템. unlock: default | region:<id> | regions:<n> | hidden:<n> | course:<n> | badge:<n> | master:<n> | synergy:<n> | quiz:<n> (아이 퀴즈 별). 프론트는 slot/key 로 그린다 (prop 은 emoji).",
   "items": [
     {"id": "floor-concrete", "slot": "floor", "key": "concrete", "name": "콘크리트", "unlock": "default"},
     {"id": "floor-asphalt", "slot": "floor", "key": "asphalt", "name": "아스팔트 차선", "unlock": "regions:2"},
@@ -34,6 +34,14 @@
     {"id": "prop-medal", "slot": "prop", "key": "🎖️", "name": "축제 메달", "unlock": "badge:1"},
     {"id": "prop-trophy", "slot": "prop", "key": "🏆", "name": "트로피", "unlock": "master:1"},
     {"id": "prop-crown", "slot": "prop", "key": "👑", "name": "왕관", "unlock": "master:1"},
-    {"id": "prop-star", "slot": "prop", "key": "🌟", "name": "슈퍼스타", "unlock": "synergy:500"}
+    {"id": "prop-star", "slot": "prop", "key": "🌟", "name": "슈퍼스타", "unlock": "synergy:500"},
+
+    {"id": "sticker-puppy", "slot": "prop", "key": "🐶", "name": "강아지 스티커", "unlock": "quiz:1"},
+    {"id": "sticker-firetruck", "slot": "prop", "key": "🚒", "name": "소방차 스티커", "unlock": "quiz:3"},
+    {"id": "sticker-police", "slot": "prop", "key": "🚓", "name": "경찰차 스티커", "unlock": "quiz:5"},
+    {"id": "sticker-bus", "slot": "prop", "key": "🚌", "name": "꼬마 버스 스티커", "unlock": "quiz:8"},
+    {"id": "sticker-dino", "slot": "prop", "key": "🦖", "name": "공룡 스티커", "unlock": "quiz:12"},
+    {"id": "sticker-rainbow", "slot": "prop", "key": "🌈", "name": "무지개 스티커", "unlock": "quiz:16"},
+    {"id": "sticker-rocket", "slot": "prop", "key": "🚀", "name": "로켓 스티커", "unlock": "quiz:20"}
   ]
 }

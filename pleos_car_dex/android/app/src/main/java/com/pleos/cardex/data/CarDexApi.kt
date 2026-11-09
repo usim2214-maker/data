@@ -32,6 +32,12 @@ interface CarDexApi {
     @POST("api/v1/quiz/question")
     suspend fun quiz(@Part image: MultipartBody.Part): QuizResponse
 
+    @GET("api/v1/quiz/stars")
+    suspend fun quizStars(): QuizStars
+
+    @POST("api/v1/quiz/star")
+    suspend fun quizStar(@Body req: QuizStarRequest): QuizStars
+
     @GET("api/v1/collection")
     suspend fun collection(): CollectionResponse
 

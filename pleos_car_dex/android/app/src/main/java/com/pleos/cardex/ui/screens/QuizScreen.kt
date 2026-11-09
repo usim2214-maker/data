@@ -55,6 +55,12 @@ fun QuizScreen(state: UiState, onNext: () -> Unit, onAnswer: (String) -> Unit, o
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text("🚗 차 맞히기 퀴즈", fontSize = 40.sp, fontWeight = FontWeight.Black, color = Color.White)
                 Text("⭐ ${state.quizStars}", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFFC94D))
+                state.quizSticker?.let { st ->
+                    Text(
+                        st.nextSticker?.let { "🎁 ${it}까지 별 ${st.starsToNext}개" } ?: "🎁 스티커 모두 모았어요!",
+                        fontSize = 22.sp, color = Color.White.copy(alpha = 0.85f),
+                    )
+                }
             }
             if (q == null) {
                 Text(state.quizMessage ?: "지나가는 차를 보고 종류와 색깔을 맞혀 봐요!", fontSize = 26.sp, color = Color.White.copy(alpha = 0.85f))

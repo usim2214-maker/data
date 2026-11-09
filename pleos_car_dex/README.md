@@ -7,6 +7,39 @@
 
 **핵심 루프**: 차량 인식 → 내가 고른 정보로 카드 → 도감 수집(일반·희귀·전설) → 쇼룸 자랑 → 희귀 차량을 찾아 새 지역으로 → 다시 수집
 
+## 왜 이 앱인가 (기획서용 가치 제안)
+
+**한 줄**: "도로 위 모든 차가 수집 대상이 되는 순간, 운전이 여행이 되고 차는 브랜드 경험이 된다."
+
+| 관점 | 써야 하는 이유 |
+|---|---|
+| **운전자 (차 사용자)** | ① 매일 같은 출퇴근길도 **오늘의 차** 미션·연속 출석으로 작은 재미 ② **내 차**를 등록하면 만나는 차마다 "가격 +1,200만 원 · 마력 +50" 처럼 **내 차 기준 비교** ③ 주차하면 10초짜리 **오늘의 드라이브 리포트**(Pleos Odometer 거리·시간 + 모은 카드·스탬프) ④ 주말엔 희귀 차·스탬프를 찾아 **AI 코스**로 국내 여행 |
+| **가족 (뒷좌석 아이)** | 지나가는 차의 종류·색깔 맞히기 퀴즈 → 별 → **쇼룸 스티커**. 장거리 운전 중 "언제 도착해?" 대신 함께 하는 놀이 (주행 중엔 음성으로만) |
+| **현대차그룹 (임원 관점)** | ① **라인업 노출**: 28종 도감·오늘의 차가 매일 다른 모델에 시선을 모음 (전설 = N·제네시스 플래그십) ② **오프라인 전환**: 브랜드 체험 스팟(모터스튜디오·기아 360·제네시스·HMG 드라이빙 센터) 방문 = 특별 스탬프 + **전설 쇼룸 아이템** → 시승·전시 방문 동기 ③ **차량 데이터 기반 리텐션**: Vehicle/Location SDK 를 쓴 '차 안에서만 되는' 경험 → Pleos 생태계 체류 시간 ④ **내수·지역 관광**: 지방일수록 높은 여행 점수, TourAPI 명소·축제 연계 |
+| **안전** | 속도·주행시간 경쟁 없음, 주행 중 화면 잠금 + 음성만, 운전 습관 평가 안 함 (리포트는 '모은 것'만) |
+
+**참신한 점**
+1. 차량 인식을 **'도감 수집'** 게임 메커니즘으로 — 차를 '보는' 행위 자체가 콘텐츠 (포켓몬식 수집 × 자동차)
+2. 카드 뒷면을 **사용자가 고른 정보**로 구성 + **내 차와 비교** → 같은 차라도 사람마다 다른 카드
+3. 도감 → 쇼룸 → 여행 → 브랜드 공간으로 이어지는 **온·오프라인 루프**: 수집 욕구가 실제 이동(국내 여행)과 브랜드 방문으로 연결
+4. 주차 시점(P단)을 **'하루를 돌아보는 순간'**으로 디자인 — 차량 신호를 UX 트리거로 사용
+
+### 5회 개선 반영 (임원·사용자 관점)
+
+| 회차 | 개선 | 사용자 가치 | 현대차 가치 |
+|---|---|---|---|
+| 1 | **내 차 등록 + 쌍둥이 차 + 내 차와 비교** | 모든 카드가 '내 차 기준'으로 의미가 생김 | 오너 정체성 강화, 상위 트림·모델 자연스런 비교 노출 |
+| 2 | **오늘의 차 미션 + 연속 출석** | 매일 켤 이유 (일반 +20 / 희귀 +30) | 날짜별로 모든 사용자가 같은 모델에 주목 → 라인업 홍보 |
+| 3 | **브랜드 체험 스팟** (특별 스탬프 +40, 전설 아이템, 코스 후보 포함) | 희귀 보상 · 갈 곳 추천 | 모터스튜디오·기아 360·제네시스 방문 유도 (오프라인 전환) |
+| 4 | **주차 시 주행 리포트** (Pleos Odometer) | 드라이브를 한 장으로 돌아봄 + 음성 요약 | Vehicle SDK 기반 '차 안에서만 되는' 경험 |
+| 5 | **퀴즈 별 → 쇼룸 스티커** | 아이 보상이 쇼룸 꾸미기로 이어짐 (랭킹 점수와 분리) | 가족 단위 사용 → 차량 앱의 일상화 |
+
+| 오늘의 차 + 연속 출석 | 브랜드 스팟 전설 아이템 | 주차 후 주행 리포트 |
+|---|---|---|
+| ![](docs/screenshots/home_daily.png) | ![](docs/screenshots/showroom_brand_legendary.png) | ![](docs/screenshots/trip_report.png) |
+
+> 브랜드 스팟 좌표는 대략값(시연용)입니다. 출시 전 공식 주소로 검증하세요 (`backend/app/data/brand_spots.json`).
+
 ## 기획 메모 → 구현 대응
 
 | 기획 | 구현 |
@@ -65,7 +98,7 @@
 |---|---|
 | FusedLocation | 지역 스탬프 · 명소 근접 알림(히든 스탬프) · 도감 '발견 위치' |
 | NaviHelper | AI 코스 · 챌린지 길안내 (목적지 + 경유지) |
-| Vehicle | 기어 상태 → 주행 모드 (+ Android Automotive 표준 UX 제한) |
+| Vehicle | 기어 상태 → 주행 모드 (+ Android Automotive 표준 UX 제한) · **Odometer 이번 주행 거리·시간 → 주차 리포트** |
 | TextToSpeech | 주행 중 음성 안내 (스탬프·카드·완주) |
 | SpeechToText | 주행 중 음성 명령 · 아이용 퀴즈 음성 대답 |
 | LLM | AI 드라이브 코스 선택 |
@@ -105,7 +138,8 @@
 |---|---|
 | ![](docs/screenshots/quiz_ask.png) | ![](docs/screenshots/quiz_reveal.png) |
 
-- "방금 지나간 차는 **무슨 색**일까요? / **어떤 차**일까요?" — 3지선다, 맞히면 ⭐ (누적 저장)
+- "방금 지나간 차는 **무슨 색**일까요? / **어떤 차**일까요?" — 3지선다, 맞히면 ⭐ (서버에 누적, 문제당 1개)
+- 별이 모이면 **쇼룸 스티커**(🐶 1 · 🚒 3 · 🚓 5 · 🚌 8 · 🦖 12 · 🌈 16 · 🚀 20) 해금 — 랭킹 점수와는 분리
 - **YOLOv8 결과만으로 출제** (차종 판별 AI 불필요): 종류 = YOLO 클래스(승용차·버스·트럭·오토바이), 색깔 = 잘라낸 차량의 차체 영역 대표 색(HSV, 9색)
 - 정차 중엔 큰 버튼, **주행 중엔 말로만** — Pleos SpeechToText 로 "퀴즈"(다음 문제), "빨간색!" · "버스!" · "1번!"(대답), 문제·결과는 Pleos TTS 로 읽어 줌. 주행 모드 화면에는 문제와 보기만 크게 표시
 - API: `POST /api/v1/quiz/question` (multipart `image`, 선택 `type=kind|color`)
@@ -179,7 +213,7 @@
 | SDK 저장소 | `https://nexus-playground.pleos.ai/repository/maven-releases/` (공식 샘플과 동일) |
 | FusedLocation SDK | `ai.pleos.playground:FusedLocation:1.1.3`, 권한 `pleos.car.permission.FUSED_LOCATION` — 지역 스탬프 획득 + 도감의 '발견 장소' |
 | NaviHelper SDK | `ai.pleos.playground:NaviHelper:3.0.5`, 권한 `NAVI_ROUTE`·`NAVI_ROUTE_SEARCH` — AI 코스 길안내 (목적지 + 경유지 2곳) |
-| Vehicle SDK | `ai.pleos.playground:Vehicle:2.3.2`, 권한 `CAR_DRIVE` — 기어(P단) 상태 (보조: SDK 에서 기어 API 가 deprecated 되어 아래 표준 API 를 우선 사용) |
+| Vehicle SDK | `ai.pleos.playground:Vehicle:2.3.2`, 권한 `CAR_DRIVE` — `Odometer.getTripCurrentDrivingDistance/Time` 으로 주차 시 주행 리포트(단위는 실차 확인 필요) · 기어(P단) 상태 (보조: SDK 에서 기어 API 가 deprecated 되어 아래 표준 API 를 우선 사용) |
 | Android Automotive 표준 | `CarUxRestrictionsManager` — 차량이 알려주는 '주행 중 UX 제한' 으로 **주행 중 화면 잠금** (1순위) |
 | **LLM SDK** | `ai.pleos.playground:LLM:2.1.3.2`, 권한 `LLM_SERVICE` — **AI 드라이브 코스 추천을 Pleos LLM 이 선택** (서버가 후보·프롬프트 제공 → Pleos LLM 선택 → 서버가 시간·점수 재계산). 못 쓰면 서버 추천으로 대체 |
 | **SpeechToText SDK** | `ai.pleos.playground:SpeechToText:3.3.1`, 권한 `STT_SERVICE` + `RECORD_AUDIO` — **주행 중 음성 명령** ('길안내', '인식', '순위', '도감') |
@@ -301,7 +335,10 @@ curl -F "video=@drive.mp4" http://localhost:8000/api/v1/recognize/video
 | POST / GET / DELETE | `/api/v1/challenge` | 코스 챌린지 시작(`DriveCourse` 그대로) / 현재 상태 / 포기 |
 | GET | `/api/v1/rankings/weekly?region_id=` | 이번 주 랭킹 (내 순위, 윗 순위까지 남은 점수) |
 | GET | `/api/v1/rankings/masters` | 이번 달 시·도별 지역 마스터, 내 칭호 |
-| GET | `/api/v1/home` | 여행 탭 요약 (점수·순위·스탬프·다음 목표) |
+| GET | `/api/v1/home` | 도감 홈 요약 (도감·전설·점수·순위·스탬프·브랜드 스팟·오늘의 차·다음 목표) |
+| GET | `/api/v1/daily` | 오늘의 차 미션 + 연속 출석 |
+| POST | `/api/v1/trips/report` | `{started_at, distance_km, drive_minutes, source}` 주차 시 주행 리포트 (이번 주행에서 모은 카드·스탬프·점수 + TTS 문구) |
+| GET / POST | `/api/v1/quiz/stars` · `/api/v1/quiz/star` | 퀴즈 별·다음 스티커 / `{question_id}` 정답 별 +1 |
 | POST | `/api/v1/demo/seed` · `/api/v1/demo/reset` | 시연 데이터 채우기 / 초기화 (`DEMO_MODE=true` 일 때만) |
 | GET / PUT | `/api/v1/preferences` | 유저 키워드(최대 8개) |
 

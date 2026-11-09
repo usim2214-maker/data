@@ -77,13 +77,15 @@ class TourClient:
         def load():
             # eventStartDate 이후 시작하는 행사를 주므로, 이미 진행 중인 축제를 잡기 위해 60일 전부터 조회 후 기간 필터
             raw = self._fetch("searchFestival2", {"eventStartDate": (on - timedelta(days=60)).strftime("%Y%m%d"), "arrange": "A"}, 300)
-            fmt = "%Y%m%d"
-            return [
-                a for a in raw
-                if a.event_start and a.event_end
-                and datetime.strptime(a.event_start, fmt).date() <= until
-                and datetime.strptime(a.event_end, fmt).date() >= on
-            ]
+            def ongoing(a: Attraction) -> bool:
+                try:  # 날짜 형식이 이상한 항목 하나 때문에 전체가 비지 않도록 항목별로 검사
+                    start = datetime.strptime(a.event_start or "", "%Y%m%d").date()
+                    end = datetime.strptime(a.event_end or "", "%Y%m%d").date()
+                except ValueError:
+                    return False
+                return start <= until and end >= on
+
+            return [a for a in raw if ongoing(a)]
 
         return self._cached(key, load)
 

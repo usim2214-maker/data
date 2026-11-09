@@ -9,7 +9,9 @@ import ai.pleos.playground.vehicle.listener.GearSelectionListener
 /**
  * Pleos Vehicle SDK 로 기어 상태를 받아 '정차(P단) 여부'를 알려준다. 권한: pleos.car.permission.CAR_DRIVE
  * (클래스/메서드는 Vehicle 2.3.2 aar 의 실제 시그니처 기준)
+ * 기어 API 는 SDK 에서 deprecated(Google GEAR_SELECTION 권고) → DrivingRestriction 을 우선 쓰고, 이건 보조 수단.
  */
+@Suppress("DEPRECATION")
 class GearMonitor(context: Context) {
     private val vehicle = runCatching { Vehicle(context.applicationContext) }.getOrNull()
     private var listener: GearSelectionListener? = null

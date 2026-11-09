@@ -23,12 +23,10 @@ import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -148,8 +146,7 @@ class MainActivity : ComponentActivity() {
                             composable(Dest.Settings.route) { KeywordSettingsScreen(state.keywords, vm::saveKeywords) }
                         }
                         // 전역 알림 배너: 스탬프 획득, 길안내 요청 등 (4초 후 사라짐)
-                        state.notice?.let { msg ->
-                            LaunchedEffect(msg) { delay(4_000); vm.clearNotice() }
+                        state.notice?.let { msg -> // 4초 후 ViewModel 이 자동으로 지움
                             Surface(
                                 color = MaterialTheme.colorScheme.secondary,
                                 shape = RoundedCornerShape(16.dp),
@@ -168,4 +165,8 @@ class MainActivity : ComponentActivity() {
 
 private const val PLEOS_LOCATION_PERMISSION = "pleos.car.permission.FUSED_LOCATION"
 private const val PLEOS_GEAR_PERMISSION = "pleos.car.permission.CAR_DRIVE" // Vehicle SDK 기어 상태
-private val PLEOS_NAVI_PERMISSIONS = arrayOf("pleos.car.permission.NAVI_ROUTE", "pleos.car.permission.NAVI_ROUTE_SEARCH")
+private val PLEOS_NAVI_PERMISSIONS = arrayOf(
+    "pleos.car.permission.NAVI_ROUTE",
+    "pleos.car.permission.NAVI_ROUTE_SEARCH",
+    "pleos.car.permission.TTS_SERVICE", // 음성 안내
+)

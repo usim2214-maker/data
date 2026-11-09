@@ -51,15 +51,16 @@
 | SDK 저장소 | `https://nexus-playground.pleos.ai/repository/maven-releases/` (공식 샘플과 동일) |
 | FusedLocation SDK | `ai.pleos.playground:FusedLocation:1.1.3`, 권한 `pleos.car.permission.FUSED_LOCATION` — 지역 스탬프 획득 + 도감의 '발견 장소' |
 | NaviHelper SDK | `ai.pleos.playground:NaviHelper:3.0.5`, 권한 `NAVI_ROUTE`·`NAVI_ROUTE_SEARCH` — AI 코스 길안내 (목적지 + 경유지 2곳) |
-| Vehicle SDK | `ai.pleos.playground:Vehicle:2.3.2`, 권한 `CAR_DRIVE` — 기어(P단) 상태로 **주행 중 화면 잠금** |
-| TextToSpeech SDK | `ai.pleos.playground:TextToSpeech:3.3.1` (ON_DEVICE) — 스탬프·코스 알림을 **음성 안내** (실패 시 안드로이드 기본 TTS) |
+| Vehicle SDK | `ai.pleos.playground:Vehicle:2.3.2`, 권한 `CAR_DRIVE` — 기어(P단) 상태 (보조: SDK 에서 기어 API 가 deprecated 되어 아래 표준 API 를 우선 사용) |
+| Android Automotive 표준 | `CarUxRestrictionsManager` — 차량이 알려주는 '주행 중 UX 제한' 으로 **주행 중 화면 잠금** (1순위) |
+| TextToSpeech SDK | `ai.pleos.playground:TextToSpeech:3.3.1` (ON_DEVICE), 권한 `TTS_SERVICE` — 스탬프·코스 알림 **음성 안내** (실패 시 안드로이드 기본 TTS) |
 | 서라운드뷰/카메라 | 공개 API 미확인 → 영상 직접 입력으로 대체 |
 
 > **빌드 확인**: Pleos SDK(FusedLocation 1.1.3, NaviHelper 3.0.5, Vehicle 2.3.2, TextToSpeech 3.3.1)를 실제로 받아
-> `./gradlew assembleDebug` 컴파일까지 통과했습니다. 에뮬레이터/실차에서의 동작 확인은 아직입니다.
+> `./gradlew assembleDebug` 컴파일과 `./gradlew lintDebug`(오류 0건)까지 통과했습니다. 에뮬레이터/실차에서의 동작 확인은 아직입니다.
 
 ## 운전자 안전 설계
-- **주행 모드**: 주행 중(Pleos Vehicle SDK 기어 ≠ P, 또는 SDK 미지원 시 위치 기반 속도 8km/h 이상)에는 모든 조작 화면을 잠그고,
+- **주행 모드**: 주행 중(① Android Automotive 표준 주행 중 UX 제한 → ② Pleos 기어 ≠ P → ③ 위치 기반 속도 5초 평균 8km/h 이상, 순서대로 사용)에는 모든 조작 화면을 잠그고,
   큰 글씨의 정보(챌린지 진행률·다음 장소·가까운 히든 스탬프·랭킹)와 **"남은 곳 길안내" 버튼 하나**만 보여줍니다. 정차(P단)하면 전체 기능이 열립니다.
 - **음성 안내**: 스탬프 획득·코스 진행·완주 알림을 Pleos TTS 로 읽어줘 화면을 볼 필요가 없습니다 (주행 모드에서 끄기 가능).
 - **속도 경쟁 없음**: 랭킹·마스터는 방문·수집 점수로만 계산합니다.
@@ -136,7 +137,8 @@ curl -F "video=@drive.mp4" http://localhost:8000/api/v1/recognize/video
    우측 '주변 히든 스탬프'에서 명소 거리 확인 (`adb emu geo fix 129.1604 35.1587` → 해운대 히든 스탬프)
 8. 키워드 탭: 항목 변경 → 다음 인식부터 카드 뒷면 변경
 
-에뮬레이터 → 호스트 백엔드 주소는 `http://10.0.2.2:8000/` (`app/build.gradle.kts`).
+에뮬레이터 → 호스트 백엔드 주소는 `http://10.0.2.2:8000/` (기본값). 다른 주소: `./gradlew assembleDebug -PapiBaseUrl=http://192.168.0.10:8000/`
+(디버그 빌드는 LAN HTTP 허용, 릴리스 빌드는 에뮬레이터 주소만 허용 — 배포 시 HTTPS 필요)
 에뮬레이터 위치 테스트: `adb emu geo fix 127.0276 37.4979` (경도 먼저).
 
 ## API

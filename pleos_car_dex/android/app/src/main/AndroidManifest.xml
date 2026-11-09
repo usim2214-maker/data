@@ -14,12 +14,15 @@
     <uses-permission android:name="pleos.car.permission.FUSED_LOCATION" />
     <!-- Pleos Vehicle SDK: 기어 상태(P단) -> 주행 중 화면 잠금 -->
     <uses-permission android:name="pleos.car.permission.CAR_DRIVE" />
+    <!-- Pleos TextToSpeech: 주행 중 음성 안내 -->
+    <uses-permission android:name="pleos.car.permission.TTS_SERVICE" />
     <!-- Pleos NaviHelper: 경로 요청(requestRoute / requestRouteWithWaypoints) -->
     <uses-permission android:name="pleos.car.permission.NAVI_ROUTE" />
     <uses-permission android:name="pleos.car.permission.NAVI_ROUTE_SEARCH" />
 
     <application
         android:label="@string/app_name"
+        android:icon="@drawable/ic_launcher"
         android:theme="@style/Theme.PleosCarDex"
         android:usesCleartextTraffic="true"
         android:networkSecurityConfig="@xml/network_security_config">
@@ -31,8 +34,7 @@
 
         <activity
             android:name=".MainActivity"
-            android:exported="true"
-            android:screenOrientation="landscape">
+            android:exported="true">
             <meta-data android:name="distractionOptimized" android:value="true" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

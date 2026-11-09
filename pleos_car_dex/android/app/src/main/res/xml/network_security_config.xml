@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- 시연용: 에뮬레이터 -> 로컬 FastAPI(HTTP) 허용. 배포 시 HTTPS 로 교체 -->
+    <!-- 릴리스: 에뮬레이터 호스트만 HTTP 허용. 실제 배포 시 HTTPS 백엔드로 교체 -->
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="false">10.0.2.2</domain>
         <domain includeSubdomains="false">localhost</domain>

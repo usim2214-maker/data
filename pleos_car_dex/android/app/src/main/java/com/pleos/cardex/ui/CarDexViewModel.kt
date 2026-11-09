@@ -21,6 +21,7 @@ import com.pleos.cardex.data.StampBook
 import com.pleos.cardex.data.SynergyScore
 import com.pleos.cardex.pleos.AssetFrameSource
 import com.pleos.cardex.pleos.DrivingSnapshot
+import com.pleos.cardex.pleos.DrivingRestriction
 import com.pleos.cardex.pleos.FrameSource
 import com.pleos.cardex.pleos.GearMonitor
 import com.pleos.cardex.pleos.VoiceGuide
@@ -30,7 +31,9 @@ import com.pleos.cardex.pleos.VehicleContextProvider
 import com.pleos.cardex.pleos.MockVehicleContextProvider
 import com.pleos.cardex.pleos.PleosVehicleContextProvider
 import com.pleos.cardex.pleos.VideoFrameSource
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -76,11 +79,9 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
 
     /** 화면의 VideoView 가 갱신하는 현재 재생 위치 */
     val videoPositionMs = AtomicLong(0)
-    private val demoVideo = VideoFrameSource.demoVideoUri(app)
-    private val frames: FrameSource =
-        demoVideo?.let { VideoFrameSource(app, it) { videoPositionMs.get() } } ?: AssetFrameSource(app)
+    private var frames: FrameSource = AssetFrameSource(app)
 
-    private val _state = MutableStateFlow(UiState(demoVideo = demoVideo))
+    private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
     private var scanJob: Job? = null
     private var locationJob: Job? = null
@@ -88,11 +89,25 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
     private val navi = PleosNavi(app).apply { onError = { msg -> _state.update { it.copy(error = msg) } } }
     private val voice = VoiceGuide(app)
     private val gear = GearMonitor(app)
+    private val uxRestriction = DrivingRestriction(app)
     private var gearAvailable = false
+    private var uxAvailable = false
     private var simulated: Boolean? = null
-    private var lastFix: Pair<GeoPoint, Long>? = null
+    private val fixes = ArrayDeque<Pair<GeoPoint, Long>>()
 
     init {
+        // 데모 주행 영상(수십 MB) 준비는 IO 스레드에서
+        viewModelScope.launch {
+            val uri = withContext(Dispatchers.IO) { VideoFrameSource.demoVideoUri(app) }
+            if (uri != null) {
+                frames = VideoFrameSource(app, uri) { videoPositionMs.get() }
+                _state.update { it.copy(demoVideo = uri) }
+            }
+        }
+        // 1순위: Android Automotive 표준 주행 중 UX 제한
+        uxAvailable = uxRestriction.start { restricted ->
+            if (simulated == null) setDriving(restricted, "차량 주행 상태")
+        }
         refreshCollection()
         loadPreferences()
         loadShowroom()
@@ -103,6 +118,10 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             state.map { it.notice }.distinctUntilChanged().filterNotNull().collect { msg ->
                 if (_state.value.voiceOn) voice.speak(msg)
+                launch {
+                    delay(NOTICE_MS)
+                    _state.update { if (it.notice == msg) it.copy(notice = null) else it }
+                }
             }
         }
     }
@@ -111,6 +130,7 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
     /** Pleos Vehicle SDK 기어 상태 구독. 권한이 없거나 미지원이면 위치 속도로 추정 */
     fun startGear(permissionGranted: Boolean) {
         if (!permissionGranted || BuildConfig.USE_MOCK_PLEOS) return
+        if (uxAvailable) return // 표준 UX 제한을 쓸 수 있으면 그걸 우선
         gearAvailable = gear.start { parked ->
             if (simulated == null && parked != null) setDriving(!parked, "Pleos 기어")
         }
@@ -125,13 +145,14 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
     /** Vehicle SDK 가 없을 때: 위치 변화로 속도 추정 (8km/h 이상 주행, 3km/h 이하 정차) */
     private fun estimateSpeed(at: GeoPoint) {
         val now = System.currentTimeMillis()
-        val prev = lastFix
-        lastFix = at to now
-        if (prev == null || now - prev.second < 1_000) return
+        fixes.addLast(at to now)
+        while (fixes.size > 2 && now - fixes[1].second >= SPEED_WINDOW_MS) fixes.removeFirst()
+        val prev = fixes.first()
+        if (now - prev.second < SPEED_WINDOW_MS) return
         val kmh = distanceM(prev.first, at) / ((now - prev.second) / 1000f) * 3.6f
-        if (kmh > 250f) return // adb geo fix 등 순간이동은 무시
+        if (kmh > 250f) { fixes.clear(); fixes.addLast(at to now); return } // adb geo fix 등 순간이동은 무시
         _state.update { it.copy(speedKmh = kmh) }
-        if (gearAvailable || simulated != null) return
+        if (uxAvailable || gearAvailable || simulated != null) return
         when {
             kmh >= 8f -> setDriving(true, "위치 속도 추정")
             kmh <= 3f -> setDriving(false, "위치 속도 추정")
@@ -150,7 +171,7 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
     fun startLocation(permissionGranted: Boolean) {
         locationJob?.cancel()
         val pleos = if (!BuildConfig.USE_MOCK_PLEOS && permissionGranted) {
-            PleosVehicleContextProvider(getApplication()).takeIf { it.isSupported() }
+            runCatching { PleosVehicleContextProvider(getApplication()) }.getOrNull()?.takeIf { it.isSupported() }
         } else null
         val p = pleos ?: MockVehicleContextProvider()
         provider = p
@@ -183,7 +204,7 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun recognizeNextFrame() {
         if (_state.value.busy) return
-        val frame = frames.next() ?: run {
+        val frame = withContext(Dispatchers.IO) { frames.next() } ?: run {
             _state.update { it.copy(error = "시연 영상(assets/demo_video/demo_drive.mp4) 또는 이미지를 넣어주세요.") }; return
         }
         _state.update { it.copy(busy = true, error = null) }
@@ -269,7 +290,7 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun registerProximity() {
-        provider?.watchLandmarks(proximityTargets()) { t -> visitLandmark(t.id) }
+        provider?.watchLandmarks(proximityTargets()) { t -> viewModelScope.launch { visitLandmark(t.id) } }
     }
 
     /** Pleos 근접 알림이 없는 환경(목업 등)을 위한 거리 판정. 서버가 중복을 걸러준다. */
@@ -406,6 +427,8 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private companion object {
+        const val NOTICE_MS = 4_000L
+        const val SPEED_WINDOW_MS = 5_000L
         const val VISIT_REPORT_INTERVAL_MS = 30_000L
         const val LANDMARK_RADIUS_M = 500 // 백엔드 LANDMARK_RADIUS_M 과 동일하게
         const val MAX_PROXIMITY_ALERTS = 20
@@ -421,6 +444,7 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
         navi.release()
         voice.release()
         gear.release()
+        uxRestriction.release()
         frames.release()
     }
 }

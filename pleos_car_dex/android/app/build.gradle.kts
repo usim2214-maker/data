@@ -8,6 +8,7 @@ plugins {
 android {
     namespace = "com.pleos.cardex"
     compileSdk = 35
+    useLibrary("android.car") // CarUxRestrictionsManager (주행 중 UX 제한)
 
     defaultConfig {
         applicationId = "com.pleos.cardex"
@@ -15,8 +16,10 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
-        // 에뮬레이터에서 호스트 PC 의 FastAPI 서버 = 10.0.2.2
-        buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8000/\"")
+        // 백엔드 주소. 에뮬레이터 -> 호스트 PC = 10.0.2.2
+        // 다른 주소로 빌드: ./gradlew assembleDebug -PapiBaseUrl=http://192.168.0.10:8000/
+        val apiBaseUrl = (project.findProperty("apiBaseUrl") as String?) ?: "http://10.0.2.2:8000/"
+        buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
         // true: Pleos SDK 를 쓰지 않고 목업 위치로 동작 (false 여도 isSupported()=false 면 자동으로 목업 사용)
         buildConfigField("boolean", "USE_MOCK_PLEOS", "false")
     }

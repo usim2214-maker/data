@@ -43,6 +43,7 @@ fun HomeSummaryCard(home: HomeSummary?, modifier: Modifier = Modifier) {
             Stat("시너지", "${home.synergyTotal}")
             Stat("이번 주", "${home.weeklyRank}위")
             Stat("지역 스탬프", "${home.regionStamps}/${home.regionTotal}")
+            if (home.brandTotal > 0) Stat("브랜드 스팟", "${home.brandSpots}/${home.brandTotal}")
         }
         home.daily?.let { DailyRow(it) }
         // 오늘의 차가 목표일 땐 위 줄과 중복이므로 생략

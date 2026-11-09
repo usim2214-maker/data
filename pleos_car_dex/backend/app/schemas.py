@@ -142,7 +142,7 @@ class Attraction(BaseModel):
     lat: float
     lon: float
     image: str | None = None
-    kind: str = "attraction"  # attraction | festival
+    kind: str = "attraction"  # attraction | festival | brand (브랜드 체험 스팟)
     event_start: str | None = None  # YYYYMMDD (축제)
     event_end: str | None = None
     region_id: str | None = None
@@ -172,6 +172,7 @@ class LandmarkVisitResponse(BaseModel):
     stamp: HiddenStamp | None = None
     message: str = ""
     challenge: "ChallengeUpdate | None" = None
+    legendary_item: str | None = None  # 브랜드 스팟 첫 방문 시 열린 전설 쇼룸 아이템
 
 
 class StampBook(BaseModel):
@@ -344,6 +345,7 @@ class DecorItem(BaseModel):
     name: str
     unlocked: bool = False
     unlock_hint: str = ""  # 잠금 해제 조건 설명
+    legendary: bool = False  # 브랜드 스팟 방문으로만 열리는 전설 아이템
 
 
 class PlacedProp(BaseModel):
@@ -432,6 +434,8 @@ class HomeSummary(BaseModel):
     challenge_progress: str | None = None  # 예: "1/3"
     next_goal: str  # 다음 목표 한 줄 (예: "부산 마스터까지 35점")
     daily: DailyMission | None = None
+    brand_spots: int = 0  # 방문한 브랜드 체험 스팟
+    brand_total: int = 0
 
 
 class QuizQuestion(BaseModel):

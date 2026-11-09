@@ -140,6 +140,7 @@ private fun StopRow(index: Int, stop: CourseStop) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("$index. ${stop.name}", style = MaterialTheme.typography.titleLarge)
             if (stop.kind == "festival") Badge("축제", Color(0xFFFF7043))
+            if (stop.kind == "brand") Badge("브랜드 스팟", Color(0xFFB388FF))
             if (stop.newRegionStamp) Badge("새 지역", Color(0xFF4DA3FF))
             if (stop.newHiddenStamp) Badge("히든", Color(0xFFFFC94D))
         }
@@ -155,7 +156,7 @@ private fun Badge(text: String, color: Color) =
 private fun LandmarkRow(item: LandmarkNearby) {
     val a = item.attraction
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(if (item.collected) "✅" else if (a.kind == "festival") "🎉" else "📍", style = MaterialTheme.typography.titleLarge)
+        Text(if (item.collected) "✅" else if (a.kind == "festival") "🎉" else if (a.kind == "brand") "🏢" else "📍", style = MaterialTheme.typography.titleLarge)
         Column(Modifier.weight(1f).padding(start = 12.dp)) {
             Text(a.title, style = MaterialTheme.typography.bodyLarge)
             Text(

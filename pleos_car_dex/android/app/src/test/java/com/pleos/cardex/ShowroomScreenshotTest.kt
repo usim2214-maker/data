@@ -55,6 +55,9 @@ class ShowroomScreenshotTest {
             item("floor-neon", "floor", "neon", "네온 그리드"), item("floor-marble", "floor", "marble", "골드 마블", false, "지역 마스터 1곳"),
             item("prop-flag", "prop", "🚩", "깃발"), item("prop-checker", "prop", "🏁", "체커기"), item("prop-trophy", "prop", "🏆", "트로피", false, "지역 마스터 1곳"),
             item("region:busan", "prop", "🌉", "부산 광안대교"), item("region:jeju", "prop", "🍊", "제주 한라산", false, "제주 스탬프 획득"),
+            DecorItem("spot:brand-hmg-taean", "prop", "🏎️", "서킷 레이스카", true, "HMG 드라이빙 익스피리언스 센터 방문", legendary = true),
+            DecorItem("spot:brand-hms-busan", "prop", "🌊", "부산 바다 파도", false, "현대 모터스튜디오 부산 방문", legendary = true),
+            DecorItem("spot:brand-genesis-gangnam", "prop", "🦅", "윙 엠블럼 조형", false, "제네시스 강남 방문", legendary = true),
         ),
         unlocked = 14, total = 47,
     )
@@ -103,6 +106,16 @@ class ShowroomScreenshotTest {
             car = ioniq5n, background = gangwon, floor = catalog.items[4], light = item("light-aurora", "light", "#B388FF", "오로라"),
             pedestal = item("pedestal-neon", "pedestal", "neon", "네온 링"), signText = "ROAD TRIPPER",
             props = props(Triple("🚩", 0.12f, 0.86f), Triple("🏁", 0.88f, 0.86f)),
+        ),
+        tab = 6,
+    )
+
+    @Test fun brandLegendaryProps() = shot(
+        "showroom_brand_legendary",
+        Showroom(
+            car = ioniq5n, background = busan, floor = catalog.items[2], light = item("light-gold", "light", "#FFD54F", "챔피언 골드"),
+            pedestal = item("pedestal-gold", "pedestal", "gold", "골드 포디움"), signText = "MOTORSTUDIO",
+            props = props(Triple("🏎️", 0.15f, 0.85f), Triple("🏁", 0.85f, 0.85f)),
         ),
         tab = 6,
     )

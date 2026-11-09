@@ -24,7 +24,7 @@ from app.schemas import (
     LLMCoursePick,
 )
 from app.services.challenge import completion_bonus
-from app.services import llm, regions
+from app.services import brand_spots, llm, regions
 from app.services.landmarks import points_for
 from app.services.store import JsonStore
 from app.services.tour import TourClient, distance_m
@@ -40,7 +40,7 @@ SYSTEM_PROMPT = (
     "당신은 국내 드라이브 여행 코스를 짜는 여행 큐레이터입니다. 목표는 운전자가 아직 가 보지 않은 지역과 "
     "지역 명소·축제를 방문하도록 돕는 것입니다(지역 관광 활성화).\n"
     "반드시 주어진 후보 목록의 id 만 사용해 2~4곳을 방문 순서대로 고르세요. 왕복 이동 시간이 희망 시간을 넘지 않도록 "
-    "출발지에서의 거리(dist_km)를 고려하고, 서로 가까운 곳끼리 묶으세요. 새 지역 스탬프(new_region)·진행 중인 축제를 우선합니다.\n"
+    "출발지에서의 거리(dist_km)를 고려하고, 서로 가까운 곳끼리 묶으세요. 새 지역 스탬프(new_region)·진행 중인 축제를 우선하고, 동선이 맞으면 브랜드 체험 스팟(kind=brand)을 하나 넣으세요.\n"
     "title 은 15자 내외의 코스 이름, summary 는 2문장 이내, reasons 는 stop_ids 와 같은 순서·개수로 각 25자 이내로 씁니다."
 )
 
@@ -158,6 +158,8 @@ class CourseService:
                 pool.setdefault(a.content_id, a)
         for a in self.tour.nearby(req.lat, req.lon, limit=4):
             pool.setdefault(a.content_id, a)
+        for a in brand_spots.nearby(req.lat, req.lon, reach_m):  # 브랜드 체험 스팟 (전설 아이템)
+            pool.setdefault(a.content_id, a)
 
         out = []
         for a in pool.values():
@@ -167,7 +169,7 @@ class CourseService:
             new_region = bool(a.region_id) and a.region_id not in visited_regions
             out.append(_Cand(
                 content_id=a.content_id, name=a.title, lat=a.lat, lon=a.lon, kind=a.kind, region_id=a.region_id,
-                reason=("진행 중인 축제" if a.kind == "festival" else "지역 명소"),
+                reason={"festival": "진행 중인 축제", brand_spots.KIND: "브랜드 체험 스팟 · 전설 아이템"}.get(a.kind, "지역 명소"),
                 new_region_stamp=new_region, new_hidden_stamp=a.content_id not in hidden,
                 points=points_for(a), dist_km=round(d / 1000, 1),
                 event=f"{a.event_start}~{a.event_end}" if a.kind == "festival" else "",
@@ -202,6 +204,7 @@ class CourseService:
             region = regions.get_region(c.region_id) if c.region_id else None
             return (
                 (3 if c.kind == "festival" else 0)
+                + (1.5 if c.kind == brand_spots.KIND else 0)
                 + (2 if c.new_region_stamp else 0)
                 + (1 if c.new_hidden_stamp else 0)
                 + (region.travel_points / 20 if region else 0)  # 지방일수록 가산

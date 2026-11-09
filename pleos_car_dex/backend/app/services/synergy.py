@@ -76,7 +76,7 @@ def compute(
             bonuses.append(SynergyBonus(name=f"{area} 완주", points=AREA_COMPLETE_POINTS, description=f"{area} 모든 시·도 방문"))
 
     if hidden_points:
-        bonuses.append(SynergyBonus(name="히든 스탬프", points=sum(hidden_points), description=f"명소·축제 {len(hidden_points)}곳 방문"))
+        bonuses.append(SynergyBonus(name="히든 스탬프", points=sum(hidden_points), description=f"명소·축제·브랜드 스팟 {len(hidden_points)}곳 방문"))
 
     if course_points:
         bonuses.append(SynergyBonus(name="코스 완주", points=sum(course_points), description=f"추천 코스 {len(course_points)}회 완주"))

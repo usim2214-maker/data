@@ -1,0 +1,21 @@
+{
+  "_comment": "브랜드 체험 스팟 = 특별 스탬프. 좌표는 대략값(시연용)이며 출시 전 공식 주소로 검증 필요. 방문 시 전설 쇼룸 아이템(item) 해금.",
+  "spots": [
+    {"id": "brand-hms-goyang", "title": "현대 모터스튜디오 고양", "brand": "현대", "addr": "경기 고양시 일산서구", "lat": 37.6697, "lon": 126.7457,
+     "item": {"slot": "light", "key": "#00AAD2", "name": "모터스튜디오 블루"}},
+    {"id": "brand-hms-seoul", "title": "현대 모터스튜디오 서울", "brand": "현대", "addr": "서울 강남구 도산대로", "lat": 37.5246, "lon": 127.0389,
+     "item": {"slot": "sign", "key": "MOTORSTUDIO", "name": "MOTORSTUDIO 간판"}},
+    {"id": "brand-hms-hanam", "title": "현대 모터스튜디오 하남", "brand": "현대", "addr": "경기 하남시 미사대로", "lat": 37.5455, "lon": 127.2237,
+     "item": {"slot": "prop", "key": "🔋", "name": "EV 충전 타워"}},
+    {"id": "brand-hms-busan", "title": "현대 모터스튜디오 부산", "brand": "현대", "addr": "부산 수영구 구락로", "lat": 35.1767, "lon": 129.1145,
+     "item": {"slot": "prop", "key": "🌊", "name": "부산 바다 파도"}},
+    {"id": "brand-kia-360", "title": "기아 360", "brand": "기아", "addr": "서울 강남구 압구정 일대", "lat": 37.5270, "lon": 127.0330,
+     "item": {"slot": "sign", "key": "MOVEMENT THAT INSPIRES", "name": "기아 360 간판"}},
+    {"id": "brand-genesis-suji", "title": "제네시스 수지", "brand": "제네시스", "addr": "경기 용인시 수지구", "lat": 37.3227, "lon": 127.0942,
+     "item": {"slot": "light", "key": "#C9A86A", "name": "제네시스 샴페인 골드"}},
+    {"id": "brand-genesis-gangnam", "title": "제네시스 강남", "brand": "제네시스", "addr": "서울 강남구 영동대로", "lat": 37.5087, "lon": 127.0627,
+     "item": {"slot": "prop", "key": "🦅", "name": "윙 엠블럼 조형"}},
+    {"id": "brand-hmg-taean", "title": "HMG 드라이빙 익스피리언스 센터", "brand": "현대자동차그룹", "addr": "충남 태안군", "lat": 36.6833, "lon": 126.3053,
+     "item": {"slot": "prop", "key": "🏎️", "name": "서킷 레이스카"}}
+  ]
+}

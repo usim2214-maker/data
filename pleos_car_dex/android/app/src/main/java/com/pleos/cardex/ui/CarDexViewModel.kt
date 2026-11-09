@@ -442,9 +442,11 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
                         s.copy(
                             notice = r.message,
                             landmarks = s.landmarks.map { if (it.attraction.contentId == id) it.copy(collected = true) else it },
+                            celebration = r.legendaryItem?.let { item -> Celebration("🏢", "브랜드 스팟 스탬프!", "${r.stamp?.attraction?.title ?: ""} · 전설 아이템 '$item' 해금") } ?: s.celebration,
                         )
                     }
                     loadStamps(); refreshCollection(); loadRankings()
+                    if (r.legendaryItem != null) loadShowroom()
                 }
             }
             visiting.remove(id)

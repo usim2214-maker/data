@@ -7,7 +7,7 @@ from datetime import date, datetime, timezone
 
 from app.config import Settings
 from app.schemas import Attraction, HiddenStamp, LandmarkNearby, LandmarkVisitResponse
-from app.services import regions
+from app.services import brand_spots, regions
 from app.services.store import JsonStore
 from app.services.tour import TourClient, distance_m
 
@@ -15,7 +15,9 @@ HIDDEN_BASE_POINTS = 15
 
 
 def points_for(a: Attraction) -> int:
-    """히든 스탬프 점수: 기본 15 + 지역 가중치의 절반 (지방 명소일수록 높게), 축제는 +10"""
+    """히든 스탬프 점수: 기본 15 + 지역 가중치의 절반 (지방 명소일수록 높게), 축제는 +10. 브랜드 스팟은 고정 40"""
+    if a.kind == brand_spots.KIND:
+        return brand_spots.POINTS
     region = regions.get_region(a.region_id) if a.region_id else None
     return HIDDEN_BASE_POINTS + (region.travel_points // 2 if region else 0) + (10 if a.kind == "festival" else 0)
 
@@ -27,7 +29,7 @@ class LandmarkService:
 
     def _candidates(self, lat: float, lon: float, radius_m: int) -> list[Attraction]:
         festivals = [f for f in self.tour.festivals(date.today(), within_days=0) if distance_m(lat, lon, f.lat, f.lon) <= radius_m]
-        return self.tour.nearby(lat, lon, radius_m) + festivals
+        return self.tour.nearby(lat, lon, radius_m) + festivals + brand_spots.nearby(lat, lon, radius_m)
 
     def nearby(self, lat: float, lon: float, radius_m: int) -> list[LandmarkNearby]:
         collected = self.store.get_hidden()
@@ -60,8 +62,15 @@ class LandmarkService:
             HiddenStamp(attraction=target, acquired_at=datetime.now(timezone.utc), points=points_for(target))
         )
         msg = f"✨ 히든 스탬프 '{target.title}' 획득! +{stamp.points}" if is_new else f"{target.title} — 이미 획득한 히든 스탬프"
+        legendary_item = None
+        if target.kind == brand_spots.KIND:
+            item = brand_spots.item_for(target.content_id)
+            legendary_item = item["name"] if item and is_new else None
+            if is_new:
+                msg = f"🏢 브랜드 스팟 '{target.title}' 스탬프! +{stamp.points}" + (f" · 전설 아이템 '{legendary_item}'" if legendary_item else "")
         if is_new and self.competition:
-            self.competition.record(stamp.points, target.region_id, "hidden_stamp", target.title)
+            kind = "brand_spot" if target.kind == brand_spots.KIND else "hidden_stamp"
+            self.competition.record(stamp.points, target.region_id, kind, target.title)
 
         progress = self.challenge.on_visit(target.content_id) if self.challenge else None
         if progress:
@@ -72,4 +81,5 @@ class LandmarkService:
                     msg += f" · 🎖️ 한정 배지 '{progress.badge.title}'"
             else:
                 msg += f" · 코스 {len(ch.visited)}/{len(ch.course.stops)}"
-        return LandmarkVisitResponse(acquired=True, is_new=is_new, stamp=stamp, message=msg, challenge=progress)
+        return LandmarkVisitResponse(acquired=True, is_new=is_new, stamp=stamp, message=msg, challenge=progress,
+                                     legendary_item=legendary_item)

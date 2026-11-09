@@ -160,7 +160,7 @@ def test_course_recommend_rule_based(client):
     assert 1 <= len(body["stops"]) <= 4
     assert body["candidates_source"] == "mock"
     assert body["est_drive_hours"] > 0 and body["expected_points"] > 0
-    assert all(s["content_id"].startswith("mock-") for s in body["stops"])
+    assert all(s["content_id"].startswith(("mock-", "brand-")) for s in body["stops"])  # 목업 명소·축제 + 브랜드 스팟
 
 
 def _course(limited_end="20991231"):
@@ -406,3 +406,25 @@ def test_daily_mission_and_streak(client, monkeypatch):
     d = client.get("/api/v1/daily").json()
     assert d["streak"] == 0 and d["best_streak"] == 2
     assert daily_mod.target_for(_date(2026, 11, 9))["id"] == daily_mod.target_for(_date(2026, 11, 9))["id"]  # 날짜로 결정
+
+
+def test_brand_spot_legendary_item(client):
+    """브랜드 체험 스팟 = 특별 스탬프(+40) + 전설 쇼룸 아이템 해금, 코스 후보에도 포함"""
+    near = client.get("/api/v1/landmarks/nearby", params={"lat": 37.524, "lon": 127.038, "radius_m": 3000}).json()
+    spot = next(n for n in near if n["attraction"]["content_id"] == "brand-hms-seoul")
+    assert spot["attraction"]["kind"] == "brand" and spot["points"] == 40
+
+    items = {i["id"]: i for i in client.get("/api/v1/showroom/items").json()["items"]}
+    assert items["spot:brand-hms-seoul"]["legendary"] and not items["spot:brand-hms-seoul"]["unlocked"]
+    assert client.put("/api/v1/showroom", json={"sign_id": "spot:brand-hms-seoul"}).status_code == 400
+
+    r = client.post("/api/v1/landmarks/brand-hms-seoul/visit", json={"lat": 37.5246, "lon": 127.0389}).json()
+    assert r["is_new"] and r["legendary_item"] == "MOTORSTUDIO 간판" and "브랜드 스팟" in r["message"]
+    items = {i["id"]: i for i in client.get("/api/v1/showroom/items").json()["items"]}
+    assert items["spot:brand-hms-seoul"]["unlocked"]
+    assert client.put("/api/v1/showroom", json={"sign_id": "spot:brand-hms-seoul"}).status_code == 200
+    home = client.get("/api/v1/home").json()
+    assert home["brand_spots"] == 1 and home["brand_total"] >= 8
+
+    cands = client.post("/api/v1/courses/candidates", json={"lat": 37.40, "lon": 127.10, "max_hours": 3}).json()
+    assert any(c["kind"] == "brand" for c in cands["candidates"])

@@ -2,7 +2,7 @@
 from app.schemas import HomeSummary
 from collections import Counter
 
-from app.services import regions
+from app.services import brand_spots, regions
 from app.services.catalog import load_catalog
 from app.services.challenge import ChallengeService
 from app.services.competition import CompetitionService
@@ -64,4 +64,6 @@ def summary(store: JsonStore, competition: CompetitionService, challenge: Challe
         challenge_progress=f"{len(active.visited)}/{len(active.course.stops)}" if active else None,
         next_goal=goal,
         daily=daily,
+        brand_spots=len(brand_spots.ids() & set(store.get_hidden())),
+        brand_total=len(brand_spots.ids()),
     )

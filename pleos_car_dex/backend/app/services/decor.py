@@ -7,7 +7,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from app.schemas import DecorItem
-from app.services import regions
+from app.services import brand_spots, regions
 from app.services.competition import CompetitionService, points_by_kind
 from app.services.progress import synergy_for
 from app.services.store import JsonStore
@@ -76,6 +76,12 @@ class DecorService:
                       unlocked=r.id in owned_regions, unlock_hint=_hint(f"region:{r.id}"))
             for r in regions.all_regions()
         ]
+        # 브랜드 체험 스팟 = 전설 아이템 (방문해야만 열림)
+        hidden = self.store.get_hidden()
+        for spot in brand_spots.raw_spots():
+            it = spot["item"]
+            items.append(DecorItem(id=f"{brand_spots.ITEM_PREFIX}{spot['id']}", slot=it["slot"], key=it["key"], name=it["name"],
+                                   unlocked=spot["id"] in hidden, unlock_hint=f"{spot['title']} 방문", legendary=True))
         return items
 
     def by_id(self) -> dict[str, DecorItem]:

@@ -130,6 +130,7 @@ data class LandmarkVisitResponse(
     val stamp: HiddenStamp? = null,
     val message: String = "",
     val challenge: ChallengeUpdate? = null,
+    @SerialName("legendary_item") val legendaryItem: String? = null, // 브랜드 스팟 전설 아이템
 )
 
 @Serializable
@@ -203,6 +204,8 @@ data class HomeSummary(
     @SerialName("challenge_progress") val challengeProgress: String? = null,
     @SerialName("next_goal") val nextGoal: String,
     val daily: DailyMission? = null,
+    @SerialName("brand_spots") val brandSpots: Int = 0,
+    @SerialName("brand_total") val brandTotal: Int = 0,
 )
 
 /** 오늘의 차 미션 + 연속 출석 */
@@ -317,6 +320,7 @@ data class DecorItem(
     val name: String,
     val unlocked: Boolean = false,
     @SerialName("unlock_hint") val unlockHint: String = "",
+    val legendary: Boolean = false, // 브랜드 체험 스팟 전설 아이템
 )
 
 @Serializable

@@ -199,6 +199,7 @@ private fun ItemGrid(items: List<DecorItem>, selectedId: String?, columns: Int =
                     else -> {}
                 }
                 Text(it.name, fontSize = 13.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+                if (it.legendary) Text("🌟 LEGENDARY", fontSize = 10.sp, color = Color(0xFFFFD54F), fontWeight = FontWeight.Black)
                 if (!it.unlocked) Text("🔒 ${it.unlockHint}", fontSize = 11.sp, color = Color(0xFFFFC94D), maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }

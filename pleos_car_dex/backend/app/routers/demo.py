@@ -1,12 +1,24 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.config import get_settings
-from app.schemas import DailyMission, HomeSummary
+from app.schemas import DailyMission, CheckinResponse, HomeSummary
 from app.services import demo, home
 from app.services.deps import get_challenge, get_competition, get_decor, get_landmarks
 from app.services.pipeline import RecognitionPipeline, get_pipeline
 
 router = APIRouter(prefix="/api/v1", tags=["home / demo"])
+
+
+@router.post("/daily/checkin", response_model=CheckinResponse)
+def daily_checkin():
+    """앱을 열 때 호출 (운전하지 않아도 됨): 출석 + 지난 '차 쉬는 날' 정산"""
+    from app.services.daily import GREEN_POINTS
+    from app.services.deps import get_daily, settle_green
+    daily = get_daily()
+    daily.mark_active()
+    n = settle_green()
+    msg = f"🌿 차가 {n}일 쉬었어요 · 잎 {n}장 +{n * GREEN_POINTS}" if n else ""
+    return CheckinResponse(mission=daily.mission(), new_green_days=n, green_points=n * GREEN_POINTS, message=msg)
 
 
 @router.get("/daily", response_model=DailyMission)

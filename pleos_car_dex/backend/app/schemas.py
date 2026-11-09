@@ -408,8 +408,16 @@ class DailyMission(BaseModel):
     target: CatalogVehicle
     found: bool
     bonus: int
-    streak: int
+    streak: int  # 앱을 연 날 + 차가 쉰 날 연속
     best_streak: int
+    green_days: int = 0  # 차가 쉰 날(그린 데이) 누적 = 잎 🌿
+
+
+class CheckinResponse(BaseModel):
+    mission: DailyMission
+    new_green_days: int = 0
+    green_points: int = 0
+    message: str = ""
 
 
 class HomeSummary(BaseModel):
@@ -498,6 +506,8 @@ class TripReport(BaseModel):
     points: int = 0
     daily_found: bool = False
     streak: int = 0
+    green_new: int = 0  # 이번 주행 전까지 차가 쉰 날 (새로 확정)
+    green_days: int = 0
     total_km: float = 0  # 앱과 함께한 누적 거리
     trips: int = 0
     headline: str  # 한 줄 제목

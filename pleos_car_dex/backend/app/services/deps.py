@@ -39,12 +39,22 @@ def get_daily():
     return DailyService(get_pipeline().store)
 
 
+def settle_green() -> int:
+    """차가 쉰 날 확정 + 원장 기록. 새 그린 데이 수 반환"""
+    from app.services.daily import GREEN_POINTS
+    new = get_daily().settle_green()
+    comp = get_competition()
+    for day in new:
+        comp.record(GREEN_POINTS, None, "green_day", day)
+    return len(new)
+
+
 @lru_cache
 def get_trips():
     from app.services import home
     from app.services.trips import TripService
     store = get_pipeline().store
-    return TripService(store, get_daily(),
+    return TripService(store, get_daily(), settle_green,
                        lambda: home.summary(store, get_competition(), get_challenge(), get_decor()).next_goal)
 
 

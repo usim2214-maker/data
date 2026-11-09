@@ -37,7 +37,13 @@ def _hint(rule: str) -> str:
         "master": f"지역 마스터 {arg}곳",
         "synergy": f"시너지 {arg}점",
         "quiz": f"퀴즈 별 {arg}개",
+        "green": f"차 쉬는 날 {arg}일",
     }.get(kind, rule)
+
+
+def _green_days() -> int:
+    from app.services.deps import get_daily
+    return get_daily().green_days()
 
 
 class DecorService:
@@ -54,6 +60,7 @@ class DecorService:
             "master": len(self.competition.my_master_region_ids()),
             "synergy": synergy_for(self.store).total,
             "quiz": quiz_stars(self.store),
+            "green": _green_days(),
         }
 
     def catalog(self) -> list[DecorItem]:

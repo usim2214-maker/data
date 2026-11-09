@@ -43,6 +43,7 @@ class CarDexRepository(private val api: CarDexApi = CarDexApi.create()) {
     suspend fun weeklyRanking(regionId: String?) = api.weeklyRanking(regionId)
     suspend fun masters() = api.masters()
     suspend fun home() = api.home()
+    suspend fun checkin() = api.checkin()
     suspend fun tripReport(req: TripReportRequest) = api.tripReport(req)
     suspend fun demoSeed() = api.demoSeed()
     suspend fun demoReset() = api.demoReset()

@@ -2,7 +2,8 @@
 
 - 매일(KST) 도감 28종 중 '오늘의 차' 하나 (전설 제외, 날짜로 결정 → 모든 사용자가 같은 차)
 - 오늘의 차를 카드로 만들면 보너스 (희귀 +30, 일반 +20) — 하루 1번
-- 수집·방문한 날이 이어지면 연속 출석
+- 연속 기록 = 앱을 연 날 + **차가 쉰 날(그린 데이)**. 운전을 안 해도 연속이 끊기지 않는다 (매일 운전하게 만드는 출석은 지양)
+- 그린 데이: 주행 기록(주차 리포트 0.5km 이상)이 없는 지난 날 → 잎 🌿 1장 = +GREEN_POINTS, 친환경 쇼룸 아이템 해금
 현대차 관점: 매일 다른 모델에 시선이 가게 하는 라인업 노출, 사용자는 매일 앱을 켤 이유.
 """
 import hashlib
@@ -15,6 +16,8 @@ from app.services.competition import KST
 from app.services.store import JsonStore
 
 BONUS = {"rare": 30, "common": 20}
+GREEN_POINTS = 10  # 차가 쉰 날 1일당 (오늘의 차 일반 보너스의 절반 — 안 타도 꾸준히 쌓임)
+GREEN_LOOKBACK = 14  # 최근 며칠까지 소급 인정
 
 
 def today() -> date:
@@ -33,7 +36,8 @@ class DailyService:
         self._path = store.extra_path("daily.json")
 
     def _load(self) -> dict:
-        return json.loads(self._path.read_text(encoding="utf-8")) if self._path.exists() else {"found": [], "active": []}
+        d = json.loads(self._path.read_text(encoding="utf-8")) if self._path.exists() else {}
+        return {"found": [], "active": [], "green": [], **d}
 
     def _save(self, d: dict) -> None:
         self._path.write_text(json.dumps(d, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -45,8 +49,39 @@ class DailyService:
             d["active"].append(t)
             self._save(d)
 
+    def drive_days(self) -> set[date]:
+        """주행한 날 (주차 리포트 기준, KST)"""
+        p = self.store.extra_path("trips.json")
+        trips = json.loads(p.read_text(encoding="utf-8")) if p.exists() else []
+        return {datetime.fromisoformat(t["at"]).astimezone(KST).date() for t in trips if t.get("km", 0) >= 0.5}
+
+    def settle_green(self) -> list[str]:
+        """어제까지 중 주행 기록이 없는 날을 그린 데이로 확정. 새로 확정된 날짜 목록 반환.
+        시작점은 앱을 처음 쓴 날 (그 전 날은 소급하지 않음)."""
+        d = self._load()
+        known = [date.fromisoformat(x) for x in d["active"]] + sorted(self.drive_days())
+        if not known:
+            return []
+        t = today()
+        start = max(min(known), t - timedelta(days=GREEN_LOOKBACK))
+        driven, green = self.drive_days(), set(d["green"])
+        new = []
+        x = start
+        while x < t:
+            if x not in driven and x.isoformat() not in green:
+                new.append(x.isoformat())
+            x += timedelta(days=1)
+        if new:
+            d["green"] = sorted(green | set(new))
+            self._save(d)
+        return new
+
+    def green_days(self) -> int:
+        return len(self._load()["green"])
+
     def streak(self) -> tuple[int, int]:
-        days = sorted({date.fromisoformat(x) for x in self._load()["active"]})
+        d = self._load()
+        days = sorted({date.fromisoformat(x) for x in d["active"] + d["green"]})
         best = cur = 0
         prev = None
         for x in days:
@@ -79,4 +114,5 @@ class DailyService:
             bonus=BONUS.get(v["rarity"], 20),
             streak=cur,
             best_streak=best,
+            green_days=self.green_days(),
         )

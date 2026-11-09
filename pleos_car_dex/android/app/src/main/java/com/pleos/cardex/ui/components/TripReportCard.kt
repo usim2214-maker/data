@@ -49,7 +49,8 @@ fun TripReportCard(r: TripReport, onDismiss: () -> Unit) {
             }
             if (r.newCards.isNotEmpty()) Line("🃏", r.newCards.joinToString(" · ") + if (r.newLegendary > 0) "  🌟 전설 ${r.newLegendary}" else "")
             if (r.stamps.isNotEmpty()) Line("📍", r.stamps.joinToString(" · "))
-            Line("🔥", "${r.streak}일 연속" + if (r.dailyFound) " · 오늘의 차 발견 ✅" else "")
+            Line("🔥", "${r.streak}일 연속 (차 쉬는 날 포함)" + if (r.dailyFound) " · 오늘의 차 발견 ✅" else "")
+            if (r.greenNew > 0) Line("🌿", "그동안 차가 ${r.greenNew}일 쉬어서 잎 ${r.greenNew}장 · 누적 ${r.greenDays}일")
             if (r.nextGoal.isNotBlank()) Line("🎯", r.nextGoal)
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("함께 달린 거리 ${r.totalKm}km · ${r.trips}번째 드라이브", color = Color.White.copy(alpha = 0.6f), fontSize = 15.sp, modifier = Modifier.weight(1f))

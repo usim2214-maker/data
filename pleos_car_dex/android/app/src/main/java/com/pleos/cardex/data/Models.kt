@@ -217,6 +217,15 @@ data class DailyMission(
     val bonus: Int,
     val streak: Int,
     @SerialName("best_streak") val bestStreak: Int,
+    @SerialName("green_days") val greenDays: Int = 0, // 차가 쉰 날 🌿
+)
+
+@Serializable
+data class CheckinResponse(
+    val mission: DailyMission,
+    @SerialName("new_green_days") val newGreenDays: Int = 0,
+    @SerialName("green_points") val greenPoints: Int = 0,
+    val message: String = "",
 )
 
 /** 아이용 차 맞히기 퀴즈 (YOLO 결과로 출제, 정답 포함 → 앱이 채점) */
@@ -402,6 +411,8 @@ data class TripReport(
     val points: Int = 0,
     @SerialName("daily_found") val dailyFound: Boolean = false,
     val streak: Int = 0,
+    @SerialName("green_new") val greenNew: Int = 0,
+    @SerialName("green_days") val greenDays: Int = 0,
     @SerialName("total_km") val totalKm: Float = 0f,
     val trips: Int = 0,
     val headline: String,

@@ -34,6 +34,7 @@ def compute(
     badge_points: list[int] | None = None,
     twin_points: list[int] | None = None,
     daily_points: list[int] | None = None,
+    green_points: list[int] | None = None,
 ) -> SynergyScore:
     stamps, regions = stamps or {}, regions or []
     base = sum(RARITY_POINTS.get(e.card.rarity, 10) for e in entries)
@@ -85,6 +86,8 @@ def compute(
 
     if daily_points:
         bonuses.append(SynergyBonus(name="오늘의 차", points=sum(daily_points), description=f"오늘의 차 {len(daily_points)}번 발견"))
+    if green_points:
+        bonuses.append(SynergyBonus(name="차 쉬는 날", points=sum(green_points), description=f"🌿 차가 쉰 날 {len(green_points)}일"))
     if twin_points:
         bonuses.append(SynergyBonus(name="쌍둥이 차", points=sum(twin_points), description=f"내 차와 같은 차 {len(twin_points)}번 만남"))
 

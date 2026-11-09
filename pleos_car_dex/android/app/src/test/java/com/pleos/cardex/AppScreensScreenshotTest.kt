@@ -158,7 +158,7 @@ class AppScreensScreenshotTest {
                 home.copy(
                     dexOwned = 6, dexTotal = 28, legendaryOwned = 1, legendaryTotal = 3,
                     nextGoal = "현대 차량 1종 더 모으면 '현대 컬렉터' +50",
-                    daily = com.pleos.cardex.data.DailyMission("2026-11-09", com.pleos.cardex.data.CatalogVehicle("kia-ev9", "기아", "EV9", "SUV", "rare"), false, 30, 4, 7),
+                    daily = com.pleos.cardex.data.DailyMission("2026-11-09", com.pleos.cardex.data.CatalogVehicle("kia-ev9", "기아", "EV9", "SUV", "rare"), false, 30, 4, 7, greenDays = 3),
                 ),
             )
         }
@@ -168,7 +168,7 @@ class AppScreensScreenshotTest {
         com.pleos.cardex.ui.components.TripReportCard(
             com.pleos.cardex.data.TripReport(
                 distanceKm = 23.4f, driveMinutes = 41, newCards = listOf("현대 아이오닉 5 N", "기아 EV9"), newLegendary = 1,
-                stamps = listOf("🌉 부산", "🏢 현대 모터스튜디오 부산"), points = 95, dailyFound = true, streak = 4,
+                stamps = listOf("🌉 부산", "🏢 현대 모터스튜디오 부산"), points = 95, dailyFound = true, streak = 6, greenNew = 2, greenDays = 9,
                 totalKm = 312.5f, trips = 12, headline = "23.4km 드라이브 · 새 카드 2장 · 스탬프 2개 · 95점",
                 tts = "", nextGoal = "현대 차량 1종 더 모으면 '현대 컬렉터' +50",
             ),

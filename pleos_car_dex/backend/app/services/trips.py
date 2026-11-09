@@ -19,14 +19,15 @@ def _aware(dt: datetime) -> datetime:
 
 
 class TripService:
-    def __init__(self, store: JsonStore, daily, home_goal):
-        self.store, self.daily, self.home_goal = store, daily, home_goal
+    def __init__(self, store: JsonStore, daily, settle_green, home_goal):
+        self.store, self.daily, self.settle_green, self.home_goal = store, daily, settle_green, home_goal
         self._path = store.extra_path("trips.json")
 
     def _load(self) -> list[dict]:
         return json.loads(self._path.read_text(encoding="utf-8")) if self._path.exists() else []
 
     def report(self, req: TripReportRequest) -> TripReport:
+        green_new = self.settle_green()  # 이번 주행 전까지 차가 쉰 날 (오늘 주행 기록 저장 전에 확정)
         since = _aware(req.started_at)
         cards = [e.card for e in self.store.list_entries() if _aware(e.first_seen_at) >= since]
         stamps = []
@@ -37,7 +38,7 @@ class TripService:
         for h in self.store.get_hidden().values():
             if _aware(h.acquired_at) >= since:
                 stamps.append(("🏢 " if h.attraction.kind == "brand" else "✨ ") + h.attraction.title)
-        points = sum(e.points for e in self.store.get_events() if _aware(e.at) >= since)
+        points = sum(e.points for e in self.store.get_events() if _aware(e.at) >= since and e.kind != "green_day")
         mission = self.daily.mission()
 
         trips = self._load()
@@ -63,9 +64,12 @@ class TripService:
             tts = f"수고하셨어요. 이번엔 {km}킬로미터를 달렸어요. 다음엔 도감 카드를 모아 볼까요?"
         if mission.found:
             tts += " 오늘의 차도 찾았어요!"
+        if green_new:
+            tts += f" 그동안 차가 {green_new}일 쉬어서 잎 {green_new}장을 받았어요."
         return TripReport(
             distance_km=km, drive_minutes=req.drive_minutes,
             new_cards=[f"{c.brand} {c.model}" for c in cards], new_legendary=sum(c.rarity == "legendary" for c in cards),
             stamps=stamps, points=points, daily_found=mission.found, streak=mission.streak,
+            green_new=green_new, green_days=mission.green_days,
             total_km=total_km, trips=len(trips), headline=headline, tts=tts, next_goal=self.home_goal(),
         )

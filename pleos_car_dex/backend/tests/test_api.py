@@ -464,3 +464,41 @@ def test_quiz_stars_unlock_stickers(client):
     assert items["sticker-puppy"]["unlocked"] and not items["sticker-firetruck"]["unlocked"]
     assert items["sticker-firetruck"]["unlock_hint"] == "퀴즈 별 3개"
     assert client.get("/api/v1/home").json()["weekly_points"] == before  # 랭킹 원장에 기록 안 함
+
+
+def test_green_days_reward_not_driving(client, monkeypatch):
+    """차를 안 탄 날도 연속이 이어지고(그린 데이), 잎·점수·친환경 아이템을 받는다"""
+    from datetime import date, timedelta
+    from app.services import daily as daily_mod
+
+    d0 = date(2026, 11, 2)
+    monkeypatch.setattr(daily_mod, "today", lambda: d0)
+    c = client.post("/api/v1/daily/checkin").json()
+    assert c["new_green_days"] == 0 and c["mission"]["streak"] == 1
+
+    # 3일 뒤 앱을 열었는데 그동안 주행 기록 없음 -> 3일 모두 그린 데이, 연속 유지
+    monkeypatch.setattr(daily_mod, "today", lambda: d0 + timedelta(days=3))
+    c = client.post("/api/v1/daily/checkin").json()
+    assert c["new_green_days"] == 3 and c["green_points"] == 30 and "잎 3장" in c["message"]
+    assert c["mission"]["green_days"] == 3 and c["mission"]["streak"] == 4
+    assert client.post("/api/v1/daily/checkin").json()["new_green_days"] == 0  # 중복 정산 없음
+    syn = {b["name"]: b["points"] for b in client.get("/api/v1/collection").json()["synergy"]["bonuses"]}
+    assert syn["차 쉬는 날"] == 30
+    items = {i["id"]: i for i in client.get("/api/v1/showroom/items").json()["items"]}
+    assert items["eco-bike"]["unlocked"] and not items["light-forest"]["unlocked"]
+    assert items["light-forest"]["unlock_hint"] == "차 쉬는 날 5일"
+
+
+def test_trip_day_is_not_green(client, monkeypatch):
+    from datetime import date, datetime, timedelta, timezone
+    from app.services import daily as daily_mod
+
+    today = datetime.now(timezone.utc).astimezone(daily_mod.KST).date()
+    monkeypatch.setattr(daily_mod, "today", lambda: today)
+    client.post("/api/v1/daily/checkin")
+    start = (datetime.now(timezone.utc) - timedelta(minutes=30)).isoformat()
+    r = client.post("/api/v1/trips/report", json={"started_at": start, "distance_km": 12, "drive_minutes": 30}).json()
+    assert r["green_new"] == 0
+    monkeypatch.setattr(daily_mod, "today", lambda: today + timedelta(days=2))
+    c = client.post("/api/v1/daily/checkin").json()
+    assert c["new_green_days"] == 1  # 주행한 날(오늘)은 제외, 다음 날만 그린 데이

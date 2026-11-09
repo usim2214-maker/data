@@ -80,6 +80,7 @@ private fun DailyRow(d: DailyMission) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text("🔥 ${d.streak}일", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black)
             Text("연속 · 최고 ${d.bestStreak}", color = Color.White.copy(alpha = 0.75f), fontSize = 13.sp)
+            Text("🌿 차 쉬는 날 ${d.greenDays}일", color = Color(0xFF7CE38B), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }

@@ -221,7 +221,7 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
         loadStamps()
         loadChallenge()
         loadRankings()
-        loadHome()
+        checkin()
         loadQuizStars()
         viewModelScope.launch { // SDK 초기화가 비동기라 잠시 뒤 상태 표시
             delay(3_000)
@@ -565,6 +565,22 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 if (r.unlockedSticker != null) loadShowroom()
             }
+        }
+    }
+
+    /** 앱을 열면 출석 (운전 불필요) + 지난 '차 쉬는 날' 정산 → 잎 🌿 */
+    private fun checkin() {
+        viewModelScope.launch {
+            call { repo.checkin() }.onSuccess { r ->
+                _state.update {
+                    it.copy(
+                        notice = r.message.takeIf { m -> m.isNotBlank() } ?: it.notice,
+                        celebration = if (r.newGreenDays > 0) Celebration("🌿", "차가 ${r.newGreenDays}일 쉬었어요", "잎 ${r.newGreenDays}장 · +${r.greenPoints}점 · 연속 기록 유지") else it.celebration,
+                    )
+                }
+                if (r.newGreenDays > 0) { loadShowroom(); refreshCollection() }
+            }
+            loadHome()
         }
     }
 

@@ -53,6 +53,7 @@ import com.pleos.cardex.data.DecorItem
 import com.pleos.cardex.data.MAX_PROPS
 import com.pleos.cardex.data.Showroom
 import com.pleos.cardex.data.StampBook
+import com.pleos.cardex.ui.components.CarIllustration
 import com.pleos.cardex.ui.components.ShowroomStage
 import com.pleos.cardex.ui.components.hexColor
 import com.pleos.cardex.ui.theme.rarityColor
@@ -152,9 +153,9 @@ private fun CarPicker(collection: List<CollectionEntry>, selectedId: String?, on
                     .clickable { onFeature(e.card.id) }.padding(6.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                AsyncImage(
-                    model = CarDexApi.absolute(e.card.imageUrl), contentDescription = e.card.model, contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxWidth().aspectRatio(1.5f).clip(RoundedCornerShape(10.dp)).background(Color.Black),
+                CarIllustration(
+                    e.card.id, e.card.bodyType, e.card.rarity,
+                    Modifier.fillMaxWidth().aspectRatio(1.5f).clip(RoundedCornerShape(10.dp)).background(Color(0xFF232A36)),
                 )
                 Text(e.card.model, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 15.sp)
             }

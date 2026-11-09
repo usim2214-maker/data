@@ -1,5 +1,5 @@
 에뮬레이터에는 실제 카메라가 없으므로, 시연용 차량 사진을 이 폴더에 넣으면
 `AssetFrameSource` 가 순서대로 백엔드에 전송합니다.
 
-파일명을 카탈로그 id 로 지으면(예: `hyundai-ioniq-5.jpg`, `porsche-911.jpg`)
+파일명을 카탈로그 id 로 지으면(예: `hyundai-ioniq-5.jpg`, `hyundai-ioniq-5-n.jpg`)
 백엔드 목업 모드에서도 해당 차량으로 인식됩니다.

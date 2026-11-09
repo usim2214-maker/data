@@ -38,10 +38,10 @@ def test_recognize_registers_and_uses_keywords(client):
 def test_keyword_override_and_delete(client):
     r = client.post(
         "/api/v1/recognize",
-        files={"image": ("porsche-911.png", _jpeg((0, 0, 0)), "image/jpeg")},
+        files={"image": ("hyundai-ioniq-5-n.png", _jpeg((0, 0, 0)), "image/jpeg")},
         data={"keywords": "브랜드, 연비"},
     ).json()
-    assert r["card"]["rarity"] == "legendary"
+    assert r["card"]["rarity"] == "legendary" and r["card"]["id"] == "hyundai-ioniq-5-n"
     assert [f["keyword"] for f in r["card"]["facts"]] == ["브랜드", "연비"]
     assert client.delete(f"/api/v1/collection/{r['card']['id']}").status_code == 204
     assert client.get("/api/v1/collection").json()["total"] == 0
@@ -100,7 +100,7 @@ def test_showroom(client):
     client.post("/api/v1/recognize", files={"image": ("hyundai-grandeur.jpg", _jpeg(), "image/jpeg")})
     client.post("/api/v1/stamps/visit", json={"lat": 33.5, "lon": 126.53})  # 제주
 
-    assert client.put("/api/v1/showroom", json={"card_id": "porsche-911"}).status_code == 400  # 미획득 차량
+    assert client.put("/api/v1/showroom", json={"card_id": "hyundai-ioniq-5-n"}).status_code == 400  # 미획득 차량
     assert client.put("/api/v1/showroom", json={"background_region_id": "seoul"}).status_code == 400  # 미획득 스탬프
 
     sr = client.put(

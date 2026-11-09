@@ -55,7 +55,8 @@ class VehicleIdentifier:
         """오프라인 시연용: 파일명 힌트(예: 'ioniq-5.jpg')가 카탈로그 id 와 맞으면 그 차량, 아니면 이미지 해시로 결정."""
         catalog = load_catalog()
         hint = hint.lower()
-        chosen = next((v for v in catalog if v["id"] in hint or v["id"].split("-", 1)[1] in hint), None)
+        matches = [v for v in catalog if v["id"] in hint or v["id"].split("-", 1)[1] in hint]
+        chosen = max(matches, key=lambda v: len(v["id"]), default=None)  # ioniq-5-n 이 ioniq-5 로 잡히지 않게
         if chosen is None:
             digest = hashlib.md5(crop.tobytes()).digest()
             chosen = catalog[digest[0] % len(catalog)]

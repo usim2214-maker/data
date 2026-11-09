@@ -102,7 +102,10 @@ fun ShowroomStage(
             drawFloor(floorKey, horizon, glow)
             drawSpotlights(light, horizon, glow)
             drawPedestal(pedestalKey, horizon, spin, accent, glow)
-            showroom.car?.let { drawCar(it.bodyType, carPaint(it.rarity), horizon, light) }
+            showroom.car?.let {
+                val ground = horizon + (size.height - horizon) * 0.5f - (size.height - horizon) * 0.02f
+                drawCartoonCar(carStyleFor(it.id, it.bodyType, it.rarity), size.width / 2, ground, size.width * 0.4f, light)
+            }
         }
 
         // 네온 간판
@@ -412,83 +415,6 @@ private fun DrawScope.drawPedestal(key: String, horizon: Float, spin: Float, acc
             }
         }
     }
-}
-
-/** 측면 차량 일러스트 (세단/쿠페는 낮게, SUV/CUV 는 높게). 전시대 윗면에 바퀴가 닿도록 배치 */
-private fun DrawScope.drawCar(bodyType: String, paint: Color, horizon: Float, light: Color) {
-    val w = size.width; val h = size.height
-    val tall = bodyType.contains("SUV") || bodyType.contains("CUV") || bodyType.contains("트럭")
-    val coupe = bodyType.contains("쿠페")
-    val cw = w * 0.36f
-    val bh = cw * (if (tall) 0.27f else 0.22f) // 차체 높이
-    val cabin = cw * (if (tall) 0.2f else if (coupe) 0.13f else 0.16f)
-    val ground = horizon + (h - horizon) * 0.5f - (h - horizon) * 0.04f
-    val x0 = w / 2 - cw / 2
-    val wheelR = cw * 0.085f
-    val bodyBottom = ground - wheelR * 0.9f
-    val bodyTop = bodyBottom - bh
-
-    // 그림자
-    drawOval(Color.Black.copy(alpha = 0.45f), Offset(x0 - cw * 0.04f, ground - wheelR * 0.35f), Size(cw * 1.08f, wheelR * 0.9f))
-
-    // 차체 (앞=왼쪽)
-    val body = Path().apply {
-        moveTo(x0 + cw * 0.02f, bodyBottom)
-        lineTo(x0, bodyTop + bh * 0.45f)
-        quadraticTo(x0 + cw * 0.01f, bodyTop + bh * 0.12f, x0 + cw * 0.1f, bodyTop + bh * 0.05f)
-        lineTo(x0 + cw * (if (coupe) 0.3f else 0.25f), bodyTop)
-        lineTo(x0 + cw * 0.92f, bodyTop + bh * 0.02f)
-        quadraticTo(x0 + cw, bodyTop + bh * 0.1f, x0 + cw, bodyTop + bh * 0.5f)
-        lineTo(x0 + cw * 0.99f, bodyBottom)
-        close()
-    }
-    drawPath(body, Brush.verticalGradient(listOf(paint.lighten(0.25f), paint, paint.darken(0.35f)), startY = bodyTop - cabin, endY = bodyBottom))
-    // 캐빈 + 유리
-    val cabinPath = Path().apply {
-        moveTo(x0 + cw * (if (coupe) 0.3f else 0.26f), bodyTop + 1f)
-        lineTo(x0 + cw * (if (coupe) 0.42f else 0.36f), bodyTop - cabin)
-        lineTo(x0 + cw * (if (tall) 0.84f else 0.72f), bodyTop - cabin)
-        lineTo(x0 + cw * (if (tall) 0.9f else 0.84f), bodyTop + 1f)
-        close()
-    }
-    drawPath(cabinPath, paint.darken(0.15f))
-    val glass = Path().apply {
-        moveTo(x0 + cw * (if (coupe) 0.33f else 0.29f), bodyTop - 2f)
-        lineTo(x0 + cw * (if (coupe) 0.44f else 0.38f), bodyTop - cabin + cabin * 0.15f)
-        lineTo(x0 + cw * (if (tall) 0.82f else 0.71f), bodyTop - cabin + cabin * 0.15f)
-        lineTo(x0 + cw * (if (tall) 0.87f else 0.81f), bodyTop - 2f)
-        close()
-    }
-    drawPath(glass, Brush.linearGradient(listOf(Color(0xFF9FD8FF), Color(0xFF2B3A55)), start = Offset(x0, bodyTop - cabin), end = Offset(x0 + cw, bodyTop)))
-    val pillarX = x0 + cw * (if (tall) 0.6f else 0.55f)
-    drawLine(paint.darken(0.2f), Offset(pillarX, bodyTop - cabin), Offset(pillarX, bodyTop), cw * 0.012f)
-    // 반사 하이라이트 + 액센트 라인 + 문 손잡이
-    drawLine(Color.White.copy(alpha = 0.35f), Offset(x0 + cw * 0.12f, bodyTop + bh * 0.22f), Offset(x0 + cw * 0.9f, bodyTop + bh * 0.24f), cw * 0.008f)
-    drawLine(light.copy(alpha = 0.7f), Offset(x0 + cw * 0.05f, bodyTop + bh * 0.62f), Offset(x0 + cw * 0.96f, bodyTop + bh * 0.62f), cw * 0.006f)
-    drawLine(Color.Black.copy(alpha = 0.25f), Offset(pillarX, bodyTop + 2f), Offset(pillarX - cw * 0.02f, bodyBottom - 4f), 2f)
-    // 라이트
-    drawOval(Color(0xFFFFF59D), Offset(x0 + cw * 0.005f, bodyTop + bh * 0.22f), Size(cw * 0.05f, bh * 0.16f))
-    drawOval(Brush.radialGradient(listOf(Color(0xFFFFF59D).copy(alpha = 0.5f), Color.Transparent), center = Offset(x0, bodyTop + bh * 0.3f), radius = cw * 0.12f),
-        Offset(x0 - cw * 0.12f, bodyTop + bh * 0.3f - cw * 0.06f), Size(cw * 0.24f, cw * 0.12f))
-    drawRect(Color(0xFFFF1744), Offset(x0 + cw * 0.975f, bodyTop + bh * 0.2f), Size(cw * 0.022f, bh * 0.2f))
-    // 바퀴
-    listOf(0.2f, 0.8f).forEach { fx ->
-        val c = Offset(x0 + cw * fx, ground - wheelR)
-        drawCircle(Color.Black.copy(alpha = 0.55f), wheelR * 1.12f, c) // 휠하우스
-        drawCircle(Color(0xFF151515), wheelR, c)
-        drawCircle(Brush.radialGradient(listOf(Color(0xFFE0E0E0), Color(0xFF757575)), center = c, radius = wheelR * 0.62f), wheelR * 0.62f, c)
-        for (k in 0 until 5) {
-            val a = Math.toRadians(k * 72.0)
-            drawLine(Color(0xFF424242), c, Offset(c.x + wheelR * 0.55f * kotlin.math.cos(a).toFloat(), c.y + wheelR * 0.55f * kotlin.math.sin(a).toFloat()), wheelR * 0.12f)
-        }
-        drawCircle(Color(0xFF212121), wheelR * 0.14f, c)
-    }
-}
-
-private fun carPaint(rarity: String) = when (rarity) {
-    "legendary" -> Color(0xFFE6B422)
-    "rare" -> Color(0xFF7C4DFF)
-    else -> Color(0xFF2F80ED)
 }
 
 // ---------------- 유틸 ----------------

@@ -40,6 +40,11 @@ class ShowroomScreenshotTest {
         listOf(KeywordFact("가격", "5,000만 원대")), rarity = "rare",
     )
 
+    private val ioniq5n = VehicleCard(
+        "hyundai-ioniq-5-n", "현대", "아이오닉 5 N", "CUV", null, "현대 N 의 고성능 전기차",
+        listOf(KeywordFact("마력", "최대 약 650마력")), rarity = "legendary",
+    )
+
     private fun item(id: String, slot: String, key: String, name: String, unlocked: Boolean = true, hint: String = "") =
         DecorItem(id, slot, key, name, unlocked, hint)
 
@@ -95,7 +100,7 @@ class ShowroomScreenshotTest {
     @Test fun gangwonNeon() = shot(
         "showroom_gangwon_neon",
         Showroom(
-            car = car, background = gangwon, floor = catalog.items[4], light = item("light-aurora", "light", "#B388FF", "오로라"),
+            car = ioniq5n, background = gangwon, floor = catalog.items[4], light = item("light-aurora", "light", "#B388FF", "오로라"),
             pedestal = item("pedestal-neon", "pedestal", "neon", "네온 링"), signText = "ROAD TRIPPER",
             props = props(Triple("🚩", 0.12f, 0.86f), Triple("🏁", 0.88f, 0.86f)),
         ),

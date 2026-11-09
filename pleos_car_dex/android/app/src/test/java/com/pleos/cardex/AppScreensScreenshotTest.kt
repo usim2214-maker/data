@@ -45,8 +45,14 @@ import java.io.File
 class AppScreensScreenshotTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
 
+    /** 화면에 나오는 차량의 공식 이미지(앞 3/4)를 미리 캐시에 넣어 둔다 */
+    private val shownCars = listOf("hyundai-ioniq-5", "hyundai-ioniq-5-n", "hyundai-grandeur", "kia-carnival", "kia-ev9", "genesis-g80", "hyundai-avante")
+
     private fun shot(name: String, content: @Composable () -> Unit) {
+        val urls = shownCars.flatMap { OfficialTestImages.urlsFor(rule.activity, it) }
+        OfficialTestImages.prime(rule.activity, urls)
         rule.setContent { CarDexTheme { Surface { content() } } }
+        runCatching { rule.waitUntil(8_000) { false } }
         rule.waitForIdle()
         val view = rule.activity.window.decorView.rootView
         val bmp = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)

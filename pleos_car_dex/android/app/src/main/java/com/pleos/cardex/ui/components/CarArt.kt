@@ -3,10 +3,6 @@ package com.pleos.cardex.ui.components
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -108,24 +104,16 @@ fun carStyleFor(id: String, bodyType: String, rarity: String): CarStyle = when (
 }
 
 /**
- * 단독 일러스트 (카드·도감·목록). 실제 제원 기반 3D 모델을 앞 3/4 각도로 그린다.
- * interactive=true 면 좌우로 드래그해 360° 돌려 볼 수 있다. silhouette=true 면 아직 못 모은 차량용 그림자.
+ * 차량 보기 (카드·도감·목록): 제조사 공식 이미지로 실제 차를 보여준다 ([OfficialCarView]).
+ * interactive=true 면 드래그로 360° 회전. silhouette=true 면 아직 못 모은 차량용 그림자.
+ * 공식 이미지가 없거나 오프라인이면 실제 제원 기반 3D 모델로 대신 그린다.
  */
 @Composable
 fun CarIllustration(
     id: String, bodyType: String, rarity: String, modifier: Modifier = Modifier, silhouette: Boolean = false,
-    yawDeg: Float = 35f, interactive: Boolean = false,
+    interactive: Boolean = false,
 ) {
-    val style = carStyleFor(id, bodyType, rarity)
-    var yaw by androidx.compose.runtime.remember(id) { androidx.compose.runtime.mutableFloatStateOf(yawDeg) }
-    val drag = if (interactive) Modifier.pointerInput(id) {
-        detectHorizontalDragGestures { change, dx -> change.consume(); yaw += dx * 0.45f }
-    } else Modifier
-    Canvas(modifier.then(drag)) {
-        val h = REAL_DIMS[id]?.let { it.h.toFloat() / it.l } ?: 0.33f
-        val w = minOf(size.width * 0.74f, size.height * 0.62f / (h + 0.18f))
-        drawCar3D(id, style, size.width / 2, size.height * 0.84f, w, yawDeg = yaw, silhouette = silhouette)
-    }
+    OfficialCarView(id, carStyleFor(id, bodyType, rarity), modifier, interactive = interactive, silhouette = silhouette)
 }
 
 /** 차량 그리기 진입점: 실차 비율 입체 일러스트 ([drawRealCar]). 예전 카툰 버전은 [drawToyCar] */

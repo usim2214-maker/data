@@ -66,10 +66,10 @@ fun FlipCard(card: VehicleCard, modifier: Modifier = Modifier, startFlipped: Boo
 @Composable
 private fun CardFront(card: VehicleCard, accent: Color) {
     Column(Modifier.fillMaxSize()) {
-        // 앞면은 항상 일러스트 (희귀도 색 그라데이션 배경)
+        // 앞면: 실제 차 (제조사 공식 이미지, 드래그로 360° 회전)
         CarIllustration(
-            card.id, card.bodyType, card.rarity,
-            Modifier.fillMaxWidth().weight(1f)
+            card.id, card.bodyType, card.rarity, interactive = true,
+            modifier = Modifier.fillMaxWidth().weight(1f)
                 .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(accent.copy(alpha = 0.35f), Color(0xFF161B22)))),
         )
         Column(Modifier.padding(20.dp)) {

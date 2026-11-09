@@ -1,0 +1,232 @@
+{
+ "_comment": "제조사 공식 사이트 이미지 URL 목록 (이미지 자체는 저장소·APK에 포함하지 않고 앱이 실행 중 내려받아 캐시). 저작권은 각 제조사에 있음 — 비상업 프로토타입 용도, 상업화 전 사용 허락 필요. spin: 360° 프레임 {n} 자리수 digits, start=앞 3/4 프레임(0부터). gallery: 각도별 사진.",
+ "vehicles": {
+  "hyundai-ioniq-5": {
+   "type": "spin",
+   "url": "https://www.hyundai.com/contents/vr360/NE09/exterior/J/C5G/{n}.png",
+   "frames": 60,
+   "digits": 3,
+   "start": 0,
+   "source": "https://www.hyundai.com/kr/ko/e/vehicles/ioniq5/intro"
+  },
+  "kia-ev9": {
+   "type": "spin",
+   "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/ev9/trim/exterior/2wd/std_light/swp/swp_{n}.png",
+   "frames": 72,
+   "digits": 2,
+   "start": 63,
+   "source": "https://www.kia.com/kr/vehicles/ev9"
+  },
+  "genesis-g80": {
+   "type": "gallery",
+   "urls": [
+    "https://dams.hyundai-autoever.com/v1/openapi/hmg-presigned-url/50534b313031303030303030303030303133343536/models/g80/2027/exterior-color/standard/genesis-g80-standard-uyuni-white-uyh-large.png",
+    "https://dams.hyundai-autoever.com/v1/openapi/hmg-presigned-url/50534b313031303030303030303030303039313334/genesis-g80-2027-black-exterior-detail-front-large.png",
+    "https://dams.hyundai-autoever.com/v1/openapi/hmg-presigned-url/50534b313031303030303030303030303039313336/genesis-g80-2027-black-exterior-detail-rear-large.png"
+   ],
+   "source": "https://www.genesis.com/kr/ko/models/g80"
+  },
+  "hyundai-grandeur": {
+   "type": "spin",
+   "url": "https://www.hyundai.com/contents/vr360/GN11/exterior/WBP/{n}.png",
+   "frames": 60,
+   "digits": 3,
+   "start": 0,
+   "source": "https://www.hyundai.com/kr/ko/e/vehicles/the-new-grandeur/intro"
+  },
+  "kia-sorento": {
+   "type": "spin",
+   "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/sorento/trim/exterior/gdi/prestige/swp/swp_{n}.png",
+   "frames": 72,
+   "digits": 2,
+   "start": 63,
+   "source": "https://www.kia.com/kr/vehicles/sorento"
+  },
+  "hyundai-ioniq-5-n": {
+   "type": "spin",
+   "url": "https://www.hyundai.com/contents/vr360/NE08/exterior/SFB/{n}.png",
+   "frames": 60,
+   "digits": 3,
+   "start": 0,
+   "source": "https://www.hyundai.com/kr/ko/e/vehicles/ioniq5-n/intro"
+  },
+  "hyundai-avante": {
+   "type": "spin",
+   "url": "https://www.hyundai.com/contents/vr360/FN01/exterior/SAW/{n}.png",
+   "frames": 60,
+   "digits": 3,
+   "start": 0,
+   "source": "https://www.hyundai.com/kr/ko/e/vehicles/the-all-new-avante/intro"
+  },
+  "hyundai-sonata": {
+   "type": "spin",
+   "url": "https://www.hyundai.com/contents/vr360/DN26/exterior/T4M/{n}.png",
+   "frames": 60,
+   "digits": 3,
+   "start": 0,
+   "source": "https://www.hyundai.com/kr/ko/e/vehicles/sonata-the-edge/intro"
+  },
+  "hyundai-tucson": {
+   "type": "spin",
+   "url": "https://www.hyundai.com/contents/vr360/GX01/exterior/W6H/{n}.png",
+   "frames": 60,
+   "digits": 3,
+   "start": 0,
+   "source": "https://www.hyundai.com/kr/ko/e/vehicles/the-all-new-tucson/intro"
+  },
+  "hyundai-palisade": {
+   "type": "spin",
+   "url": "https://www.hyundai.com/contents/vr360/FX03/exterior/C/R8N/{n}.png",
+   "frames": 60,
+   "digits": 3,
+   "start": 0,
+   "source": "https://www.hyundai.com/kr/ko/e/vehicles/palisade/intro"
+  },
+  "hyundai-casper": {
+   "type": "gallery",
+   "urls": [
+    "https://casper.hyundai.com/wstatic/images/pc/main/img-lineup-pe-27my.png",
+    "https://www.hyundai.com/contents/repn-car/side-w/casper-26my-well-side.png"
+   ],
+   "source": "https://casper.hyundai.com/"
+  },
+  "hyundai-ioniq-6": {
+   "type": "spin",
+   "url": "https://www.hyundai.com/contents/vr360/CE03/exterior/W6H/{n}.png",
+   "frames": 60,
+   "digits": 3,
+   "start": 0,
+   "source": "https://www.hyundai.com/kr/ko/e/vehicles/the-new-ioniq6/intro"
+  },
+  "hyundai-staria": {
+   "type": "spin",
+   "url": "https://www.hyundai.com/contents/vr360/US30/exterior/TM/YAC/{n}.png",
+   "frames": 60,
+   "digits": 3,
+   "start": 0,
+   "source": "https://www.hyundai.com/kr/ko/e/vehicles/the-new-staria/intro"
+  },
+  "hyundai-avante-n": {
+   "type": "spin",
+   "url": "https://www.hyundai.com/contents/vr360/CN26/exterior/XFB/{n}.png",
+   "frames": 60,
+   "digits": 3,
+   "start": 0,
+   "source": "https://www.hyundai.com/kr/ko/e/vehicles/avante-n/intro"
+  },
+  "kia-morning": {
+   "type": "spin",
+   "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/morning/trim/exterior/trendy/ud/ud_{n}.png",
+   "frames": 72,
+   "digits": 2,
+   "start": 63,
+   "source": "https://www.kia.com/kr/vehicles/morning"
+  },
+  "kia-ray": {
+   "type": "spin",
+   "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/ray/trim/exterior/trendy/ud/ud_{n}.png",
+   "frames": 72,
+   "digits": 2,
+   "start": 63,
+   "source": "https://www.kia.com/kr/vehicles/ray"
+  },
+  "kia-k5": {
+   "type": "spin",
+   "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/k5/trim/exterior/hev/prestige/swp/swp_{n}.png",
+   "frames": 72,
+   "digits": 2,
+   "start": 63,
+   "source": "https://www.kia.com/kr/vehicles/k5"
+  },
+  "kia-k8": {
+   "type": "spin",
+   "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/k8/trim/exterior/gsl_2-5/noblesse_light/swp/swp_{n}.png",
+   "frames": 72,
+   "digits": 2,
+   "start": 63,
+   "source": "https://www.kia.com/kr/vehicles/k8"
+  },
+  "kia-sportage": {
+   "type": "spin",
+   "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/sportage/trim/exterior/1-6_ice/prestige/swp/swp_{n}.png",
+   "frames": 72,
+   "digits": 2,
+   "start": 63,
+   "source": "https://www.kia.com/kr/vehicles/sportage"
+  },
+  "kia-seltos": {
+   "type": "spin",
+   "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/seltos/trim/exterior/tgdi/trendy/swp/swp_{n}.png",
+   "frames": 72,
+   "digits": 2,
+   "start": 63,
+   "source": "https://www.kia.com/kr/vehicles/seltos"
+  },
+  "kia-carnival": {
+   "type": "gallery",
+   "urls": [
+    "https://www.kia.com/content/dam/kwp/kr/ko/vehicles/represent/krkp328/carnival_kphg99i39_a_swp.png"
+   ],
+   "source": "https://www.kia.com/kr/vehicles/carnival"
+  },
+  "kia-ev3": {
+   "type": "spin",
+   "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/ev3/trim/exterior/air/std/swp/swp_{n}.png",
+   "frames": 72,
+   "digits": 2,
+   "start": 63,
+   "source": "https://www.kia.com/kr/vehicles/ev3"
+  },
+  "kia-ev6": {
+   "type": "spin",
+   "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/ev6/trim/exterior/std/std_light/swp/swp_{n}.png",
+   "frames": 72,
+   "digits": 2,
+   "start": 63,
+   "source": "https://www.kia.com/kr/vehicles/ev6"
+  },
+  "genesis-g90": {
+   "type": "gallery",
+   "urls": [
+    "https://dams.hyundai-autoever.com/v1/openapi/hmg-presigned-url/50534b313031303030303030303030303133353635/models/g90/2027/exterior-color/standard/genesis-g90-uyuni-white-uyh-large.png",
+    "https://dams.hyundai-autoever.com/v1/openapi/hmg-presigned-url/50534b313031303030303030303030303131333337/genesis-g90-2027-black-exterior-detail-front-large.png",
+    "https://dams.hyundai-autoever.com/v1/openapi/hmg-presigned-url/50534b313031303030303030303030303131333431/genesis-g90-2027-black-exterior-detail-rear-large.png"
+   ],
+   "source": "https://www.genesis.com/kr/ko/models/g90"
+  },
+  "genesis-gv70": {
+   "type": "gallery",
+   "urls": [
+    "https://dams.hyundai-autoever.com/v1/openapi/hmg-presigned-url/50534b313031303030303030303030303133363934/models/gv70/2027/exterior-color/standard/genesis-gv70-standard-uyuni-white-uyh-large.png",
+    "https://dams.hyundai-autoever.com/v1/openapi/hmg-presigned-url/50534b313031303030303030303030303134373130/models/gv70/2027/exterior/genesis-gv70-exterior-detail-rear-large.png"
+   ],
+   "source": "https://www.genesis.com/kr/ko/models/gv70"
+  },
+  "genesis-gv80": {
+   "type": "gallery",
+   "urls": [
+    "https://dams.hyundai-autoever.com/v1/openapi/hmg-presigned-url/50534b313031303030303030303030303137383837/models/gv80/27MY+HEV/exterior-color/genesis-gv80-27my-uyuni-white-uyh-large.png",
+    "https://dams.hyundai-autoever.com/v1/openapi/hmg-presigned-url/50534b313031303030303030303030303137363336/models/gv80/27MY+HEV/exterior/genesis-gv80-27my-exterior-detail-front-large.png",
+    "https://dams.hyundai-autoever.com/v1/openapi/hmg-presigned-url/50534b313031303030303030303030303137363430/models/gv80/27MY+HEV/exterior/genesis-gv80-27my-exterior-detail-rear-large.png"
+   ],
+   "source": "https://www.genesis.com/kr/ko/models/gv80"
+  },
+  "genesis-gv60": {
+   "type": "gallery",
+   "urls": [
+    "https://dams.hyundai-autoever.com/v1/openapi/hmg-presigned-url/50534b313031303030303030303030303133363538/models/gv60/2027/exterior-color/genesis-gv60-uyuni-white-uyh-large.png",
+    "https://dams.hyundai-autoever.com/v1/openapi/hmg-presigned-url/50534b313031303030303030303030303132323235/genesis-gv60-2027-exterior-detail-front-large.png",
+    "https://dams.hyundai-autoever.com/v1/openapi/hmg-presigned-url/50534b313031303030303030303030303132323331/genesis-gv60-2027-exterior-detail-rear-large.png"
+   ],
+   "source": "https://www.genesis.com/kr/ko/models/gv60"
+  },
+  "hyundai-kona": {
+   "type": "spin",
+   "url": "https://www.hyundai.com/contents/vr360/SX19/exterior/RRR/{n}.png",
+   "frames": 60,
+   "digits": 3,
+   "start": 0,
+   "source": "https://www.hyundai.com/kr/ko/e/vehicles/kona/intro"
+  }
+ }
+}

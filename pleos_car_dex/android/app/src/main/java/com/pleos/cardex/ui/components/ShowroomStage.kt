@@ -107,10 +107,21 @@ fun ShowroomStage(
             drawFloor(floorKey, horizon, glow, floorTex)
             drawSpotlights(light, horizon, glow)
             drawPedestal(pedestalKey, horizon, spin, accent, glow)
-            showroom.car?.let {
-                val ground = horizon + (size.height - horizon) * 0.5f - (size.height - horizon) * 0.02f
-                val style = carStyleFor(it.id, it.bodyType, it.rarity)
-                drawCartoonCar(style, size.width / 2, ground, size.width * 0.5f, light)
+        }
+
+        // 대표 차량: 제조사 공식 이미지 (턴테이블과 함께 회전)
+        showroom.car?.let { car ->
+            val horizonPx = hPx * 0.56f
+            val groundPx = horizonPx + (hPx - horizonPx) * 0.48f
+            val boxW = wPx * 0.66f; val boxH = boxW * 0.52f
+            Box(
+                Modifier.offset { IntOffset(((wPx - boxW) / 2).roundToInt(), (groundPx - boxH * 0.86f).roundToInt()) }
+                    .size(with(density) { boxW.toDp() }, with(density) { boxH.toDp() }),
+            ) {
+                OfficialCarView(
+                    car.id, carStyleFor(car.id, car.bodyType, car.rarity), Modifier.fillMaxSize(),
+                    turn = if (animate) spin / 360f else null, showHint = false,
+                )
             }
         }
 

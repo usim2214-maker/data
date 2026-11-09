@@ -44,6 +44,9 @@ class CarArtScreenshotTest {
     }
 
     @Test fun gallery() {
+        val ctx = rule.activity
+        val urls = cars.flatMap { OfficialTestImages.urlsFor(ctx, it.first.first) }
+        OfficialTestImages.prime(ctx, urls)
         rule.setContent {
             Column(Modifier.fillMaxSize().background(Color(0xFF0D1117)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 cars.chunked(7).forEach { row ->
@@ -61,6 +64,7 @@ class CarArtScreenshotTest {
                 }
             }
         }
+        runCatching { rule.waitUntil(30_000) { urls.all { com.pleos.cardex.ui.components.OfficialCarImages.cached(it) != null } } }
         rule.waitForIdle()
         val view = rule.activity.window.decorView.rootView
         val bmp = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
@@ -68,16 +72,21 @@ class CarArtScreenshotTest {
         File(File("build/screenshots").apply { mkdirs() }, "car_gallery.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
-    /** 큰 크기 디테일 확인용 */
+    /** 실제 차 여러 각도 (아이오닉 5 N 360° 프레임 / 제네시스 G80 갤러리) */
     @Test fun detail() {
-        val picks = listOf(Triple("hyundai-ioniq-5", "CUV", "rare"), Triple("kia-ev9", "SUV", "rare"), Triple("genesis-g80", "세단", "rare"), Triple("hyundai-ioniq-5-n", "CUV", "legendary"))
+        val ctx = rule.activity
+        val style = com.pleos.cardex.ui.components.carStyleFor("hyundai-ioniq-5-n", "CUV", "legendary")
+        val urls = OfficialTestImages.urlsFor(ctx, "hyundai-ioniq-5-n", allFrames = true)
+        OfficialTestImages.prime(ctx, urls)
+        val turns = listOf(0f, 0.12f, 0.3f, 0.5f, 0.65f, 0.85f)
         rule.setContent {
             Column(Modifier.fillMaxSize().background(Color(0xFF1C2330)).padding(10.dp)) {
-                picks.chunked(2).forEach { row ->
-                    Row { row.forEach { (id, b, r) -> CarIllustration(id, b, r, Modifier.size(690.dp, 420.dp)) } }
+                turns.chunked(3).forEach { row ->
+                    Row { row.forEach { t -> com.pleos.cardex.ui.components.OfficialCarView("hyundai-ioniq-5-n", style, Modifier.size(460.dp, 280.dp), turn = t) } }
                 }
             }
         }
+        runCatching { rule.waitUntil(60_000) { urls.all { com.pleos.cardex.ui.components.OfficialCarImages.cached(it) != null } } }
         rule.waitForIdle()
         val view = rule.activity.window.decorView.rootView
         val bmp = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)

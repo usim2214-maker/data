@@ -359,6 +359,7 @@ class DemoFlowTest {
         // 5) 도감
         caption = "☰ 메뉴 → 도감"
         openMenu("모은 차 카드"); go(Scr.Collection); hold(1.4)
+        drag(Offset(900f, 620f), 0f, -330f, 1.2); hold(0.6) // 카드가 다 보이게 살짝 스크롤
         caption = "모은 차는 실제 차로, 드래그하면 360° 회전"
         val dragHint = centerOf("드래그해서 360°", dy = -70f)
         drag(dragHint, -260f, 0f, 2.4); hold(0.6)

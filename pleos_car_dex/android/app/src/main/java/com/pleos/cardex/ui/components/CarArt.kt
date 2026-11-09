@@ -3,6 +3,10 @@ package com.pleos.cardex.ui.components
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -103,24 +107,24 @@ fun carStyleFor(id: String, bodyType: String, rarity: String): CarStyle = when (
     }
 }
 
-/** 단독 일러스트 (목록 썸네일 등). silhouette=true 면 아직 못 모은 차량용 그림자 실루엣 */
+/**
+ * 단독 일러스트 (카드·도감·목록). 실제 제원 기반 3D 모델을 앞 3/4 각도로 그린다.
+ * interactive=true 면 좌우로 드래그해 360° 돌려 볼 수 있다. silhouette=true 면 아직 못 모은 차량용 그림자.
+ */
 @Composable
-fun CarIllustration(id: String, bodyType: String, rarity: String, modifier: Modifier = Modifier, silhouette: Boolean = false) {
+fun CarIllustration(
+    id: String, bodyType: String, rarity: String, modifier: Modifier = Modifier, silhouette: Boolean = false,
+    yawDeg: Float = 35f, interactive: Boolean = false,
+) {
     val style = carStyleFor(id, bodyType, rarity)
-    Canvas(modifier) {
-        // 키 큰 SUV 도 잘리지 않게 높이에 맞춰 축소
-        val w = minOf(size.width * 0.88f / style.length, size.height * 0.8f / style.realHeightRatio())
-        if (!silhouette) {
-            drawCartoonCar(style, centerX = size.width / 2, groundY = size.height * 0.9f, width = w)
-        } else {
-            // 별도 레이어에 차를 그린 뒤, 그려진 픽셀만 단색으로 덮어 실루엣을 만든다 (배경은 그대로)
-            drawIntoCanvas { canvas ->
-                canvas.saveLayer(Rect(Offset.Zero, size), Paint())
-                drawCartoonCar(style, centerX = size.width / 2, groundY = size.height * 0.9f, width = w)
-                drawRect(Color(0xFF2E3644), blendMode = BlendMode.SrcIn)
-                canvas.restore()
-            }
-        }
+    var yaw by androidx.compose.runtime.remember(id) { androidx.compose.runtime.mutableFloatStateOf(yawDeg) }
+    val drag = if (interactive) Modifier.pointerInput(id) {
+        detectHorizontalDragGestures { change, dx -> change.consume(); yaw += dx * 0.45f }
+    } else Modifier
+    Canvas(modifier.then(drag)) {
+        val h = REAL_DIMS[id]?.let { it.h.toFloat() / it.l } ?: 0.33f
+        val w = minOf(size.width * 0.74f, size.height * 0.62f / (h + 0.18f))
+        drawCar3D(id, style, size.width / 2, size.height * 0.84f, w, yawDeg = yaw, silhouette = silhouette)
     }
 }
 

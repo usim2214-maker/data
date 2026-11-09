@@ -20,11 +20,11 @@ import kotlin.math.sin
  * - 휠: 타이어 측면 음영, 브레이크 디스크·캘리퍼가 비치는 멀티 스포크 알로이
  * 로고·엠블럼·번호판은 그리지 않는다 (상표·개인정보). 차종 특징은 [CarStyle] 의 램프·지붕·비율로 표현.
  */
-private data class P(val x: Float, val y: Float) // x: 길이 비율(앞=0), y: 전고 비율(지면=0)
+internal data class P(val x: Float, val y: Float) // x: 길이 비율(앞=0), y: 전고 비율(지면=0)
 
-private class Profile(val body: List<P>, val glass: List<P>, val height: Float, val axles: Pair<Float, Float>)
+internal class Profile(val body: List<P>, val glass: List<P>, val height: Float, val axles: Pair<Float, Float>)
 
-private fun profileOf(s: CarStyle): Profile {
+internal fun profileOf(s: CarStyle): Profile {
     val mpv = s.roof == Roof.SUV && s.cabinH >= 0.26f
     val small = s.length < 0.86f
     var body: List<P>

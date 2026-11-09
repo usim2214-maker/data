@@ -215,7 +215,7 @@ class DemoFlowTest {
     private fun startEncoder(w: Int, h: Int) {
         val dst = File("build/demo_flow").apply { mkdirs() }
         ff = ProcessBuilder(
-            "ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgba", "-s", "${w}x$h", "-r", "$fps", "-i", "-",
+            "ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "bgra", "-s", "${w}x$h", "-r", "$fps", "-i", "-",
             "-vf", "format=yuv420p", "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-movflags", "+faststart", File(dst, "cardex_demo.mp4").absolutePath,
         ).redirectErrorStream(true).start()
         out = ff!!.outputStream.buffered(1 shl 22)
@@ -278,7 +278,7 @@ class DemoFlowTest {
     private fun go(s: Scr) { drawerOpen = false; scr = s }
 
     private fun openMenu(item: String) {
-        if (scr == Scr.Home) tapText("메뉴") else tap(Offset(32f, 30f))
+        tap(if (scr == Scr.Home) Offset(46f, 46f) else Offset(32f, 28f)) // ☰ 아이콘 위치
         hold(0.6)
         tapText(item)
     }

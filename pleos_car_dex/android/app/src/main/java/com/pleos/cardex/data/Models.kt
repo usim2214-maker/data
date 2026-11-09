@@ -33,12 +33,14 @@ data class VehicleCard(
     @SerialName("one_liner") val oneLiner: String,
     val facts: List<KeywordFact>,
     val rarity: String = "common",
+    val grounded: Boolean = true, // false = 카탈로그 밖 차량 -> 'AI 추정' 표시
 )
 
 @Serializable
 data class RecognitionResponse(
     val detected: Boolean,
-    val detection: Detection? = null,
+    val detection: Detection? = null, // 카드로 만든 차량
+    val detections: List<Detection> = emptyList(), // 화면 속 모든 차량
     val identity: VehicleIdentity? = null,
     val card: VehicleCard? = null,
     @SerialName("is_new_entry") val isNewEntry: Boolean = false,

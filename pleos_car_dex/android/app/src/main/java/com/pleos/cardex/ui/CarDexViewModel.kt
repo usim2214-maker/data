@@ -55,6 +55,8 @@ data class UiState(
     val scanning: Boolean = false,
     val busy: Boolean = false,
     val lastResult: RecognitionResponse? = null,
+    /** 마지막으로 분석한 프레임 (수집 탭 미리보기 + 감지 박스) */
+    val lastFrameJpeg: ByteArray? = null,
     val collection: List<CollectionEntry> = emptyList(),
     val catalog: List<CatalogVehicle> = emptyList(),
     val synergy: SynergyScore? = null,
@@ -279,12 +281,24 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
         val frame = withContext(Dispatchers.IO) { frames.next() } ?: run {
             _state.update { it.copy(error = "시연 영상(assets/demo_video/demo_drive.mp4) 또는 이미지를 넣어주세요.") }; return
         }
-        _state.update { it.copy(busy = true, error = null) }
+        _state.update { it.copy(busy = true, error = null, lastFrameJpeg = frame.jpeg) }
         call { repo.recognize(frame.jpeg, frame.name, _state.value.driving?.location) }
             .onSuccess { r ->
-                // 차량이 없는 프레임은 직전 카드를 유지
-                _state.update { it.copy(lastResult = if (r.card != null || it.lastResult == null) r else it.lastResult) }
-                if (r.card != null) refreshCollection()
+                val card = r.card
+                _state.update {
+                    it.copy(
+                        // 차량이 없는 프레임은 직전 카드를 유지 (박스는 이번 프레임 기준)
+                        lastResult = if (card != null || it.lastResult == null) r else it.lastResult?.copy(detections = r.detections),
+                        // 새 카드: 희귀·전설은 축하 연출, 일반은 알림 (주행 중엔 음성만)
+                        celebration = if (card != null && r.isNewEntry) when (card.rarity) {
+                            "legendary" -> Celebration("🌟", "LEGENDARY 카드 획득!", "${card.brand} ${card.model}")
+                            "rare" -> Celebration("💎", "희귀 카드 획득!", "${card.brand} ${card.model}")
+                            else -> it.celebration
+                        } else it.celebration,
+                        notice = if (card != null && r.isNewEntry) "🃏 새 카드: ${card.brand} ${card.model}" else it.notice,
+                    )
+                }
+                if (card != null) refreshCollection()
             }
             .onFailure { e -> _state.update { it.copy(error = "서버 연결 실패: ${e.message}") } }
         _state.update { it.copy(busy = false) }

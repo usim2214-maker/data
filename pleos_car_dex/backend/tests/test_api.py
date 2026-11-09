@@ -25,7 +25,8 @@ def test_recognize_registers_and_uses_keywords(client):
     assert body["card"]["id"] == "hyundai-ioniq-5"
     assert [f["keyword"] for f in body["card"]["facts"]] == ["가격", "마력"]
     assert body["is_new_entry"] is True
-    assert client.get(body["card"]["image_url"]).status_code == 200
+    assert body["card"]["image_url"] is None  # 개인정보: 크롭 이미지 미저장 (기본)
+    assert len(body["detections"]) == 1 and body["card"]["grounded"] is True
 
     # 재발견 -> 신규 아님, seen_count 증가
     again = client.post("/api/v1/recognize", files={"image": ("ioniq-5.jpg", _jpeg(), "image/jpeg")}).json()
@@ -295,3 +296,31 @@ def test_catalog_and_dex_home(client):
     h = client.get("/api/v1/home").json()
     assert h["dex_owned"] == 3 and h["legendary_owned"] == 1  # 아반떼 N 이 아반떼로 잘못 잡히지 않음
     assert "현대" in h["next_goal"] or "마스터" in h["next_goal"] or "계단" in h["next_goal"]
+
+
+def test_identity_cache_and_ungrounded_card(client, monkeypatch):
+    from app.schemas import VehicleIdentity
+    from app.services.pipeline import get_pipeline
+
+    pipe = get_pipeline()
+    monkeypatch.setattr(pipe, "_cache_enabled", lambda: True)  # 실제 Claude 판별일 때와 같은 조건
+    calls = []
+    orig = pipe.identifier.identify
+    monkeypatch.setattr(pipe.identifier, "identify", lambda crop, hint="": calls.append(hint) or orig(crop, hint))
+    for _ in range(3):  # 같은 차를 연속으로 봄 -> 판별은 1번만
+        client.post("/api/v1/recognize", files={"image": ("kia-ev9.jpg", _jpeg(), "image/jpeg")})
+    assert len(calls) == 1
+    # 다른 모습의 차가 같은 위치에 나타나면 다시 판별 (앞차가 바뀐 경우)
+    import io as _io
+    from PIL import Image as _Image, ImageDraw as _Draw
+    img = _Image.new("RGB", (640, 360), (20, 20, 20)); _Draw.Draw(img).rectangle([0, 0, 320, 360], fill=(250, 250, 250))
+    buf = _io.BytesIO(); img.save(buf, format="JPEG")
+    client.post("/api/v1/recognize", files={"image": ("kia-ev9.jpg", buf.getvalue(), "image/jpeg")})
+    assert len(calls) == 2
+
+    # 카탈로그에 없는 차 -> 'AI 추정' (grounded=False)
+    pipe._recent.clear()
+    monkeypatch.setattr(pipe.identifier, "identify", lambda crop, hint="": VehicleIdentity(
+        is_vehicle=True, brand="테슬라", model="모델 Y", body_type="SUV", confidence=0.9))
+    r = client.post("/api/v1/recognize", files={"image": ("x.jpg", _jpeg((10, 200, 10)), "image/jpeg")}).json()
+    assert r["card"]["id"] == "테슬라-모델-y" and r["card"]["grounded"] is False and r["card"]["rarity"] == "common"

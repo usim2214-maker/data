@@ -2,6 +2,9 @@ package com.pleos.cardex
 
 import android.graphics.Bitmap
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -81,6 +84,39 @@ class AppScreensScreenshotTest {
     @Test fun travelCourse() = shot("travel_course") {
         TravelScreen(course = course, loading = false, landmarks = landmarks, challenge = null,
             onRecommend = { _, _ -> }, onStartChallenge = {}, onResumeNavigation = {}, onAbandon = {}, home = home)
+    }
+
+    /** 수집 탭: 실제 YOLOv8 감지 결과(RoadSceneRenderTest + scripts/detect_demo_scene.py 산출물)로 렌더링 */
+    @Test fun scan() {
+        val img = File("build/demo_video/road_scene.png"); val json = File("build/demo_video/road_scene.json")
+        org.junit.Assume.assumeTrue(img.exists() && json.exists())
+        val o = org.json.JSONObject(json.readText())
+        fun det(j: org.json.JSONObject) = j.getJSONObject("bbox").let { b ->
+            com.pleos.cardex.data.Detection(j.getString("label"), j.getDouble("confidence").toFloat(),
+                com.pleos.cardex.data.BoundingBox(b.getInt("x1"), b.getInt("y1"), b.getInt("x2"), b.getInt("y2")))
+        }
+        val dets = o.getJSONArray("detections").let { a -> (0 until a.length()).map { det(a.getJSONObject(it)) } }
+        val card = com.pleos.cardex.data.VehicleCard("kia-ev9", "기아", "EV9", "SUV", null, "3열 대형 전기 SUV",
+            listOf(com.pleos.cardex.data.KeywordFact("가격", "약 7,000만 원대~")), rarity = "rare")
+        shot("scan_collect") {
+            com.pleos.cardex.ui.screens.ScanScreen(
+                UiState(
+                    keywords = listOf("가격", "브랜드", "마력", "연비"), lastFrameJpeg = img.readBytes(),
+                    lastResult = com.pleos.cardex.data.RecognitionResponse(true, det(o.getJSONObject("primary")), dets, null, card, isNewEntry = true),
+                ),
+                java.util.concurrent.atomic.AtomicLong(0), {}, {},
+            )
+        }
+    }
+
+    @Test fun aiEstimateCard() = shot("card_ai_estimate") {
+        androidx.compose.foundation.layout.Row(androidx.compose.ui.Modifier.padding(40.dp), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(40.dp)) {
+            val est = com.pleos.cardex.data.VehicleCard("테슬라-모델-y", "테슬라", "모델 Y", "SUV", null, "AI 가 추정한 정보예요",
+                listOf(com.pleos.cardex.data.KeywordFact("가격", "약 5,000만 원대 (추정)"), com.pleos.cardex.data.KeywordFact("마력", "약 300마력대 (추정)")),
+                rarity = "common", grounded = false)
+            com.pleos.cardex.ui.components.FlipCard(est, androidx.compose.ui.Modifier.size(330.dp, 470.dp), flipped = false)
+            com.pleos.cardex.ui.components.FlipCard(est, androidx.compose.ui.Modifier.size(330.dp, 470.dp), flipped = true)
+        }
     }
 
     @Test fun onboarding() = shot("onboarding") { OnboardingScreen(onFinish = {}) }

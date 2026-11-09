@@ -82,7 +82,11 @@ private fun CardFront(card: VehicleCard, accent: Color) {
 private fun CardBack(card: VehicleCard, accent: Color) {
     Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("${card.brand} ${card.model}", style = MaterialTheme.typography.titleLarge, color = accent)
-        Text("✨ 내가 고른 정보 · AI 요약", style = MaterialTheme.typography.labelLarge, color = Color.Gray)
+        if (card.grounded) {
+            Text("✨ 내가 고른 정보 · AI 요약", style = MaterialTheme.typography.labelLarge, color = Color.Gray)
+        } else { // 근거 데이터가 없는 차량: AI 추정치임을 분명히
+            Text("🤖 AI 추정 · 공식 자료로 확인해 주세요", style = MaterialTheme.typography.labelLarge, color = Color(0xFFFFB74D))
+        }
         HorizontalDivider(color = accent.copy(alpha = 0.4f))
         card.facts.forEach { fact ->
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

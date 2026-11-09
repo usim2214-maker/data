@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     video_max_vehicles: int = 3
     # 같은 차량을 이 시간(초) 안에 다시 보면 LLM 요약을 재사용 (비용/지연 절감)
     reuse_card_within_sec: int = 120
+    # 같은 차(겹치는 위치 또는 비슷한 모습)를 이 시간(초) 안에 다시 보면 차종 판별(Claude 비전)도 재사용
+    reuse_identity_within_sec: int = 30
+    # 개인정보: 기본은 크롭 이미지를 저장하지 않음 (번호판 등). 디버깅용으로만 true
+    save_crops: bool = False
 
     # 한국관광공사 TourAPI (공공데이터포털 KorService2). 비우면 시연용 목업 명소/축제 사용
     tour_api_key: str = ""

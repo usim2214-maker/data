@@ -50,15 +50,17 @@ class VehicleCard(BaseModel):
     brand: str
     model: str
     body_type: str
-    image_url: str | None = None  # 카드 앞면 이미지 (MVP: 크롭 이미지)
+    image_url: str | None = None  # 기본은 None (개인정보: 원본/크롭 이미지 미저장, 앞면은 일러스트). SAVE_CROPS=true 일 때만
     one_liner: str
     facts: list[KeywordFact]  # 카드 뒷면
     rarity: str = "common"  # common | rare | legendary (도감 게이미피케이션)
+    grounded: bool = True  # 카탈로그 근거 데이터로 요약했는지. False 면 앱에 'AI 추정' 표시
 
 
 class RecognitionResponse(BaseModel):
     detected: bool
-    detection: Detection | None = None
+    detection: Detection | None = None  # 카드로 만든 차량 (가장 가깝게 보인 차)
+    detections: list[Detection] = []  # 화면 속 모든 차량 (앱에서 박스 표시)
     identity: VehicleIdentity | None = None
     card: VehicleCard | None = None
     is_new_entry: bool = False

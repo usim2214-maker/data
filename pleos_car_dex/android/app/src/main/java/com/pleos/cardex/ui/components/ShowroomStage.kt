@@ -110,7 +110,7 @@ fun ShowroomStage(
             showroom.car?.let {
                 val ground = horizon + (size.height - horizon) * 0.5f - (size.height - horizon) * 0.02f
                 val style = carStyleFor(it.id, it.bodyType, it.rarity)
-                drawCartoonCar(style, size.width / 2, ground, size.width * 0.4f, light)
+                drawCartoonCar(style, size.width / 2, ground, size.width * 0.5f, light)
             }
         }
 

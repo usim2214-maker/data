@@ -67,4 +67,21 @@ class CarArtScreenshotTest {
         view.draw(android.graphics.Canvas(bmp))
         File(File("build/screenshots").apply { mkdirs() }, "car_gallery.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
+
+    /** 큰 크기 디테일 확인용 */
+    @Test fun detail() {
+        val picks = listOf(Triple("hyundai-ioniq-5", "CUV", "rare"), Triple("kia-ev9", "SUV", "rare"), Triple("genesis-g80", "세단", "rare"), Triple("hyundai-ioniq-5-n", "CUV", "legendary"))
+        rule.setContent {
+            Column(Modifier.fillMaxSize().background(Color(0xFF1C2330)).padding(10.dp)) {
+                picks.chunked(2).forEach { row ->
+                    Row { row.forEach { (id, b, r) -> CarIllustration(id, b, r, Modifier.size(690.dp, 420.dp)) } }
+                }
+            }
+        }
+        rule.waitForIdle()
+        val view = rule.activity.window.decorView.rootView
+        val bmp = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        view.draw(android.graphics.Canvas(bmp))
+        File(File("build/screenshots").apply { mkdirs() }, "car_detail.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
 }

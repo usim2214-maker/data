@@ -22,7 +22,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * 둥글둥글한 카툰 스타일 차량 일러스트 (측면, 앞=왼쪽).
+ * 차량 일러스트 (측면, 앞=왼쪽). 기본은 실차 비율 입체 렌더링(RealCarArt.kt), 카툰 버전도 보관.
  * 실제 차의 '알아볼 수 있는 특징'(비율·램프 모양·루프랙·윙 등)만 살리고 로고/엠블럼은 그리지 않는다.
  */
 enum class LampStyle { PIXEL, VERTICAL, TWO_LINE, HORIZON, ROUND }
@@ -109,7 +109,7 @@ fun CarIllustration(id: String, bodyType: String, rarity: String, modifier: Modi
     val style = carStyleFor(id, bodyType, rarity)
     Canvas(modifier) {
         // 키 큰 SUV 도 잘리지 않게 높이에 맞춰 축소
-        val w = minOf(size.width * 0.8f, size.height * 0.78f / style.heightRatio)
+        val w = minOf(size.width * 0.88f / style.length, size.height * 0.8f / style.realHeightRatio())
         if (!silhouette) {
             drawCartoonCar(style, centerX = size.width / 2, groundY = size.height * 0.9f, width = w)
         } else {
@@ -124,7 +124,12 @@ fun CarIllustration(id: String, bodyType: String, rarity: String, modifier: Modi
     }
 }
 
-fun DrawScope.drawCartoonCar(style: CarStyle, centerX: Float, groundY: Float, width: Float, light: Color = Color.White) {
+/** 차량 그리기 진입점: 실차 비율 입체 일러스트 ([drawRealCar]). 예전 카툰 버전은 [drawToyCar] */
+fun DrawScope.drawCartoonCar(style: CarStyle, centerX: Float, groundY: Float, width: Float, light: Color = Color.White) =
+    drawRealCar(style, centerX, groundY, width, light)
+
+/** (이전) 둥글둥글 카툰 버전 — 필요 시 전환용으로 보관 */
+fun DrawScope.drawToyCar(style: CarStyle, centerX: Float, groundY: Float, width: Float, light: Color = Color.White) {
     val L = width * style.length
     val x0 = centerX - L / 2
     val wheelR = L * style.wheel

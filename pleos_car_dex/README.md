@@ -186,6 +186,10 @@
 
 ## 쇼룸 디자인
 
+> **차량 일러스트 (실차 비율 입체 렌더링)**: 외곽선 없는 메탈릭 도장 반사·틴팅 유리·알로이 휠로 28종을 코드로 그립니다 (`RealCarArt.kt`). 로고·번호판은 그리지 않아 상표·개인정보 문제가 없고, 이전 카툰 버전(`drawToyCar`)도 보관.
+>
+> ![](docs/screenshots/car_detail.png)
+>
 > **무료 에셋 적용**: 바닥은 Poly Haven 실사 질감(CC0)을 원근 변환으로 타일링, 소품·스탬프 아이콘은 Twemoji(CC BY 4.0)로 통일 → 기기 폰트와 상관없이 같은 그림체. 출처: [`docs/ASSET_CREDITS.md`](docs/ASSET_CREDITS.md)
 
 | 우드 데크 + 친환경 소품 | 골드 마블 + 지역 마스터 |

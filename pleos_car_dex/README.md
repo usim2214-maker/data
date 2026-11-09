@@ -46,12 +46,26 @@
 
 ## 시연 영상
 
-[`docs/demo/cardex_demo.mp4`](docs/demo/cardex_demo.mp4) (약 58초, 1280×720, 자막 포함 · 음성 없음)
+[`docs/demo/cardex_demo.mp4`](docs/demo/cardex_demo.mp4) (약 65초, 1280×720, 자막 포함 · 음성 없음)
 
-타이틀 → 첫 실행 안내 → 여행 홈 → AI 코스 추천 → 챌린지 시작·주행 모드(히든 스탬프) → 완주·축제 배지·지역 마스터 축하 → 랭킹 → 쇼룸 꾸미기 → 사용 기술
+타이틀 → 첫 실행 안내 → 여행 홈 → AI 코스 추천 → 챌린지 시작·주행 모드(히든 스탬프) → 완주·축제 배지·지역 마스터 축하 → 랭킹 → **차량 인식(실제 YOLOv8 감지 결과)** → 쇼룸 꾸미기 → 사용 기술
 
 > 실제 앱의 화면 코드를 샘플 데이터로 렌더링하고 버튼은 실제로 클릭해 진행한 **UI 시연 영상**입니다 (에뮬레이터 녹화 아님).
 > 다시 만들기: `./scripts/make_demo_video.sh` (JDK 17 · Android SDK · ffmpeg 필요). 장면·자막은 `android/app/src/test/.../DemoVideoFramesTest.kt` 에서 수정.
+
+## 차량 인식 (베타) 검증 현황
+
+![](docs/screenshots/recognition_yolo.png)
+
+| 단계 | 상태 |
+|---|---|
+| ① YOLOv8 차량 감지 | ✅ 백엔드 API(`/recognize`, `/recognize/video`)로 실제 실행 확인 — COCO 샘플 사진에서 버스 0.80~0.94·승용차 0.64 감지, 사람만 있는 사진은 '차량 없음', 4초 패닝 영상에서 같은 차를 1대로 추적. 위 장면(직접 그린 도로)에서 car 0.80 / 0.71 / 0.40 |
+| ② 가장 가까운 차 선택·잘라내기 | ✅ 확인 |
+| ③ 차종 판별·키워드 요약 (Claude) | ⏳ API 키 연동 후 확인 필요 (지금은 mock) |
+| ④ 도감 등록 (신규/재발견) | ✅ 백엔드 테스트로 확인 |
+
+- YOLO 객체 추적(`model.track`)에는 `lap` 패키지가 필요해 `requirements-vision.txt` 에 추가. 없으면 IoU 기반 대체 추적으로 자동 전환
+- 감지 장면 재생성: `python scripts/detect_demo_scene.py <이미지> <출력.json>` (백엔드의 실제 감지 코드 사용)
 
 ## 화면
 

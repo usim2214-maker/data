@@ -5,6 +5,9 @@ import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -130,6 +133,21 @@ class DemoVideoFramesTest {
     private data class Celebrate(val c: Celebration, val home: HomeSummary) : Scene
     private data object Ranking : Scene
     private data class Garage(val showroom: Showroom, val tab: Int) : Scene
+    private data class Recognize(val revealed: Int) : Scene
+
+    // 차량 인식 장면: RoadSceneRenderTest 가 그린 장면 + scripts/detect_demo_scene.py 의 실제 YOLOv8 감지 결과
+    private data class Det(val label: String, val conf: Double, val x1: Int, val y1: Int, val x2: Int, val y2: Int)
+    private val roadImage = File("build/demo_video/road_scene.png").takeIf { it.exists() }
+        ?.let { android.graphics.BitmapFactory.decodeFile(it.path) }
+    private val roadCrop = File("build/demo_video/road_scene_crop.png").takeIf { it.exists() }
+        ?.let { android.graphics.BitmapFactory.decodeFile(it.path) }
+    private val roadDets: List<Det> = File("build/demo_video/road_scene.json").takeIf { it.exists() }?.let { f ->
+        val arr = org.json.JSONObject(f.readText()).getJSONArray("detections")
+        (0 until arr.length()).map { i ->
+            val o = arr.getJSONObject(i); val b = o.getJSONObject("bbox")
+            Det(o.getString("label"), o.getDouble("confidence"), b.getInt("x1"), b.getInt("y1"), b.getInt("x2"), b.getInt("y2"))
+        }.sortedByDescending { it.conf }
+    }.orEmpty()
 
     private var scene by mutableStateOf<Scene>(Title("", ""))
     private var caption by mutableStateOf("")
@@ -216,27 +234,36 @@ class DemoVideoFramesTest {
         show(Ranking, "속도가 아닌 '방문·수집'으로만 경쟁 — 주간 랭킹과 시·도별 지역 마스터", "6")
         hold(4.0)
 
-        // 7. 쇼룸 꾸미기
+        // 7. 차량 인식 (베타): 실제 YOLOv8 감지 결과
+        if (roadImage != null && roadDets.isNotEmpty()) {
+            val cap = "차량 인식(베타) — 측면 카메라 화면을 YOLOv8 이 실제로 분석한 결과예요"
+            show(Recognize(0), cap, "7"); hold(1.2)
+            roadDets.indices.forEach { i -> show(Recognize(i + 1), cap, "7"); hold(0.8) }
+            show(Recognize(roadDets.size + 1), "가장 가까운 차를 잘라 → 차종 판별·키워드 요약(LLM) → 도감 등록 → 쇼룸 전시", "7")
+            hold(4.0)
+        }
+
+        // 8. 쇼룸 꾸미기
         val base = Showroom(car = ioniq5, floor = catalog.items[0], signText = "MY GARAGE")
-        animatedScene(Garage(base, 0), "쇼룸 — 대표 차량을 전시하고 여행으로 얻은 아이템으로 꾸며요", "7", 2.0)
+        animatedScene(Garage(base, 0), "쇼룸 — 대표 차량을 전시하고 여행으로 얻은 아이템으로 꾸며요", "8", 2.0)
         val s1 = base.copy(car = ioniq5n)
-        animatedScene(Garage(s1, 0), "대표 차량 변경 — 실제 차의 특징을 살린 카툰 일러스트 (로고 없음)", "7", 2.0)
+        animatedScene(Garage(s1, 0), "대표 차량 변경 — 실제 차의 특징을 살린 카툰 일러스트 (로고 없음)", "8", 2.0)
         val s2 = s1.copy(background = gangwon, backgroundMastered = true, titles = listOf("강원"))
-        animatedScene(Garage(s2, 1), "배경: 방문한 지역의 풍경 — 강원 설악산", "7", 2.0)
+        animatedScene(Garage(s2, 1), "배경: 방문한 지역의 풍경 — 강원 설악산", "8", 2.0)
         val s3 = s2.copy(
             floor = catalog.items[4], light = item("light-aurora", "light", "#B388FF", "오로라"),
             pedestal = item("pedestal-neon", "pedestal", "neon", "네온 링"), signText = "강원 MASTER",
         )
-        animatedScene(Garage(s3, 2), "바닥·조명·전시대·네온 간판 — 코스 완주·배지·마스터로 해금", "7", 2.5)
+        animatedScene(Garage(s3, 2), "바닥·조명·전시대·네온 간판 — 코스 완주·배지·마스터로 해금", "8", 2.5)
         val s4 = s3.copy(props = listOf(
             PlacedPropOut("prop-crown", 0.12f, 0.84f, 1.4f, catalog.items[8]),
             PlacedPropOut("region:gangwon", 0.88f, 0.84f, 1.3f, catalog.items[9]),
             PlacedPropOut("prop-checker", 0.2f, 0.62f, 1f, catalog.items[7]),
             PlacedPropOut("prop-flag", 0.8f, 0.62f, 1f, catalog.items[6]),
         ))
-        animatedScene(Garage(s4, 6), "소품은 드래그로 자유롭게 배치 — 꾸미고 싶어서 다시 여행을 떠나요", "7", 3.0)
+        animatedScene(Garage(s4, 6), "소품은 드래그로 자유롭게 배치 — 꾸미고 싶어서 다시 여행을 떠나요", "8", 3.0)
 
-        // 8. 마무리
+        // 9. 마무리
         show(Title("CarDex", "달릴수록 넓어지는 나의 대한민국", listOf(
             "Pleos SDK: FusedLocation(위치·근접 알림) · NaviHelper(길안내) · Vehicle(주행 상태) · TextToSpeech(음성)",
             "한국관광공사 TourAPI · LLM 코스 추천 · 덜 알려진 지역일수록 높은 점수",
@@ -287,6 +314,7 @@ class DemoVideoFramesTest {
                         gangwon, {},
                     )
                 }
+                is Recognize -> RecognizeScene(s.revealed)
                 is Garage -> ShowroomScreen(
                     showroom = s.showroom, collection = listOf(
                         CollectionEntry(ioniq5, "2026-11-08T00:00:00Z", "2026-11-08T00:00:00Z"),
@@ -297,6 +325,69 @@ class DemoVideoFramesTest {
                 )
             }
             if (caption.isNotEmpty() && scene !is Driving) CaptionBar(caption, step, Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp))
+        }
+    }
+
+    @Composable
+    private fun RecognizeScene(revealed: Int) {
+        val img = roadImage ?: return
+        Row(Modifier.fillMaxSize().padding(24.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+            Column(Modifier.weight(1.45f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("📷 측면 카메라", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    Text(if (revealed == 0) "분석 중…" else "YOLOv8n 감지 ${minOf(revealed, roadDets.size)}대",
+                        color = Color(0xFF4DA3FF), fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                }
+                Box(Modifier.fillMaxWidth().aspectRatio(img.width / img.height.toFloat()).clip(RoundedCornerShape(16.dp))) {
+                    androidx.compose.foundation.Image(img.asImageBitmap(), null, Modifier.fillMaxSize())
+                    androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                        val sx = size.width / img.width; val sy = size.height / img.height
+                        roadDets.take(minOf(revealed, roadDets.size)).forEach { d ->
+                            val tl = androidx.compose.ui.geometry.Offset(d.x1 * sx, d.y1 * sy)
+                            val sz = androidx.compose.ui.geometry.Size((d.x2 - d.x1) * sx, (d.y2 - d.y1) * sy)
+                            drawRect(Color(0xFF4DA3FF), tl, sz, style = androidx.compose.ui.graphics.drawscope.Stroke(5f))
+                            drawRect(Color(0xFF4DA3FF), tl, androidx.compose.ui.geometry.Size(132f, 30f))
+                        }
+                    }
+                    // 라벨 텍스트 (박스 좌상단)
+                    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+                        val sx = constraints.maxWidth / img.width.toFloat(); val sy = constraints.maxHeight / img.height.toFloat()
+                        val density = androidx.compose.ui.platform.LocalDensity.current
+                        roadDets.take(minOf(revealed, roadDets.size)).forEach { d ->
+                            Text(
+                                "${d.label} ${"%.2f".format(d.conf)}", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold,
+                                modifier = Modifier.offset(with(density) { (d.x1 * sx + 6).toDp() }, with(density) { (d.y1 * sy + 4).toDp() }),
+                            )
+                        }
+                    }
+                }
+                Text("※ 시연용으로 직접 그린 도로 장면 · 박스는 백엔드 YOLOv8 감지 코드의 실제 출력", color = Color.Gray, fontSize = 15.sp)
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Text("인식 → 도감 등록", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Black)
+                val done = revealed > roadDets.size
+                Step("①", "YOLOv8 차량 감지", roadDets.take(minOf(revealed, roadDets.size)).joinToString(" · ") { "${it.label} ${"%.2f".format(it.conf)}" }.ifEmpty { "분석 중…" }, revealed > 0)
+                Step("②", "가장 가까운 차 선택·잘라내기", if (done) "화면에서 가장 크게 보인 차량" else "", done)
+                if (done && roadCrop != null) {
+                    androidx.compose.foundation.Image(
+                        roadCrop.asImageBitmap(), null,
+                        Modifier.size(220.dp, (220f * roadCrop.height / roadCrop.width).dp).clip(RoundedCornerShape(12.dp)),
+                    )
+                }
+                Step("③", "차종 판별 · 키워드 요약 (LLM)", if (done) "API 키 연동 시 자동 — 이 영상에서는 생략" else "", false)
+                Step("④", "도감 등록 → 쇼룸 전시", if (done) "새 차량이면 카드 생성 + 시너지 점수" else "", false)
+            }
+        }
+    }
+
+    @Composable
+    private fun Step(no: String, title: String, detail: String, ok: Boolean) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(no, color = if (ok) Color(0xFF4DA3FF) else Color.Gray, fontSize = 22.sp, fontWeight = FontWeight.Black)
+            Column {
+                Text(title + if (ok) "  ✓" else "", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.SemiBold)
+                if (detail.isNotEmpty()) Text(detail, color = Color.White.copy(alpha = 0.75f), fontSize = 17.sp)
+            }
         }
     }
 

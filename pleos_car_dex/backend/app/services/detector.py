@@ -27,6 +27,9 @@ class VehicleDetector:
     def __init__(self, settings: Settings):
         self.settings = settings
         self._model = None
+        self._tracker_ok = True  # YOLO 내장 추적기(lap 필요) 사용 가능 여부
+        self._prev: list[tuple[int, BoundingBox]] = []  # 대체 추적기 상태
+        self._next_id = 0
         if settings.detector_mode == "yolo":
             try:
                 from ultralytics import YOLO  # 무거운 의존성이라 지연 import
@@ -105,17 +108,47 @@ class VehicleDetector:
             w, h = frame.size
             return [(0, Detection(label="car", confidence=1.0, bbox=BoundingBox(x1=0, y1=0, x2=w, y2=h)))]
 
-        # persist=False 로 첫 프레임에서 트래커 초기화, 이후 같은 ID 유지
-        result = self._model.track(
-            frame, persist=not first, conf=self.settings.yolo_conf, classes=COCO_VEHICLE_IDS, verbose=False
-        )[0]
-        out: list[tuple[int, Detection]] = []
-        if result.boxes.id is None:
-            return out
-        for box, tid in zip(result.boxes, result.boxes.id.int().tolist()):
-            x1, y1, x2, y2 = (int(v) for v in box.xyxy[0].tolist())
-            det = Detection(
-                label=result.names[int(box.cls)], confidence=float(box.conf), bbox=BoundingBox(x1=x1, y1=y1, x2=x2, y2=y2)
-            )
-            out.append((tid, det))
+        if self._tracker_ok:
+            try:
+                # persist=False 로 첫 프레임에서 트래커 초기화, 이후 같은 ID 유지
+                result = self._model.track(
+                    frame, persist=not first, conf=self.settings.yolo_conf, classes=COCO_VEHICLE_IDS, verbose=False
+                )[0]
+                out: list[tuple[int, Detection]] = []
+                if result.boxes.id is None:
+                    return out
+                for box, tid in zip(result.boxes, result.boxes.id.int().tolist()):
+                    x1, y1, x2, y2 = (int(v) for v in box.xyxy[0].tolist())
+                    det = Detection(
+                        label=result.names[int(box.cls)], confidence=float(box.conf), bbox=BoundingBox(x1=x1, y1=y1, x2=x2, y2=y2)
+                    )
+                    out.append((tid, det))
+                return out
+            except ImportError as e:  # lap 미설치 등
+                log.warning("YOLO tracker unavailable (%s) -> IoU 대체 추적", e)
+                self._tracker_ok = False
+        return self._iou_track(self.detect(frame), first)
+
+    def _iou_track(self, dets: list[Detection], first: bool, thr: float = 0.3) -> list[tuple[int, Detection]]:
+        """대체 추적: 직전 프레임 박스와 겹침(IoU)이 크면 같은 차로 본다."""
+        if first:
+            self._prev, self._next_id = [], 0
+        out, used = [], set()
+        for d in dets:
+            best = max(((tid, _iou(b, d.bbox)) for tid, b in self._prev if tid not in used), key=lambda t: t[1], default=None)
+            if best and best[1] >= thr:
+                tid = best[0]
+            else:
+                tid, self._next_id = self._next_id, self._next_id + 1
+            used.add(tid)
+            out.append((tid, d))
+        self._prev = [(tid, d.bbox) for tid, d in out]
         return out
+
+
+def _iou(a: BoundingBox, b: BoundingBox) -> float:
+    ix = max(0, min(a.x2, b.x2) - max(a.x1, b.x1))
+    iy = max(0, min(a.y2, b.y2) - max(a.y1, b.y1))
+    inter = ix * iy
+    union = a.area + b.area - inter
+    return inter / union if union else 0.0

@@ -108,7 +108,7 @@ class RecognitionPipeline:
             identity=identity,
             card=card,
             is_new_entry=is_new,
-            message="새로운 차량을 도감에 등록했어요!" if is_new else "이미 수집한 차량이에요.",
+            message=("새로운 차량을 도감에 등록했어요!" if is_new else "이미 수집한 차량이에요.") if register else "카드를 만들었어요 (도감 미등록)",
         )
 
     def _reusable_card(self, card_id: str, keywords: list[str]) -> VehicleCard | None:

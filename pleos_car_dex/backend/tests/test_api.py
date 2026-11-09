@@ -267,3 +267,17 @@ def test_demo_tools_disabled_by_default(client, monkeypatch):
     get_settings().demo_mode = False
     assert client.post("/api/v1/demo/seed").status_code == 403
     get_settings().demo_mode = True
+
+
+def test_iou_fallback_tracker():
+    """YOLO 내장 추적기(lap)가 없을 때 쓰는 대체 추적: 겹치는 박스는 같은 차로 묶는다."""
+    from app.config import Settings
+    from app.schemas import BoundingBox, Detection
+    from app.services.detector import VehicleDetector
+
+    det = VehicleDetector(Settings(detector_mode="mock"))
+    car = lambda x: Detection(label="car", confidence=0.9, bbox=BoundingBox(x1=x, y1=100, x2=x + 200, y2=220))
+    f1 = det._iou_track([car(100), car(600)], first=True)
+    f2 = det._iou_track([car(130), car(630)], first=False)  # 조금씩 이동
+    f3 = det._iou_track([car(1000)], first=False)  # 새 차
+    assert [t for t, _ in f1] == [0, 1] and [t for t, _ in f2] == [0, 1] and [t for t, _ in f3] == [2]

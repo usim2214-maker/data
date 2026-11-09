@@ -1,5 +1,6 @@
 package com.pleos.cardex.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,7 +33,7 @@ fun DrivingScreen(
     onToggleVoice: () -> Unit,
     onExitSimulation: (() -> Unit)?,
 ) {
-    Column(Modifier.fillMaxSize().padding(40.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+    Column(Modifier.fillMaxSize().padding(horizontal = 40.dp, vertical = 28.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("🚗 주행 모드", fontSize = 44.sp, style = MaterialTheme.typography.displaySmall)
             Row {
@@ -41,6 +42,14 @@ fun DrivingScreen(
             }
         }
         Text("정차하면 모든 기능을 이용할 수 있어요 · ${state.drivingSource}", color = Color.Gray, fontSize = 22.sp)
+        // 방금 일어난 일(스탬프 획득 등)은 가장 눈에 띄는 위쪽에 크게
+        state.notice?.let {
+            Text(
+                it, fontSize = 30.sp, color = Color.Black,
+                modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.secondary, androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+            )
+        }
 
         val ch = state.challenge?.takeIf { it.status == "active" }
         if (ch != null) {
@@ -76,7 +85,6 @@ fun DrivingScreen(
         state.weekly?.me?.let { me ->
             Text("이번 주 ${me.rank}위 · ${me.points}점" + (state.weekly.gapToNext?.let { " — 한 계단 위까지 ${it}점" } ?: ""), fontSize = 28.sp)
         }
-        state.notice?.let { Text(it, fontSize = 30.sp, color = MaterialTheme.colorScheme.secondary) }
     }
 }
 

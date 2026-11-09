@@ -385,8 +385,15 @@ class DemoFlowTest {
         // 7) 퀴즈 · 랭킹
         if (quizImg != null) {
             caption = "아이와 함께 — 지나간 차 색깔 맞히기"
+            val bb = File("build/demo_video/road_scene.json").takeIf { it.exists() }?.let { org.json.JSONObject(it.readText()).getJSONObject("primary").getJSONObject("bbox") }
+            val det = com.pleos.cardex.data.Detection("car", 0.9f, com.pleos.cardex.data.BoundingBox(bb?.getInt("x1") ?: 300, bb?.getInt("y1") ?: 200, bb?.getInt("x2") ?: 700, bb?.getInt("y2") ?: 450))
+            ui = ui.copy(
+                quiz = QuizQuestion("q-demo", "color", "방금 지나간 차는 무슨 색일까요?", listOf("빨간색", "파란색", "흰색"), listOf("#E53935", "#1E88E5", "#FAFAFA"), "파란색", det),
+                quizFrameJpeg = quizImg, quizPicked = null,
+                quizSticker = com.pleos.cardex.data.QuizStars(4, nextSticker = "꼬마 버스 스티커", starsToNext = 4),
+            )
             openMenu("아이와 차 맞히기"); go(Scr.Quiz); hold(1.6)
-            tapText("파란색"); ui = ui.copy(quizPicked = "파란색", quizStars = 5); hold(2.2)
+            tapText("2. 파란색"); ui = ui.copy(quizPicked = "파란색", quizStars = 5, quizSticker = com.pleos.cardex.data.QuizStars(5, nextSticker = "꼬마 버스 스티커", starsToNext = 3)); hold(2.2)
         }
         caption = "주간 랭킹 · 지역 마스터 (속도 경쟁 없이 방문·수집으로)"
         openMenu("주간 랭킹"); go(Scr.Ranking); hold(2.6)

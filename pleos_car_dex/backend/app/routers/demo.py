@@ -23,7 +23,7 @@ def daily_checkin():
 
 @router.get("/daily", response_model=DailyMission)
 def daily_mission():
-    """오늘의 차 미션 + 연속 출석"""
+    """이번 주의 차 미션 + 연속 기록 + 차 쉬는 날"""
     from app.services.deps import get_daily
     return get_daily().mission()
 

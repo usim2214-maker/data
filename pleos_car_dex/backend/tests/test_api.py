@@ -245,14 +245,14 @@ def test_decor_unlocks(client):
 def test_home_and_demo_tools(client):
     h = client.get("/api/v1/home").json()
     assert h["collection"] == 0 and h["region_total"] == 17
-    assert "첫 카드" in h["next_goal"] and h["daily"]["found"] is False  # 첫 목표 + 오늘의 차 미션은 daily 필드
+    assert "첫 카드" in h["next_goal"] and h["daily"]["found"] is False  # 첫 목표 + 이번 주의 차 미션은 daily 필드
 
     seeded = client.post("/api/v1/demo/seed").json()
     assert seeded["cars"] == 4 and set(seeded["region_names"]) == {"서울", "경기", "강원"}
     h = client.get("/api/v1/home").json()
     assert h["collection"] == 4 and h["region_stamps"] == 3 and h["hidden_stamps"] == 2
     assert h["synergy_total"] > 0 and h["weekly_points"] > 0
-    assert "현대 차량 1종 더" in h["next_goal"]  # 시드: 현대 2종 -> 브랜드 컬렉터 목표 (오늘의 차는 별도 daily 필드)
+    assert "현대 차량 1종 더" in h["next_goal"]  # 시드: 현대 2종 -> 브랜드 컬렉터 목표 (이번 주의 차는 별도 daily 필드)
     assert client.get("/api/v1/showroom").json()["car"]["id"] == "hyundai-ioniq-5"
 
     client.post("/api/v1/challenge", json=_course())
@@ -390,13 +390,13 @@ def test_daily_mission_and_streak(client, monkeypatch):
     target = m["target"]["id"]
     assert m["target"]["rarity"] != "legendary" and m["found"] is False and m["streak"] == 0
     r = client.post("/api/v1/recognize", files={"image": (f"{target}.jpg", _jpeg(), "image/jpeg")}).json()
-    assert r["daily_bonus"] in (20, 30) and "오늘의 차" in r["message"]
+    assert r["daily_bonus"] in (30, 50) and "이번 주의 차" in r["message"]
     again = client.post("/api/v1/recognize", files={"image": (f"{target}.jpg", _jpeg(), "image/jpeg")}).json()
-    assert again["daily_bonus"] == 0  # 하루 1번
+    assert again["daily_bonus"] == 0  # 주 1번
     m = client.get("/api/v1/daily").json()
     assert m["found"] and m["streak"] == 1
     syn = {b["name"]: b["points"] for b in client.get("/api/v1/collection").json()["synergy"]["bonuses"]}
-    assert syn["오늘의 차"] == r["daily_bonus"]
+    assert syn["이번 주의 차"] == r["daily_bonus"]
 
     # 다음 날 방문 -> 연속 2일, 하루 건너뛰면 끊김
     monkeypatch.setattr(daily_mod, "today", lambda: _date.fromisoformat(m["date"]) + __import__("datetime").timedelta(days=1))
@@ -405,7 +405,11 @@ def test_daily_mission_and_streak(client, monkeypatch):
     monkeypatch.setattr(daily_mod, "today", lambda: _date.fromisoformat(m["date"]) + __import__("datetime").timedelta(days=4))
     d = client.get("/api/v1/daily").json()
     assert d["streak"] == 0 and d["best_streak"] == 2
-    assert daily_mod.target_for(_date(2026, 11, 9))["id"] == daily_mod.target_for(_date(2026, 11, 9))["id"]  # 날짜로 결정
+    # 같은 주는 같은 차, 짝수 주는 전기차 주간
+    assert daily_mod.target_for(_date(2026, 11, 9))["id"] == daily_mod.target_for(_date(2026, 11, 15))["id"]
+    even = _date(2026, 11, 9) if _date(2026, 11, 9).isocalendar().week % 2 == 0 else _date(2026, 11, 16)
+    assert daily_mod.target_for(even)["facts"]["연료"] == "전기"
+    assert m["week"].startswith("20") and 0 <= m["days_left"] <= 6
 
 
 def test_brand_spot_legendary_item(client):
@@ -502,3 +506,37 @@ def test_trip_day_is_not_green(client, monkeypatch):
     monkeypatch.setattr(daily_mod, "today", lambda: today + timedelta(days=2))
     c = client.post("/api/v1/daily/checkin").json()
     assert c["new_green_days"] == 1  # 주행한 날(오늘)은 제외, 다음 날만 그린 데이
+
+
+
+def test_eco_cards_and_ev_collector(client):
+    """친환경 배지(ev / eco_option) + 전기차 3종 = 전동화 컬렉터"""
+    r = client.post("/api/v1/recognize", files={"image": ("hyundai-ioniq-5.jpg", _jpeg(), "image/jpeg")}).json()
+    assert r["card"]["eco"] == "ev"
+    r = client.post("/api/v1/recognize", files={"image": ("hyundai-grandeur.jpg", _jpeg(), "image/jpeg")}).json()
+    assert r["card"]["eco"] == "eco_option"
+    r = client.post("/api/v1/recognize", files={"image": ("kia-morning.jpg", _jpeg(), "image/jpeg")}).json()
+    assert r["card"]["eco"] is None
+    for car in ("kia-ev9", "kia-ev6"):
+        client.post("/api/v1/recognize", files={"image": (f"{car}.jpg", _jpeg(), "image/jpeg")})
+    syn = {b["name"]: b["points"] for b in client.get("/api/v1/collection").json()["synergy"]["bonuses"]}
+    assert syn["전동화 컬렉터"] == 50
+
+
+def test_low_carbon_course_and_trip_tips(client):
+    """저탄소 코스는 일반 코스보다 짧고 CO2 추정치를 함께 준다. 짧은 이동엔 걷기 제안"""
+    base = {"lat": 37.5665, "lon": 126.9780, "max_hours": 6, "date": "20261108"}
+    normal = client.post("/api/v1/courses/recommend", json=base).json()
+    eco = client.post("/api/v1/courses/recommend", json={**base, "eco": True}).json()
+    assert eco["eco"] and eco["stops"] and eco["title"].startswith("🌿")
+    assert eco["est_km"] < normal["est_km"] and eco["est_co2_kg"] < normal["est_co2_kg"]
+    client.put("/api/v1/preferences", json={"keywords": ["가격"], "my_car_id": "hyundai-ioniq-5"})
+    assert client.post("/api/v1/courses/recommend", json={**base, "eco": True}).json()["est_co2_kg"] == 0  # 전기차 오너
+
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc).isoformat()
+    short = client.post("/api/v1/trips/report", json={"started_at": now, "distance_km": 1.8, "drive_minutes": 6}).json()
+    assert "걷기" in short["eco_tip"]
+    client.post("/api/v1/trips/report", json={"started_at": now, "distance_km": 8, "drive_minutes": 15})
+    third = client.post("/api/v1/trips/report", json={"started_at": now, "distance_km": 9, "drive_minutes": 15}).json()
+    assert "묶으면" in third["eco_tip"]

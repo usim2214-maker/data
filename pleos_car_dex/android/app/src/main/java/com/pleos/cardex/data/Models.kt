@@ -35,13 +35,14 @@ data class VehicleCard(
     val rarity: String = "common",
     @SerialName("is_my_car") val isMyCar: Boolean = false,
     @SerialName("vs_my_car") val vsMyCar: List<String> = emptyList(), // 카드 뒷면 '내 차와 비교'
+    val eco: String? = null, // ev | eco_option (친환경 배지)
 )
 
 @Serializable
 data class RecognitionResponse(
     val detected: Boolean,
     val twin: Boolean = false, // 내 차와 같은 차(쌍둥이)
-    @SerialName("daily_bonus") val dailyBonus: Int = 0, // 오늘의 차 보너스
+    @SerialName("daily_bonus") val dailyBonus: Int = 0, // 이번 주의 차 보너스
     val detection: Detection? = null, // 카드로 만든 차량
     val detections: List<Detection> = emptyList(), // 화면 속 모든 차량
     val identity: VehicleIdentity? = null,
@@ -143,6 +144,7 @@ data class CourseRequest(
     val lon: Double,
     @SerialName("max_hours") val maxHours: Double,
     val note: String = "",
+    val eco: Boolean = false, // 저탄소 코스
 )
 
 @Serializable
@@ -176,6 +178,9 @@ data class DriveCourse(
     @SerialName("candidates_source") val candidatesSource: String,
     val limited: LimitedEvent? = null,
     @SerialName("completion_bonus") val completionBonus: Int = 0,
+    @SerialName("est_km") val estKm: Double = 0.0,
+    @SerialName("est_co2_kg") val estCo2Kg: Double = 0.0,
+    val eco: Boolean = false,
 )
 
 /** 도감 칸 (미발견은 실루엣) */
@@ -208,10 +213,13 @@ data class HomeSummary(
     @SerialName("brand_total") val brandTotal: Int = 0,
 )
 
-/** 오늘의 차 미션 + 연속 출석 */
+/** 이번 주의 차 미션 + 연속 기록 */
 @Serializable
 data class DailyMission(
     val date: String,
+    val week: String = "",
+    @SerialName("days_left") val daysLeft: Int = 0,
+    @SerialName("ev_week") val evWeek: Boolean = false,
     val target: CatalogVehicle,
     val found: Boolean,
     val bonus: Int,
@@ -411,6 +419,7 @@ data class TripReport(
     val points: Int = 0,
     @SerialName("daily_found") val dailyFound: Boolean = false,
     val streak: Int = 0,
+    @SerialName("eco_tip") val ecoTip: String = "",
     @SerialName("green_new") val greenNew: Int = 0,
     @SerialName("green_days") val greenDays: Int = 0,
     @SerialName("total_km") val totalKm: Float = 0f,

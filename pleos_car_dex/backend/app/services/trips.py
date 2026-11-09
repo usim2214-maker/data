@@ -12,6 +12,17 @@ from app.schemas import TripReport, TripReportRequest
 from app.services.store import JsonStore
 
 MIN_KM = 0.5  # 이보다 짧으면 주행 횟수/누적에 넣지 않음 (주차장 이동 등)
+SHORT_KM = 3.0  # 걷기·자전거로 대신할 만한 거리
+MANY_TRIPS = 3  # 하루 이 횟수 이상이면 '볼일 묶기' 제안
+
+
+def eco_tip(km: float, trips_today: int) -> str:
+    """잔소리가 아닌 제안 한 줄. 차를 덜 쓰면 잎(차 쉬는 날)으로 보상된다는 걸 연결"""
+    if MIN_KM <= km < SHORT_KM:
+        return "🚶 3km 안쪽은 걷기·자전거도 좋아요. 차가 쉬는 날엔 잎 🌿 을 받아요"
+    if trips_today >= MANY_TRIPS:
+        return f"🧺 오늘 {trips_today}번째 운전이에요. 볼일을 한 번에 묶으면 이동도 배출도 줄어요"
+    return ""
 
 
 def _aware(dt: datetime) -> datetime:
@@ -47,6 +58,9 @@ class TripService:
                           "minutes": req.drive_minutes, "cards": len(cards), "stamps": len(stamps), "points": points})
             self._path.write_text(json.dumps(trips[-200:], ensure_ascii=False, indent=2), encoding="utf-8")
         total_km = round(sum(t["km"] for t in trips), 1)
+        from app.services.daily import KST, today
+        trips_today = sum(datetime.fromisoformat(t["at"]).astimezone(KST).date() == today() for t in trips)
+        tip = eco_tip(req.distance_km, trips_today)
 
         km = round(req.distance_km, 1)
         got = []
@@ -63,13 +77,13 @@ class TripService:
             headline = f"{km}km 드라이브 완료"
             tts = f"수고하셨어요. 이번엔 {km}킬로미터를 달렸어요. 다음엔 도감 카드를 모아 볼까요?"
         if mission.found:
-            tts += " 오늘의 차도 찾았어요!"
+            tts += " 이번 주의 차도 찾았어요!"
         if green_new:
             tts += f" 그동안 차가 {green_new}일 쉬어서 잎 {green_new}장을 받았어요."
         return TripReport(
             distance_km=km, drive_minutes=req.drive_minutes,
             new_cards=[f"{c.brand} {c.model}" for c in cards], new_legendary=sum(c.rarity == "legendary" for c in cards),
             stamps=stamps, points=points, daily_found=mission.found, streak=mission.streak,
-            green_new=green_new, green_days=mission.green_days,
+            green_new=green_new, green_days=mission.green_days, eco_tip=tip,
             total_km=total_km, trips=len(trips), headline=headline, tts=tts, next_goal=self.home_goal(),
         )

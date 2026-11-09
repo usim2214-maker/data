@@ -61,6 +61,8 @@ fun TravelScreen(
     onAbandon: () -> Unit,
     home: HomeSummary? = null,
     courseBy: String = "",
+    eco: Boolean = false,
+    onEco: (Boolean) -> Unit = {},
 ) {
     var hours by remember { mutableDoubleStateOf(4.0) }
     var note by remember { mutableStateOf("") }
@@ -82,6 +84,10 @@ fun TravelScreen(
                     )
                 }
             }
+            FilterChip(
+                selected = eco, onClick = { onEco(!eco) },
+                label = { Text("🌿 저탄소 코스 (가까운 곳 위주 · 이동 최소화)", fontSize = 18.sp, modifier = Modifier.padding(vertical = 8.dp)) },
+            )
             OutlinedTextField(
                 value = note, onValueChange = { note = it.take(100) },
                 label = { Text("취향 (예: 바다, 아이와 함께)") }, modifier = Modifier.fillMaxWidth(),
@@ -115,6 +121,9 @@ private fun CourseCard(course: DriveCourse, onStartChallenge: () -> Unit, course
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AssistChip(onClick = {}, label = { Text("운전 약 ${course.estDriveHours}시간") })
                 AssistChip(onClick = {}, label = { Text("스탬프 +${course.expectedPoints}") })
+                if (course.estKm > 0) AssistChip(onClick = {}, label = {
+                    Text("왕복 약 ${course.estKm.toInt()}km · " + if (course.estCo2Kg > 0) "CO₂ 약 ${course.estCo2Kg}kg" else "전기차 주행 배출 0")
+                })
                 AssistChip(onClick = {}, label = { Text("🏁 완주 +${course.completionBonus}") })
                 if (course.candidatesSource == "mock") AssistChip(onClick = {}, label = { Text("시연 데이터") })
                 if (courseBy.isNotEmpty()) AssistChip(onClick = {}, label = { Text("추천: $courseBy") })

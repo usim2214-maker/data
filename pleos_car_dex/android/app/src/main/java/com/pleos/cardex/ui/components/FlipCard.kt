@@ -73,7 +73,11 @@ private fun CardFront(card: VehicleCard, accent: Color) {
                 .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(accent.copy(alpha = 0.35f), Color(0xFF161B22)))),
         )
         Column(Modifier.padding(20.dp)) {
-            Text(card.rarity.uppercase() + if (card.isMyCar) "  ·  🚗 MY CAR" else "", color = accent, style = MaterialTheme.typography.labelLarge)
+            Text(
+                card.rarity.uppercase() + (if (card.isMyCar) "  ·  🚗 MY CAR" else "") +
+                    when (card.eco) { "ev" -> "  ·  ⚡ EV"; "eco_option" -> "  ·  🌿 친환경 트림"; else -> "" },
+                color = accent, style = MaterialTheme.typography.labelLarge,
+            )
             Text("${card.brand} ${card.model}", style = MaterialTheme.typography.headlineMedium)
             Text(card.oneLiner, style = MaterialTheme.typography.bodyLarge, color = Color.LightGray)
         }

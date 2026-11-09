@@ -23,6 +23,7 @@ from app.schemas import (
     LimitedEvent,
     LLMCoursePick,
 )
+from app.services.catalog import eco_type
 from app.services.challenge import completion_bonus
 from app.services import brand_spots, llm, regions
 from app.services.landmarks import points_for
@@ -34,6 +35,8 @@ log = logging.getLogger(__name__)
 ROAD_FACTOR = 1.35  # 직선거리 -> 도로거리 보정
 AVG_KMH = 80.0  # 고속도로 위주 평균
 MAX_STOPS = 4
+CO2_KG_PER_KM = 0.14  # 국내 승용차 평균 수준의 예시값 (내 차 연비/연료 기준 계산은 추후)
+ECO_REACH = 0.5  # 저탄소 코스: 도달 거리 절반
 LOCAL_KM = 15  # 출발지에서 이보다 가까운 곳은 '여행 목적지'로 보지 않음 (경유지로만)
 
 SYSTEM_PROMPT = (
@@ -49,9 +52,15 @@ def _date_of(req: CourseRequest) -> date:
     return datetime.strptime(req.date, "%Y%m%d").date() if req.date else date.today()
 
 
+def _road_km(points: list[tuple[float, float]]) -> float:
+    return sum(distance_m(*points[i], *points[i + 1]) for i in range(len(points) - 1)) / 1000 * ROAD_FACTOR
+
+
 def _road_hours(points: list[tuple[float, float]]) -> float:
-    km = sum(distance_m(*points[i], *points[i + 1]) for i in range(len(points) - 1)) / 1000 * ROAD_FACTOR
-    return round(km / AVG_KMH, 1)
+    return round(_road_km(points) / AVG_KMH, 1)
+
+
+ECO_NOTE = "저탄소 모드: 총 이동 거리가 가장 짧아지도록 가까운 곳 2~3곳만 고르세요.\n"
 
 
 class CourseService:
@@ -99,7 +108,8 @@ class CourseService:
         return (
             SYSTEM_PROMPT + "\n\n"
             f"날짜: {on.isoformat()}\n희망 왕복 시간: {req.max_hours}시간\n취향: {req.note or '없음'}\n"
-            f"후보:\n{json.dumps(payload, ensure_ascii=False)}\n\n"
+            + (ECO_NOTE if req.eco else "")
+            + f"후보:\n{json.dumps(payload, ensure_ascii=False)}\n\n"
             '반드시 JSON 한 개로만 답하세요: {"title": "...", "summary": "...", "stop_ids": ["..."], "reasons": ["..."]}'
         )
 
@@ -122,6 +132,7 @@ class CourseService:
         while len(stops) > 1 and _road_hours(route_of(stops)) > req.max_hours:
             stops.pop()
         route = route_of(stops)
+        km = round(_road_km(route), 1)
         new_regions = {s.region_id for s in stops if s.new_region_stamp and s.region_id}
         expected = sum(r.travel_points for rid in new_regions if (r := regions.get_region(rid)))
         expected += sum(s.points for s in stops if s.new_hidden_stamp)
@@ -136,11 +147,16 @@ class CourseService:
             candidates_source=self.tour.source,
             limited=limited,
             completion_bonus=completion_bonus(expected),
+            est_km=km,
+            est_co2_kg=0.0 if eco_type(self.store.get_preferences().my_car_id or "") == "ev" else round(km * CO2_KG_PER_KM, 1),
+            eco=req.eco,
         )
 
     # ---------------- 후보 ----------------
     def _candidates(self, req: CourseRequest, on: date) -> list["_Cand"]:
         reach_m = req.max_hours / 2 * AVG_KMH / ROAD_FACTOR * 1000  # 편도 직선 도달 거리
+        if req.eco:
+            reach_m *= ECO_REACH
         visited_regions = set(self.store.get_stamps())
         if here := regions.locate(req.lat, req.lon):
             visited_regions.add(here.id)  # 현재 지역 스탬프는 위치 보고로 이미 받는다고 본다
@@ -185,7 +201,8 @@ class CourseService:
         ]
         content = (
             f"날짜: {on.isoformat()}\n희망 왕복 시간: {req.max_hours}시간\n취향: {req.note or '없음'}\n"
-            f"후보:\n{json.dumps(payload, ensure_ascii=False)}"
+            + (ECO_NOTE if req.eco else "")
+            + f"후보:\n{json.dumps(payload, ensure_ascii=False)}"
         )
         try:
             pick = llm.parse(output_format=LLMCoursePick, system=SYSTEM_PROMPT, content=content)
@@ -198,7 +215,7 @@ class CourseService:
 
     @staticmethod
     def _greedy_pick(req: CourseRequest, cands: list["_Cand"]) -> LLMCoursePick:
-        reach_km = req.max_hours / 2 * AVG_KMH / ROAD_FACTOR
+        reach_km = req.max_hours / 2 * AVG_KMH / ROAD_FACTOR * (ECO_REACH if req.eco else 1)
         """축제·새 지역 우선 점수로 고르되, 첫 장소에서 가까운 곳을 이어 붙인다."""
         def score(c):
             region = regions.get_region(c.region_id) if c.region_id else None
@@ -208,19 +225,23 @@ class CourseService:
                 + (2 if c.new_region_stamp else 0)
                 + (1 if c.new_hidden_stamp else 0)
                 + (region.travel_points / 20 if region else 0)  # 지방일수록 가산
-                + min(c.dist_km / reach_km, 1.0) * 1.5  # 희망 시간을 활용하는 '여행다운' 거리 선호
+                + (
+                    (1 - min(c.dist_km / reach_km, 1.0)) * 2.0 if req.eco  # 저탄소: 가까울수록 가산
+                    else min(c.dist_km / reach_km, 1.0) * 1.5  # 희망 시간을 활용하는 '여행다운' 거리 선호
+                )
             )
 
-        trips = [c for c in cands if c.dist_km >= LOCAL_KM] or cands
+        trips = cands if req.eco else ([c for c in cands if c.dist_km >= LOCAL_KM] or cands)
         first = max(trips, key=score)
         rest = sorted((c for c in cands if c is not first), key=lambda c: distance_m(first.lat, first.lon, c.lat, c.lon))
         chosen = [first] + [c for c in rest if distance_m(first.lat, first.lon, c.lat, c.lon) <= 40_000][:2]
         chosen.sort(key=lambda c: c.dist_km)
         region = regions.get_region(first.region_id) if first.region_id else None
-        title = f"{region.name if region else ''} {first.name} 드라이브".strip()
+        title = ("🌿 " if req.eco else "") + f"{region.name if region else ''} {first.name} 드라이브".strip()
         return LLMCoursePick(
             title=title,
-            summary=f"{len(chosen)}곳을 잇는 코스예요. 새 스탬프를 모으며 지역 명소를 둘러보세요.",
+            summary=(f"가까운 {len(chosen)}곳을 짧게 잇는 저탄소 코스예요. 이동은 줄이고 스탬프는 챙겨요." if req.eco
+                     else f"{len(chosen)}곳을 잇는 코스예요. 새 스탬프를 모으며 지역 명소를 둘러보세요."),
             stop_ids=[c.content_id for c in chosen],
             reasons=[c.reason + (" · 새 지역 스탬프" if c.new_region_stamp else "") for c in chosen],
         )

@@ -66,6 +66,7 @@ class AppScreensScreenshotTest {
     private val course = DriveCourse(
         "강원 바다·산 드라이브", "남이섬에서 설악산을 거쳐 속초 축제까지, 강원 스탬프와 히든 3곳을 모아요.",
         stops, 4.6, 115, "mock", LimitedEvent("mock-fest-x", "속초 오징어 축제 (시연용)", "20261116"), 87,
+        estKm = 372.0, estCo2Kg = 52.1,
     )
     private val landmarks = listOf(
         LandmarkNearby(Attraction("a", "경복궁", lat = 37.58, lon = 126.98), 1500, true, 20),
@@ -117,7 +118,7 @@ class AppScreensScreenshotTest {
             }
             val card = com.pleos.cardex.data.VehicleCard("kia-carnival", "기아", "카니발", "MPV", null, "가족 나들이의 대표 미니밴",
                 listOf(com.pleos.cardex.data.KeywordFact("가격", "약 3,500만 원대~"), com.pleos.cardex.data.KeywordFact("차급", "대형 MPV"),
-                    com.pleos.cardex.data.KeywordFact("마력", "약 245~294마력"), com.pleos.cardex.data.KeywordFact("승차인원", "7~11인승")))
+                    com.pleos.cardex.data.KeywordFact("마력", "약 245~294마력"), com.pleos.cardex.data.KeywordFact("승차인원", "7~11인승")), eco = "eco_option")
             com.pleos.cardex.ui.components.FlipCard(card, androidx.compose.ui.Modifier.padding(32.dp).size(330.dp, 470.dp), flipped = true)
         }
     }
@@ -158,7 +159,7 @@ class AppScreensScreenshotTest {
                 home.copy(
                     dexOwned = 6, dexTotal = 28, legendaryOwned = 1, legendaryTotal = 3,
                     nextGoal = "현대 차량 1종 더 모으면 '현대 컬렉터' +50",
-                    daily = com.pleos.cardex.data.DailyMission("2026-11-09", com.pleos.cardex.data.CatalogVehicle("kia-ev9", "기아", "EV9", "SUV", "rare"), false, 30, 4, 7, greenDays = 3),
+                    daily = com.pleos.cardex.data.DailyMission(date = "2026-11-09", week = "2026-W46", daysLeft = 6, evWeek = true, target = com.pleos.cardex.data.CatalogVehicle("kia-ev9", "기아", "EV9", "SUV", "rare"), found = false, bonus = 50, streak = 4, bestStreak = 7, greenDays = 3),
                 ),
             )
         }
@@ -168,11 +169,27 @@ class AppScreensScreenshotTest {
         com.pleos.cardex.ui.components.TripReportCard(
             com.pleos.cardex.data.TripReport(
                 distanceKm = 23.4f, driveMinutes = 41, newCards = listOf("현대 아이오닉 5 N", "기아 EV9"), newLegendary = 1,
-                stamps = listOf("🌉 부산", "🏢 현대 모터스튜디오 부산"), points = 95, dailyFound = true, streak = 6, greenNew = 2, greenDays = 9,
+                stamps = listOf("🌉 부산", "🏢 현대 모터스튜디오 부산"), points = 95, dailyFound = true, streak = 6, greenNew = 2, greenDays = 9, ecoTip = "🧺 오늘 3번째 운전이에요. 볼일을 한 번에 묶으면 이동도 배출도 줄어요",
                 totalKm = 312.5f, trips = 12, headline = "23.4km 드라이브 · 새 카드 2장 · 스탬프 2개 · 95점",
                 tts = "", nextGoal = "현대 차량 1종 더 모으면 '현대 컬렉터' +50",
             ),
         ) {}
+    }
+
+    @Test fun ecoCourse() = shot("travel_eco_course") {
+        TravelScreen(course = course.copy(title = "🌿 경기 수원 화성 드라이브", summary = "가까운 2곳을 짧게 잇는 저탄소 코스예요. 이동은 줄이고 스탬프는 챙겨요.",
+            stops = stops.take(2), estDriveHours = 1.4, estKm = 96.0, estCo2Kg = 13.4, eco = true, limited = null),
+            loading = false, landmarks = landmarks, challenge = null,
+            onRecommend = { _, _ -> }, onStartChallenge = {}, onResumeNavigation = {}, onAbandon = {}, home = home, eco = true)
+    }
+
+    @Test fun ecoFront() = shot("card_eco_front") {
+        androidx.compose.foundation.layout.Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(24.dp), modifier = androidx.compose.ui.Modifier.padding(32.dp)) {
+            listOf(
+                com.pleos.cardex.data.VehicleCard("hyundai-ioniq-5", "현대", "아이오닉 5", "CUV", null, "레트로 감성의 전기 CUV", emptyList(), rarity = "rare", eco = "ev"),
+                com.pleos.cardex.data.VehicleCard("hyundai-grandeur", "현대", "그랜저", "세단", null, "대한민국 대표 준대형 세단", emptyList(), eco = "eco_option"),
+            ).forEach { c -> com.pleos.cardex.ui.components.FlipCard(c, androidx.compose.ui.Modifier.size(330.dp, 470.dp)) }
+        }
     }
 
     @Test fun onboarding() = shot("onboarding") { OnboardingScreen(onFinish = {}) }

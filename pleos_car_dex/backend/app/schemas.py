@@ -56,12 +56,13 @@ class VehicleCard(BaseModel):
     rarity: str = "common"  # common | rare | legendary (도감 게이미피케이션)
     is_my_car: bool = False  # 내 차와 같은 모델
     vs_my_car: list[str] = []  # 카드 뒷면 '내 차와 비교' (조회 시 계산)
+    eco: str | None = None  # ev(전기 전용) | eco_option(하이브리드·전기 선택 가능) — 조회 시 계산
 
 
 class RecognitionResponse(BaseModel):
     detected: bool
     twin: bool = False  # 내 차와 같은 차(쌍둥이)를 만남
-    daily_bonus: int = 0  # 오늘의 차를 찾았으면 보너스 점수
+    daily_bonus: int = 0  # 이번 주의 차를 찾았으면 보너스 점수
     detection: Detection | None = None  # 카드로 만든 차량 (가장 가깝게 보인 차)
     detections: list[Detection] = []  # 화면 속 모든 차량 (앱에서 박스 표시)
     identity: VehicleIdentity | None = None
@@ -189,6 +190,7 @@ class CourseRequest(BaseModel):
     max_hours: float = Field(4.0, ge=1, le=12, description="왕복 희망 시간")
     date: str | None = Field(None, description="YYYYMMDD, 비우면 오늘")
     note: str = Field("", max_length=200, description="취향 메모 (예: 바다, 아이와 함께)")
+    eco: bool = Field(False, description="저탄소 코스: 가까운 곳 위주, 이동 거리 최소화")
 
 
 class CourseStop(BaseModel):
@@ -220,6 +222,9 @@ class DriveCourse(BaseModel):
     candidates_source: str  # tourapi | mock
     limited: LimitedEvent | None = None
     completion_bonus: int = 0  # 완주 시 추가 점수 (서버 계산)
+    est_km: float = 0  # 왕복 도로 거리 추정
+    est_co2_kg: float = 0  # 평균 승용차 기준 CO₂ 추정 (전기차는 주행 중 배출 0)
+    eco: bool = False  # 저탄소 코스
 
 
 # ---------------- 경쟁: 코스 챌린지 / 랭킹 / 지역 마스터 / 한정 배지 ----------------
@@ -402,9 +407,12 @@ class CatalogVehicle(BaseModel):
 
 
 class DailyMission(BaseModel):
-    """오늘의 차 미션 + 연속 출석"""
+    """이번 주의 차 미션 + 연속 기록 (경로 호환을 위해 이름은 daily 유지)"""
 
     date: str
+    week: str = ""  # 2026-W46
+    days_left: int = 0  # 이번 주 남은 날 (일요일 0)
+    ev_week: bool = False  # 전기차 주간
     target: CatalogVehicle
     found: bool
     bonus: int
@@ -506,6 +514,7 @@ class TripReport(BaseModel):
     points: int = 0
     daily_found: bool = False
     streak: int = 0
+    eco_tip: str = ""  # 짧은 이동·잦은 이동 시 친환경 제안
     green_new: int = 0  # 이번 주행 전까지 차가 쉰 날 (새로 확정)
     green_days: int = 0
     total_km: float = 0  # 앱과 함께한 누적 거리

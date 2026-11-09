@@ -23,7 +23,7 @@ def get_competition() -> CompetitionService:
     get_pipeline().on_twin = lambda card: comp.record(TWIN_POINTS, None, "twin", card.model)  # 쌍둥이 차 보너스
     daily = get_daily()
 
-    def on_card(card):  # 오늘의 차 보너스 + 출석
+    def on_card(card):  # 이번 주의 차 보너스 + 출석
         bonus = daily.on_card(card.id)
         if bonus:
             comp.record(bonus, None, "daily", card.model)

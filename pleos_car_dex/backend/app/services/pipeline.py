@@ -49,7 +49,7 @@ class RecognitionPipeline:
         self.summarizer = CardSummarizer(s)
         self.store = JsonStore(s.data_dir)
         self.on_twin = None  # 쌍둥이 차를 만났을 때 콜백 (deps 에서 원장 기록 연결)
-        self.on_card = None  # 카드를 만들 때 콜백 -> 오늘의 차 보너스 점수 반환 (deps 에서 연결)
+        self.on_card = None  # 카드를 만들 때 콜백 -> 이번 주의 차 보너스 점수 반환 (deps 에서 연결)
         # 최근 판별 결과 캐시: (시각, 박스, 이미지 해시, 판별 결과)
         self._recent: list[tuple[float, Detection, int, VehicleIdentity]] = []
 
@@ -151,7 +151,7 @@ class RecognitionPipeline:
         message = ("새로운 차량을 도감에 등록했어요!" if is_new else "이미 수집한 차량이에요.") if register else "카드를 만들었어요 (도감 미등록)"
         daily_bonus = self.on_card(card) if register and self.on_card else 0
         if daily_bonus:
-            message = f"오늘의 차 {card.model} 발견! +{daily_bonus}"
+            message = f"이번 주의 차 {card.model} 발견! +{daily_bonus}"
         if twin:
             message = f"내 차와 같은 {card.model}를 만났어요! 쌍둥이 +{mycar.TWIN_POINTS}"
         return RecognitionResponse(

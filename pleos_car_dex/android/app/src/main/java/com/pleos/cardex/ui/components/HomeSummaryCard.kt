@@ -46,8 +46,7 @@ fun HomeSummaryCard(home: HomeSummary?, modifier: Modifier = Modifier) {
             if (home.brandTotal > 0) Stat("브랜드 스팟", "${home.brandSpots}/${home.brandTotal}")
         }
         home.daily?.let { DailyRow(it) }
-        // 오늘의 차가 목표일 땐 위 줄과 중복이므로 생략
-        if (home.daily == null || !home.nextGoal.startsWith("오늘의 차")) Row(
+        Row(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color.Black.copy(alpha = 0.25f)).padding(14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -57,7 +56,7 @@ fun HomeSummaryCard(home: HomeSummary?, modifier: Modifier = Modifier) {
     }
 }
 
-/** 오늘의 차: 찾기 전엔 실루엣, 찾으면 일러스트 + 연속 출석 */
+/** 이번 주의 차: 찾기 전엔 실루엣, 찾으면 일러스트 + 연속 기록(차 쉬는 날 포함) */
 @Composable
 private fun DailyRow(d: DailyMission) {
     Row(
@@ -71,7 +70,10 @@ private fun DailyRow(d: DailyMission) {
             silhouette = !d.found,
         )
         Column(Modifier.weight(1f)) {
-            Text("📅 오늘의 차", color = Color(0xFFFFD54F), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text(
+                "📅 이번 주의 차" + (if (d.evWeek) "  ⚡ 전기차 주간" else "") + (if (!d.found) "  · ${d.daysLeft}일 남음" else ""),
+                color = Color(0xFFFFD54F), fontSize = 16.sp, fontWeight = FontWeight.Bold,
+            )
             Text(
                 if (d.found) "${d.target.brand} ${d.target.model} 발견 완료 ✅" else "${d.target.brand} ${d.target.model} 를 찾아보세요 (+${d.bonus})",
                 color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.SemiBold,

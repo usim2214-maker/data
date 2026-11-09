@@ -1,7 +1,9 @@
-"""오늘의 차 미션 + 연속 출석.
+"""이번 주의 차 미션 + 연속 기록.
 
-- 매일(KST) 도감 28종 중 '오늘의 차' 하나 (전설 제외, 날짜로 결정 → 모든 사용자가 같은 차)
-- 오늘의 차를 카드로 만들면 보너스 (희귀 +30, 일반 +20) — 하루 1번
+- 매주(KST, 월~일) 도감 28종 중 '이번 주의 차' 하나 (전설 제외, 주 번호로 결정 → 모든 사용자가 같은 차)
+  매일 찾으러 나갈 필요 없이 일주일 동안 평소 다니는 길에서 만나면 된다 (불필요한 운전 지양)
+- 격주로 전기차 주간: 짝수 주는 전기차 중에서 골라 전동화 라인업 노출
+- 이번 주의 차를 카드로 만들면 보너스 (희귀 +50, 일반 +30) — 주 1번
 - 연속 기록 = 앱을 연 날 + **차가 쉰 날(그린 데이)**. 운전을 안 해도 연속이 끊기지 않는다 (매일 운전하게 만드는 출석은 지양)
 - 그린 데이: 주행 기록(주차 리포트 0.5km 이상)이 없는 지난 날 → 잎 🌿 1장 = +GREEN_POINTS, 친환경 쇼룸 아이템 해금
 현대차 관점: 매일 다른 모델에 시선이 가게 하는 라인업 노출, 사용자는 매일 앱을 켤 이유.
@@ -15,8 +17,8 @@ from app.services.catalog import load_catalog
 from app.services.competition import KST
 from app.services.store import JsonStore
 
-BONUS = {"rare": 30, "common": 20}
-GREEN_POINTS = 10  # 차가 쉰 날 1일당 (오늘의 차 일반 보너스의 절반 — 안 타도 꾸준히 쌓임)
+BONUS = {"rare": 50, "common": 30}
+GREEN_POINTS = 10  # 차가 쉰 날 1일당 (안 타도 꾸준히 쌓임 — 일주일 쉬면 주간 미션보다 큼)
 GREEN_LOOKBACK = 14  # 최근 며칠까지 소급 인정
 
 
@@ -24,9 +26,18 @@ def today() -> date:
     return datetime.now(timezone.utc).astimezone(KST).date()
 
 
+def week_of(d: date) -> str:
+    iso = d.isocalendar()
+    return f"{iso.year}-W{iso.week:02d}"
+
+
 def target_for(d: date) -> dict:
-    pool = sorted((v for v in load_catalog() if v["rarity"] != "legendary"), key=lambda v: v["id"])
-    idx = int(hashlib.sha256(d.isoformat().encode()).hexdigest(), 16) % len(pool)
+    """그 주의 차. 짝수 주 = 전기차 주간"""
+    pool = [v for v in load_catalog() if v["rarity"] != "legendary"]
+    if d.isocalendar().week % 2 == 0:
+        pool = [v for v in pool if v["facts"].get("연료") == "전기"] or pool
+    pool.sort(key=lambda v: v["id"])
+    idx = int(hashlib.sha256(week_of(d).encode()).hexdigest(), 16) % len(pool)
     return pool[idx]
 
 
@@ -92,14 +103,14 @@ class DailyService:
         return current, best
 
     def on_card(self, card_id: str) -> int:
-        """카드를 만들 때 호출. 오늘의 차면 보너스 점수를 돌려준다 (하루 1번)"""
+        """카드를 만들 때 호출. 이번 주의 차면 보너스 점수를 돌려준다 (주 1번)"""
         self.mark_active()
         t = today()
         target = target_for(t)
         d = self._load()
-        if card_id != target["id"] or t.isoformat() in d["found"]:
+        if card_id != target["id"] or week_of(t) in d["found"]:
             return 0
-        d["found"].append(t.isoformat())
+        d["found"].append(week_of(t))
         self._save(d)
         return BONUS.get(target["rarity"], 20)
 
@@ -109,8 +120,11 @@ class DailyService:
         cur, best = self.streak()
         return DailyMission(
             date=t.isoformat(),
+            week=week_of(t),
+            days_left=7 - t.isoweekday(),
+            ev_week=v["facts"].get("연료") == "전기" and t.isocalendar().week % 2 == 0,
             target=CatalogVehicle(**{k: v[k] for k in ("id", "brand", "model", "body_type", "rarity")}),
-            found=t.isoformat() in self._load()["found"],
+            found=week_of(t) in self._load()["found"],
             bonus=BONUS.get(v["rarity"], 20),
             streak=cur,
             best_streak=best,

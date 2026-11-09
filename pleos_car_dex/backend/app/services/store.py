@@ -82,7 +82,7 @@ class JsonStore:
                 p.unlink(missing_ok=True)
 
     def extra_path(self, name: str) -> Path:
-        """부가 기능(오늘의 차·주행 리포트·퀴즈)용 파일 경로"""
+        """부가 기능(이번 주의 차·주행 리포트·퀴즈)용 파일 경로"""
         return self._collection_path.with_name(name)
 
     def get_entry(self, card_id: str) -> CollectionEntry | None:

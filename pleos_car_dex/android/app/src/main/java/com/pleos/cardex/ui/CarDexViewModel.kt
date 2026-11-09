@@ -109,6 +109,8 @@ data class UiState(
     val celebration: Celebration? = null,
     /** 주차(P단) 후 주행 리포트 */
     val tripReport: TripReport? = null,
+    /** 저탄소 코스 모드 */
+    val ecoCourse: Boolean = false,
     val onboardingDone: Boolean = true,
     val error: String? = null,
 )
@@ -358,7 +360,7 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
                         // 차량이 없는 프레임은 직전 카드를 유지 (박스는 이번 프레임 기준)
                         lastResult = if (card != null || it.lastResult == null) r else it.lastResult?.copy(detections = r.detections),
                         // 새 카드: 희귀·전설은 축하 연출, 일반은 알림 (주행 중엔 음성만)
-                        celebration = if (card != null && r.dailyBonus > 0) Celebration("📅", "오늘의 차 발견!", "${card.brand} ${card.model} · +${r.dailyBonus}")
+                        celebration = if (card != null && r.dailyBonus > 0) Celebration("📅", "이번 주의 차 발견!", "${card.brand} ${card.model} · +${r.dailyBonus}")
                         else if (card != null && r.twin) Celebration("👯", "쌍둥이 차 발견!", r.message)
                         else if (card != null && r.isNewEntry) when (card.rarity) {
                             "legendary" -> Celebration("🌟", "LEGENDARY 카드 획득!", "${card.brand} ${card.model}")
@@ -499,13 +501,16 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
      * AI 드라이브 코스: Pleos LLM 을 쓸 수 있으면 서버 후보·프롬프트 → Pleos LLM 선택 → 서버가 시간·점수 계산,
      * 아니면 서버 추천(규칙 기반/서버 LLM).
      */
+    fun setEcoCourse(on: Boolean) = _state.update { it.copy(ecoCourse = on) }
+
     fun recommendCourse(maxHours: Double, note: String) {
         val at = _state.value.driving?.location ?: run {
             _state.update { it.copy(error = "현재 위치를 아직 받지 못했어요.") }; return
         }
         _state.update { it.copy(courseLoading = true, error = null) }
         viewModelScope.launch {
-            val req = com.pleos.cardex.data.CourseRequest(at.lat, at.lon, maxHours, note)
+            val eco = _state.value.ecoCourse
+            val req = com.pleos.cardex.data.CourseRequest(at.lat, at.lon, maxHours, note, eco)
             val byPleos = if (pleosAi.available) {
                 call { repo.courseCandidates(req) }.getOrNull()?.let { c -> pleosAi.pickCourse(c.prompt) }?.let { pick ->
                     call { repo.buildCourse(com.pleos.cardex.data.CourseBuildRequest(req, pick.title, pick.summary, pick.stopIds, pick.reasons)) }.getOrNull()
@@ -514,7 +519,7 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
             if (byPleos != null) {
                 _state.update { it.copy(course = byPleos, courseBy = "Pleos LLM") }
             } else {
-                call { repo.recommendCourse(at, maxHours, note) }
+                call { repo.recommendCourse(at, maxHours, note, eco) }
                     .onSuccess { c -> _state.update { it.copy(course = c, courseBy = "서버") } }
                     .onFailure { e -> _state.update { it.copy(error = "코스 추천 실패: ${e.message}") } }
             }

@@ -154,6 +154,8 @@ class MainActivity : ComponentActivity() {
                                     challenge = state.challenge,
                                     courseBy = state.courseBy,
                                     onRecommend = vm::recommendCourse,
+                                    eco = state.ecoCourse,
+                                    onEco = vm::setEcoCourse,
                                     onStartChallenge = vm::startChallengeAndNavigate,
                                     onResumeNavigation = vm::resumeNavigation,
                                     onAbandon = vm::abandonChallenge,

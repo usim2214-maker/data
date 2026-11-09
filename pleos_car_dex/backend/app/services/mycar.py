@@ -50,4 +50,6 @@ def compare(card: VehicleCard, my_car_id: str | None) -> list[str]:
 
 
 def annotate(card: VehicleCard, my_car_id: str | None) -> VehicleCard:
-    return card.model_copy(update={"is_my_car": bool(my_car_id) and card.id == my_car_id, "vs_my_car": compare(card, my_car_id)})
+    from app.services.catalog import eco_type
+    return card.model_copy(update={"is_my_car": bool(my_car_id) and card.id == my_car_id, "vs_my_car": compare(card, my_car_id),
+                                   "eco": eco_type(card.id)})

@@ -21,6 +21,7 @@ REVISIT_POINTS, REVISIT_CAP = 5, 15  # 재방문(1시간 이상 간격) 1회당 
 AREA_COMPLETE_POINTS = 100  # 권역 내 모든 시·도 방문
 TRAVEL_FIND_POINTS = 10  # 수도권 밖에서 처음 발견한 차량 1대당 — 여행지에서의 수집 장려
 HOME_AREA = "수도권"
+EV_SET_SIZE, EV_SET_POINTS = 3, 50  # 전기차 3종 이상 수집 = 전동화 컬렉터
 
 
 def compute(
@@ -56,6 +57,11 @@ def compute(
     if len(bodies) >= BODY_VARIETY_SIZE:
         bonuses.append(SynergyBonus(name="다양성", points=BODY_VARIETY_POINTS, description=f"차체 유형 {len(bodies)}가지 수집"))
 
+    from app.services.catalog import eco_type
+    evs = [e for e in entries if eco_type(e.card.id) == "ev"]
+    if len(evs) >= EV_SET_SIZE:
+        bonuses.append(SynergyBonus(name="전동화 컬렉터", points=EV_SET_POINTS, description=f"전기차 {len(evs)}종 수집"))
+
     if featured_brand and brands.get(featured_brand, 0) > 1:
         pts = (brands[featured_brand] - 1) * FEATURED_MATCH_POINTS
         bonuses.append(SynergyBonus(name="대표차 공명", points=pts, description=f"쇼룸 대표 차량과 같은 {featured_brand} 카드"))
@@ -85,7 +91,7 @@ def compute(
         bonuses.append(SynergyBonus(name="축제 한정", points=sum(badge_points), description=f"축제 한정 배지 {len(badge_points)}개"))
 
     if daily_points:
-        bonuses.append(SynergyBonus(name="오늘의 차", points=sum(daily_points), description=f"오늘의 차 {len(daily_points)}번 발견"))
+        bonuses.append(SynergyBonus(name="이번 주의 차", points=sum(daily_points), description=f"이번 주의 차 {len(daily_points)}번 발견"))
     if green_points:
         bonuses.append(SynergyBonus(name="차 쉬는 날", points=sum(green_points), description=f"🌿 차가 쉰 날 {len(green_points)}일"))
     if twin_points:

@@ -57,6 +57,8 @@ class VehicleCard(BaseModel):
     is_my_car: bool = False  # 내 차와 같은 모델
     vs_my_car: list[str] = []  # 카드 뒷면 '내 차와 비교' (조회 시 계산)
     eco: str | None = None  # ev(전기 전용) | eco_option(하이브리드·전기 선택 가능) — 조회 시 계산
+    seen_color: str | None = None  # 도로에서 본 차체 색 (9색 분류: 흰색·검은색·회색·빨간색 …)
+    color_code: str | None = None  # 사용자가 고른 공식 색상 코드 (없으면 seen_color 와 가장 가까운 색)
 
 
 class RecognitionResponse(BaseModel):
@@ -464,6 +466,10 @@ class QuizQuestion(BaseModel):
     choice_icons: list[str]  # 종류: 이모지 / 색깔: #RRGGBB
     answer: str
     detection: Detection
+
+
+class CardColorRequest(BaseModel):
+    color_code: str | None = None  # None = 본 색으로 자동
 
 
 class QuizStars(BaseModel):

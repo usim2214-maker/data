@@ -4,6 +4,8 @@ import android.content.Context
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -50,9 +52,18 @@ import kotlin.math.roundToInt
  * - 오프라인/로딩 전에는 코드로 만든 3D 모델([drawCar3D])을 대신 보여준다.
  */
 sealed interface CarViews {
-    data class Spin(val url: String, val frames: Int, val digits: Int, val start: Int) : CarViews {
+    data class Spin(val url: String, val frames: Int, val digits: Int, val start: Int, val colors: List<CarColor> = emptyList()) : CarViews {
         fun frameUrl(i: Int): String = url.replace("{n}", (((i % frames) + frames) % frames + 1).toString().padStart(digits, '0'))
+
+        /** 고른 색 > 도로에서 본 색과 같은 이름의 색 > 기본 색 */
+        fun withColor(code: String?, seen: String?): Spin {
+            val c = colors.firstOrNull { it.code == code } ?: seen?.let { s -> colors.firstOrNull { it.name == s } }
+            return if (c == null) this else copy(url = c.url)
+        }
+        fun currentCode(): String? = colors.firstOrNull { it.url == url }?.code
     }
+    /** 공식 색상: 코드, 9색 분류 이름, 대표색, 프레임 URL 패턴 */
+    data class CarColor(val code: String, val name: String, val hex: String, val url: String)
     data class Gallery(val urls: List<String>) : CarViews
 }
 
@@ -67,7 +78,12 @@ object OfficialCarImages {
                 val root = JSONObject(context.assets.open("vehicle_images.json").bufferedReader().use { it.readText() }).getJSONObject("vehicles")
                 root.keys().asSequence().associateWith { k ->
                     val o = root.getJSONObject(k)
-                    if (o.getString("type") == "spin") CarViews.Spin(o.getString("url"), o.getInt("frames"), o.getInt("digits"), o.optInt("start", 0))
+                    if (o.getString("type") == "spin") CarViews.Spin(
+                        o.getString("url"), o.getInt("frames"), o.getInt("digits"), o.optInt("start", 0),
+                        o.optJSONArray("colors")?.let { a ->
+                            (0 until a.length()).map { i -> a.getJSONObject(i).let { c -> CarViews.CarColor(c.getString("code"), c.getString("name"), c.getString("hex"), c.getString("url")) } }
+                        } ?: emptyList(),
+                    )
                     else CarViews.Gallery((0 until o.getJSONArray("urls").length()).map { o.getJSONArray("urls").getString(it) })
                 }
             }.getOrDefault(emptyMap()).also { manifest = it }
@@ -141,14 +157,19 @@ object OfficialCarImages {
 fun OfficialCarView(
     id: String, style: CarStyle, modifier: Modifier = Modifier, interactive: Boolean = false,
     silhouette: Boolean = false, turn: Float? = null, showHint: Boolean = interactive,
+    colorCode: String? = null, seenColor: String? = null, onColor: ((String?) -> Unit)? = null,
 ) {
     val ctx = LocalContext.current
-    val views = remember(id) { OfficialCarImages.views(ctx, id) }
+    val base = remember(id) { OfficialCarImages.views(ctx, id) }
+    val views = (base as? CarViews.Spin)?.withColor(colorCode, seenColor) ?: base
+    val viewKey = (views as? CarViews.Spin)?.url ?: id
     val count = when (views) { is CarViews.Spin -> views.frames; is CarViews.Gallery -> views.urls.size; null -> 0 }
     val start = (views as? CarViews.Spin)?.start ?: 0
     var index by remember(id) { mutableIntStateOf(start) }
     val shown = if (turn != null && count > 0) (start + (turn * count).roundToInt()) % count else index
-    val loaded = remember(id) { mutableStateMapOf<Int, ImageBitmap>() }
+    val loaded = remember(viewKey) { mutableStateMapOf<Int, ImageBitmap>() }
+    // 데이터 절약: 처음엔 보이는 각도 1장만, 손가락으로 돌리기 시작하거나 턴테이블일 때만 나머지 프레임을 받는다
+    var wantAll by remember(viewKey) { androidx.compose.runtime.mutableStateOf(false) }
     fun urlOf(i: Int): String? = when (views) {
         is CarViews.Spin -> views.frameUrl(i)
         is CarViews.Gallery -> views.urls.getOrNull(((i % count) + count) % count)
@@ -156,11 +177,11 @@ fun OfficialCarView(
     }
 
     // 현재 각도 먼저, 돌려 보기를 켜면 나머지 프레임도 미리 받아 부드럽게
-    LaunchedEffect(id, interactive || turn != null) {
+    LaunchedEffect(viewKey, wantAll || turn != null) {
         if (views == null) return@LaunchedEffect
         val order = buildList {
             add(shown)
-            if (interactive || turn != null) for (d in 1..count / 2) { add(shown + d); add(shown - d) }
+            if (wantAll || turn != null) for (d in 1..count / 2) { add(shown + d); add(shown - d) }
         }.map { ((it % count) + count) % count }.distinct()
         for (i in order) {
             if (i in loaded) continue
@@ -173,7 +194,7 @@ fun OfficialCarView(
 
     val drag = if (interactive && count > 1) Modifier.pointerInput(id) {
         var acc = 0f
-        detectHorizontalDragGestures { change, dx ->
+        detectHorizontalDragGestures(onDragStart = { wantAll = true }) { change, dx ->
             change.consume()
             acc += dx
             val step = if (views is CarViews.Spin) size.width / (count * 0.9f) else size.width / 4f
@@ -215,6 +236,26 @@ fun OfficialCarView(
                 val h = REAL_DIMS[id]?.let { it.h.toFloat() / it.l } ?: 0.33f
                 val w = minOf(size.width * 0.74f, size.height * 0.62f / (h + 0.18f))
                 drawCar3D(id, style, size.width / 2, size.height * 0.84f, w, yawDeg = 35f, silhouette = silhouette)
+            }
+        }
+        // 공식 색상 칩 (카드에서 색 바꾸기). 도로에서 본 색과 같은 계열은 🎯 표시
+        val spin = views as? CarViews.Spin
+        if (onColor != null && spin != null && spin.colors.size > 1 && !silhouette) {
+            val cur = spin.currentCode()
+            Row(
+                Modifier.align(Alignment.TopStart).padding(6.dp).clip(RoundedCornerShape(12.dp)).background(Color.Black.copy(alpha = 0.35f)).padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically,
+            ) {
+                spin.colors.take(8).forEach { c ->
+                    val sel = c.code == cur
+                    Box(
+                        Modifier.size(if (sel) 20.dp else 16.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                            .background(if (sel) Color.White else Color.Transparent).padding(2.dp)
+                            .clip(androidx.compose.foundation.shape.CircleShape).background(hexColor(c.hex))
+                            .clickable { onColor(c.code) },
+                    )
+                }
+                if (seenColor != null) Text("🎯$seenColor", color = Color.White, fontSize = 10.sp, modifier = Modifier.clickable { onColor(null) })
             }
         }
         if (showHint && count > 1 && !silhouette) {

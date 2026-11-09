@@ -386,6 +386,16 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** 카드에 보여줄 공식 색상 변경 (null = 도로에서 본 색) */
+    fun setCardColor(id: String, code: String?) {
+        viewModelScope.launch {
+            call { repo.setCardColor(id, code) }.onSuccess { e ->
+                _state.update { s -> s.copy(collection = s.collection.map { if (it.card.id == id) e else it }) }
+                loadShowroom()
+            }
+        }
+    }
+
     fun deleteEntry(id: String) {
         viewModelScope.launch {
             call { repo.delete(id) }; refreshCollection(); loadShowroom()

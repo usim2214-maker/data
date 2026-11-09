@@ -119,10 +119,12 @@ class RecognitionPipeline:
             )
         if self.settings.save_crops:  # 기본은 저장하지 않음 (개인정보)
             crop.save(self.settings.crops_dir / f"{ref['id']}-{uuid.uuid4().hex[:8]}.jpg", quality=90)
-        return self._card_from(ref, identity, detection, keywords, location, register)
+        from app.services.quiz import dominant_color
+        return self._card_from(ref, identity, detection, keywords, location, register, seen_color=dominant_color(crop))
 
     def _card_from(self, ref: dict, identity: VehicleIdentity, detection: Detection | None,
-                   keywords: list[str] | None, location: GeoPoint | None, register: bool) -> RecognitionResponse:
+                   keywords: list[str] | None, location: GeoPoint | None, register: bool,
+                   seen_color: str | None = None) -> RecognitionResponse:
         prefs = self.store.get_preferences()
         keywords = keywords or prefs.keywords
         card_id = ref["id"]
@@ -141,6 +143,9 @@ class RecognitionPipeline:
                 rarity=ref.get("rarity", "common"),
             )
 
+        if seen_color:  # 이번에 본 색 (사용자가 직접 고른 색이 있으면 그대로 둔다)
+            prev = self.store.get_entry(card_id)
+            card = card.model_copy(update={"seen_color": seen_color, "color_code": prev.card.color_code if prev else None})
         is_new = False
         if register:
             _, is_new = self.store.register(card, location)

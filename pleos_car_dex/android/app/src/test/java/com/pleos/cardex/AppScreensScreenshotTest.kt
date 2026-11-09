@@ -192,9 +192,9 @@ class AppScreensScreenshotTest {
     @Test fun ecoFront() = shot("card_eco_front") {
         androidx.compose.foundation.layout.Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(24.dp), modifier = androidx.compose.ui.Modifier.padding(32.dp)) {
             listOf(
-                com.pleos.cardex.data.VehicleCard("hyundai-ioniq-5", "현대", "아이오닉 5", "CUV", null, "레트로 감성의 전기 CUV", emptyList(), rarity = "rare", eco = "ev"),
-                com.pleos.cardex.data.VehicleCard("hyundai-grandeur", "현대", "그랜저", "세단", null, "대한민국 대표 준대형 세단", emptyList(), eco = "eco_option"),
-            ).forEach { c -> com.pleos.cardex.ui.components.FlipCard(c, androidx.compose.ui.Modifier.size(330.dp, 470.dp)) }
+                com.pleos.cardex.data.VehicleCard("hyundai-ioniq-5", "현대", "아이오닉 5", "CUV", null, "레트로 감성의 전기 CUV", emptyList(), rarity = "rare", eco = "ev", seenColor = "흰색"),
+                com.pleos.cardex.data.VehicleCard("hyundai-grandeur", "현대", "그랜저", "세단", null, "대한민국 대표 준대형 세단", emptyList(), eco = "eco_option", seenColor = "검은색"),
+            ).forEach { c -> com.pleos.cardex.ui.components.FlipCard(c, androidx.compose.ui.Modifier.size(330.dp, 470.dp), onColor = {}) }
         }
     }
 

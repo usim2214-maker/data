@@ -44,6 +44,9 @@ interface CarDexApi {
     @GET("api/v1/collection/catalog")
     suspend fun catalog(): List<CatalogVehicle>
 
+    @PUT("api/v1/collection/{id}/color")
+    suspend fun setCardColor(@Path("id") id: String, @Body req: CardColorRequest): CollectionEntry
+
     @DELETE("api/v1/collection/{id}")
     suspend fun deleteEntry(@Path("id") id: String)
 

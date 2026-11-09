@@ -40,7 +40,10 @@ import com.pleos.cardex.ui.theme.rarityColor
  * flipped 를 넘기면 외부에서 앞/뒤를 제어 (시연 등), null 이면 탭으로 뒤집기
  */
 @Composable
-fun FlipCard(card: VehicleCard, modifier: Modifier = Modifier, startFlipped: Boolean = false, flipped: Boolean? = null) {
+fun FlipCard(
+    card: VehicleCard, modifier: Modifier = Modifier, startFlipped: Boolean = false, flipped: Boolean? = null,
+    onColor: ((String?) -> Unit)? = null,
+) {
     var tapped by remember(card.id) { mutableStateOf(startFlipped) }
     val showBack = flipped ?: tapped
     val rotation by animateFloatAsState(if (showBack) 180f else 0f, tween(600), label = "flip")
@@ -55,7 +58,7 @@ fun FlipCard(card: VehicleCard, modifier: Modifier = Modifier, startFlipped: Boo
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
         if (rotation <= 90f) {
-            CardFront(card, accent)
+            CardFront(card, accent, onColor)
         } else {
             // 뒷면은 글자가 거꾸로 보이지 않도록 한 번 더 뒤집는다
             Box(Modifier.fillMaxSize().graphicsLayer { rotationY = 180f }) { CardBack(card, accent) }
@@ -64,11 +67,11 @@ fun FlipCard(card: VehicleCard, modifier: Modifier = Modifier, startFlipped: Boo
 }
 
 @Composable
-private fun CardFront(card: VehicleCard, accent: Color) {
+private fun CardFront(card: VehicleCard, accent: Color, onColor: ((String?) -> Unit)? = null) {
     Column(Modifier.fillMaxSize()) {
         // 앞면: 실제 차 (제조사 공식 이미지, 드래그로 360° 회전)
         CarIllustration(
-            card.id, card.bodyType, card.rarity, interactive = true,
+            card.id, card.bodyType, card.rarity, interactive = true, colorCode = card.colorCode, seenColor = card.seenColor, onColor = onColor,
             modifier = Modifier.fillMaxWidth().weight(1f)
                 .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(accent.copy(alpha = 0.35f), Color(0xFF161B22)))),
         )

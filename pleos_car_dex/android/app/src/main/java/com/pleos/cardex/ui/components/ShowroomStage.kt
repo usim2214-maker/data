@@ -120,7 +120,7 @@ fun ShowroomStage(
             ) {
                 OfficialCarView(
                     car.id, carStyleFor(car.id, car.bodyType, car.rarity), Modifier.fillMaxSize(),
-                    turn = if (animate) spin / 360f else null, showHint = false,
+                    turn = if (animate) spin / 360f else null, showHint = false, colorCode = car.colorCode, seenColor = car.seenColor,
                 )
             }
         }

@@ -5,6 +5,7 @@
 
 - `vr.js <현대 모델 slug...>` — 현대 `/contents/vr360/<모델코드>/exterior/.../NNN.png` (360°, 60프레임)
 - `kia.js <기아 모델 slug...>` — 기아 `/configurator/<모델>/trim/exterior/.../<색>_NN.png` (360°, 72프레임)
+- `chips.js <모델 페이지 URL...>` — 공식 색상 칩 주소 (색상별 360° 프레임 경로·대표색 계산에 사용)
 - `cap.js <URL>` — 페이지가 요청하는 이미지/API 주소 목록 (제네시스·캐스퍼 등 확인용)
 - `links.js <URL> <정규식>` — 라인업 페이지의 모델 링크
 

@@ -540,3 +540,15 @@ def test_low_carbon_course_and_trip_tips(client):
     client.post("/api/v1/trips/report", json={"started_at": now, "distance_km": 8, "drive_minutes": 15})
     third = client.post("/api/v1/trips/report", json={"started_at": now, "distance_km": 9, "drive_minutes": 15}).json()
     assert "묶으면" in third["eco_tip"]
+
+
+def test_seen_color_and_card_color(client):
+    """인식할 때 본 차체 색을 카드에 기록, 공식 색상은 사용자가 바꿀 수 있고 재인식해도 유지"""
+    from app.services.quiz import COLOR_HEX
+    r = client.post("/api/v1/recognize", files={"image": ("hyundai-ioniq-5.jpg", _jpeg(), "image/jpeg")}).json()
+    assert r["card"]["seen_color"] in COLOR_HEX and r["card"]["color_code"] is None
+    e = client.put("/api/v1/collection/hyundai-ioniq-5/color", json={"color_code": "SAW"}).json()
+    assert e["card"]["color_code"] == "SAW"
+    r2 = client.post("/api/v1/recognize", files={"image": ("hyundai-ioniq-5.jpg", _jpeg(), "image/jpeg")}).json()
+    assert r2["card"]["color_code"] == "SAW"
+    assert client.put("/api/v1/collection/kia-k5/color", json={"color_code": "abp"}).status_code == 404

@@ -85,6 +85,16 @@ class JsonStore:
         """부가 기능(이번 주의 차·주행 리포트·퀴즈)용 파일 경로"""
         return self._collection_path.with_name(name)
 
+    def set_card_color(self, card_id: str, color_code: str | None) -> CollectionEntry | None:
+        with self._lock:
+            entries = self._load()
+            e = entries.get(card_id)
+            if e is None:
+                return None
+            e.card = e.card.model_copy(update={"color_code": color_code})
+            self._dump(entries)
+            return e
+
     def get_entry(self, card_id: str) -> CollectionEntry | None:
         return self._load().get(card_id)
 

@@ -58,6 +58,7 @@ fun CollectionScreen(
     onRefresh: () -> Unit,
     onFeature: (String) -> Unit,
     onDelete: (String) -> Unit,
+    onColor: (String, String?) -> Unit = { _, _ -> },
     catalog: List<CatalogVehicle> = emptyList(),
     home: HomeSummary? = null,
 ) {
@@ -103,7 +104,7 @@ fun CollectionScreen(
         val missingList = missing.filter { filter != DexFilter.Legendary || it.rarity == "legendary" }
         if (showOwned) items(ownedList, key = { it.card.id }) { entry ->
             Column {
-                FlipCard(entry.card, Modifier.fillMaxWidth().aspectRatio(0.72f))
+                FlipCard(entry.card, Modifier.fillMaxWidth().aspectRatio(0.72f), onColor = { code -> onColor(entry.card.id, code) })
                 Text("발견 ${entry.seenCount}회", color = Color.Gray, modifier = Modifier.padding(top = 8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Button(onClick = { onFeature(entry.card.id) }, enabled = featuredId != entry.card.id) {

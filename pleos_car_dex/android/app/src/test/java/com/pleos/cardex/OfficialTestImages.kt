@@ -12,7 +12,8 @@ object OfficialTestImages {
     private val client = OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS).readTimeout(20, TimeUnit.SECONDS).build()
 
     fun urlsFor(context: Context, id: String, allFrames: Boolean = false): List<String> = when (val v = OfficialCarImages.views(context, id)) {
-        is CarViews.Spin -> if (allFrames) (0 until v.frames).map { v.frameUrl(it) } else listOf(v.frameUrl(v.start))
+        is CarViews.Spin -> if (allFrames) (0 until v.frames).map { v.frameUrl(it) }
+            else listOf(v.frameUrl(v.start)) + v.colors.map { c -> v.copy(url = c.url).frameUrl(v.start) }
         is CarViews.Gallery -> v.urls.take(if (allFrames) v.urls.size else 1)
         null -> emptyList()
     }

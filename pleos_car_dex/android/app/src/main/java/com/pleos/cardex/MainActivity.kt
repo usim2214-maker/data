@@ -123,6 +123,7 @@ class MainActivity : ComponentActivity() {
                                     onRefresh = vm::refreshCollection,
                                     onFeature = vm::feature,
                                     onDelete = vm::deleteEntry,
+                                    onColor = vm::setCardColor,
                                     catalog = state.catalog,
                                     home = state.home,
                                 )

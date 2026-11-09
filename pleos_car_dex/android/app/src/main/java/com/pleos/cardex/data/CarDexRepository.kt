@@ -25,6 +25,7 @@ class CarDexRepository(private val api: CarDexApi = CarDexApi.create()) {
     suspend fun quizStar(questionId: String) = api.quizStar(QuizStarRequest(questionId))
     suspend fun collection() = api.collection()
     suspend fun delete(id: String) = api.deleteEntry(id)
+    suspend fun setCardColor(id: String, code: String?) = api.setCardColor(id, CardColorRequest(code))
     suspend fun catalog() = api.catalog()
     suspend fun showroom() = api.showroom()
     suspend fun updateShowroom(req: ShowroomUpdate) = api.updateShowroom(req)

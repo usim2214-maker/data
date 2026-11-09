@@ -1,5 +1,5 @@
 {
- "_comment": "제조사 공식 사이트 이미지 URL 목록 (이미지 자체는 저장소·APK에 포함하지 않고 앱이 실행 중 내려받아 캐시). 저작권은 각 제조사에 있음 — 비상업 프로토타입 용도, 상업화 전 사용 허락 필요. spin: 360° 프레임 {n} 자리수 digits, start=앞 3/4 프레임(0부터). gallery: 각도별 사진.",
+ "_comment": "제조사 공식 사이트 이미지 URL 목록 (이미지 자체는 저장소·APK에 포함하지 않고 앱이 실행 중 내려받아 캐시). 저작권은 각 제조사에 있음 — 비상업 프로토타입 용도, 상업화 전 사용 허락 필요. spin: 360° 프레임 {n} 자리수 digits, start=앞 3/4 프레임(0부터). gallery: 각도별 사진. colors: 같은 모델의 공식 색상별 360° 프레임(name=9색 분류, hex=대표색). 인식한 차의 색과 가장 가까운 색으로 카드를 보여준다.",
  "vehicles": {
   "hyundai-ioniq-5": {
    "type": "spin",
@@ -7,7 +7,63 @@
    "frames": 60,
    "digits": 3,
    "start": 0,
-   "source": "https://www.hyundai.com/kr/ko/e/vehicles/ioniq5/intro"
+   "source": "https://www.hyundai.com/kr/ko/e/vehicles/ioniq5/intro",
+   "colors": [
+    {
+     "code": "C5G",
+     "name": "회색",
+     "hex": "#A5A29F",
+     "url": "https://www.hyundai.com/contents/vr360/NE09/exterior/J/C5G/{n}.png"
+    },
+    {
+     "code": "A2B",
+     "name": "검은색",
+     "hex": "#262626",
+     "url": "https://www.hyundai.com/contents/vr360/NE09/exterior/J/A2B/{n}.png"
+    },
+    {
+     "code": "M9U",
+     "name": "초록색",
+     "hex": "#596B67",
+     "url": "https://www.hyundai.com/contents/vr360/NE09/exterior/J/M9U/{n}.png"
+    },
+    {
+     "code": "PE2",
+     "name": "검은색",
+     "hex": "#3A3C3B",
+     "url": "https://www.hyundai.com/contents/vr360/NE09/exterior/J/PE2/{n}.png"
+    },
+    {
+     "code": "RTE",
+     "name": "회색",
+     "hex": "#4C4B46",
+     "url": "https://www.hyundai.com/contents/vr360/NE09/exterior/J/RTE/{n}.png"
+    },
+    {
+     "code": "SAW",
+     "name": "흰색",
+     "hex": "#EBEDF6",
+     "url": "https://www.hyundai.com/contents/vr360/NE09/exterior/J/SAW/{n}.png"
+    },
+    {
+     "code": "U3P",
+     "name": "파란색",
+     "hex": "#7B8B98",
+     "url": "https://www.hyundai.com/contents/vr360/NE09/exterior/J/U3P/{n}.png"
+    },
+    {
+     "code": "W3T",
+     "name": "회색",
+     "hex": "#AAA49E",
+     "url": "https://www.hyundai.com/contents/vr360/NE09/exterior/J/W3T/{n}.png"
+    },
+    {
+     "code": "Y2T",
+     "name": "흰색",
+     "hex": "#AFBDBE",
+     "url": "https://www.hyundai.com/contents/vr360/NE09/exterior/J/Y2T/{n}.png"
+    }
+   ]
   },
   "kia-ev9": {
    "type": "spin",
@@ -15,7 +71,51 @@
    "frames": 72,
    "digits": 2,
    "start": 63,
-   "source": "https://www.kia.com/kr/vehicles/ev9"
+   "source": "https://www.kia.com/kr/vehicles/ev9",
+   "colors": [
+    {
+     "code": "swp",
+     "name": "흰색",
+     "hex": "#ECECEA",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/ev9/trim/exterior/2wd/std_light/swp/swp_{n}.png"
+    },
+    {
+     "code": "abp",
+     "name": "검은색",
+     "hex": "#212226",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/ev9/trim/exterior/2wd/std_light/abp/abp_{n}.png"
+    },
+    {
+     "code": "dfg",
+     "name": "회색",
+     "hex": "#919096",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/ev9/trim/exterior/2wd/std_light/dfg/dfg_{n}.png"
+    },
+    {
+     "code": "ieg",
+     "name": "회색",
+     "hex": "#879290",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/ev9/trim/exterior/2wd/std_light/ieg/ieg_{n}.png"
+    },
+    {
+     "code": "ism",
+     "name": "회색",
+     "hex": "#B1B2AD",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/ev9/trim/exterior/2wd/std_light/ism/ism_{n}.png"
+    },
+    {
+     "code": "obg",
+     "name": "파란색",
+     "hex": "#115A82",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/ev9/trim/exterior/2wd/std_light/obg/obg_{n}.png"
+    },
+    {
+     "code": "p2m",
+     "name": "회색",
+     "hex": "#3F4248",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/ev9/trim/exterior/2wd/std_light/p2m/p2m_{n}.png"
+    }
+   ]
   },
   "genesis-g80": {
    "type": "gallery",
@@ -32,7 +132,69 @@
    "frames": 60,
    "digits": 3,
    "start": 0,
-   "source": "https://www.hyundai.com/kr/ko/e/vehicles/the-new-grandeur/intro"
+   "source": "https://www.hyundai.com/kr/ko/e/vehicles/the-new-grandeur/intro",
+   "colors": [
+    {
+     "code": "WBP",
+     "name": "빨간색",
+     "hex": "#4E211C",
+     "url": "https://www.hyundai.com/contents/vr360/GN11/exterior/WBP/{n}.png"
+    },
+    {
+     "code": "A2B",
+     "name": "검은색",
+     "hex": "#19191B",
+     "url": "https://www.hyundai.com/contents/vr360/GN11/exterior/A2B/{n}.png"
+    },
+    {
+     "code": "M7D",
+     "name": "회색",
+     "hex": "#5D616C",
+     "url": "https://www.hyundai.com/contents/vr360/GN11/exterior/M7D/{n}.png"
+    },
+    {
+     "code": "NY9",
+     "name": "파란색",
+     "hex": "#595D68",
+     "url": "https://www.hyundai.com/contents/vr360/GN11/exterior/NY9/{n}.png"
+    },
+    {
+     "code": "T2G",
+     "name": "검은색",
+     "hex": "#272C30",
+     "url": "https://www.hyundai.com/contents/vr360/GN11/exterior/T2G/{n}.png"
+    },
+    {
+     "code": "T4A",
+     "name": "회색",
+     "hex": "#ABADAE",
+     "url": "https://www.hyundai.com/contents/vr360/GN11/exterior/T4A/{n}.png"
+    },
+    {
+     "code": "T9M",
+     "name": "파란색",
+     "hex": "#353A3E",
+     "url": "https://www.hyundai.com/contents/vr360/GN11/exterior/T9M/{n}.png"
+    },
+    {
+     "code": "W6H",
+     "name": "흰색",
+     "hex": "#F2F3ED",
+     "url": "https://www.hyundai.com/contents/vr360/GN11/exterior/W6H/{n}.png"
+    },
+    {
+     "code": "WBM",
+     "name": "빨간색",
+     "hex": "#572828",
+     "url": "https://www.hyundai.com/contents/vr360/GN11/exterior/WBM/{n}.png"
+    },
+    {
+     "code": "XB9",
+     "name": "검은색",
+     "hex": "#1A1C24",
+     "url": "https://www.hyundai.com/contents/vr360/GN11/exterior/XB9/{n}.png"
+    }
+   ]
   },
   "kia-sorento": {
    "type": "spin",
@@ -40,7 +202,39 @@
    "frames": 72,
    "digits": 2,
    "start": 63,
-   "source": "https://www.kia.com/kr/vehicles/sorento"
+   "source": "https://www.kia.com/kr/vehicles/sorento",
+   "colors": [
+    {
+     "code": "swp",
+     "name": "흰색",
+     "hex": "#ECECEA",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/sorento/trim/exterior/gdi/prestige/swp/swp_{n}.png"
+    },
+    {
+     "code": "abp",
+     "name": "검은색",
+     "hex": "#0E121F",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/sorento/trim/exterior/gdi/prestige/abp/abp_{n}.png"
+    },
+    {
+     "code": "agt",
+     "name": "검은색",
+     "hex": "#262931",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/sorento/trim/exterior/gdi/prestige/agt/agt_{n}.png"
+    },
+    {
+     "code": "bn4",
+     "name": "회색",
+     "hex": "#979185",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/sorento/trim/exterior/gdi/prestige/bn4/bn4_{n}.png"
+    },
+    {
+     "code": "cge",
+     "name": "초록색",
+     "hex": "#404C47",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/sorento/trim/exterior/gdi/prestige/cge/cge_{n}.png"
+    }
+   ]
   },
   "hyundai-ioniq-5-n": {
    "type": "spin",
@@ -48,7 +242,57 @@
    "frames": 60,
    "digits": 3,
    "start": 0,
-   "source": "https://www.hyundai.com/kr/ko/e/vehicles/ioniq5-n/intro"
+   "source": "https://www.hyundai.com/kr/ko/e/vehicles/ioniq5-n/intro",
+   "colors": [
+    {
+     "code": "SFB",
+     "name": "파란색",
+     "hex": "#8FB5DA",
+     "url": "https://www.hyundai.com/contents/vr360/NE08/exterior/SFB/{n}.png"
+    },
+    {
+     "code": "A2B",
+     "name": "검은색",
+     "hex": "#292929",
+     "url": "https://www.hyundai.com/contents/vr360/NE08/exterior/A2B/{n}.png"
+    },
+    {
+     "code": "C5G",
+     "name": "회색",
+     "hex": "#AEACA9",
+     "url": "https://www.hyundai.com/contents/vr360/NE08/exterior/C5G/{n}.png"
+    },
+    {
+     "code": "PE2",
+     "name": "회색",
+     "hex": "#646567",
+     "url": "https://www.hyundai.com/contents/vr360/NE08/exterior/PE2/{n}.png"
+    },
+    {
+     "code": "SAW",
+     "name": "흰색",
+     "hex": "#EDEFF9",
+     "url": "https://www.hyundai.com/contents/vr360/NE08/exterior/SAW/{n}.png"
+    },
+    {
+     "code": "SOP",
+     "name": "빨간색",
+     "hex": "#BF452D",
+     "url": "https://www.hyundai.com/contents/vr360/NE08/exterior/SOP/{n}.png"
+    },
+    {
+     "code": "W3T",
+     "name": "흰색",
+     "hex": "#BFBAB2",
+     "url": "https://www.hyundai.com/contents/vr360/NE08/exterior/W3T/{n}.png"
+    },
+    {
+     "code": "XGE",
+     "name": "파란색",
+     "hex": "#81ABD2",
+     "url": "https://www.hyundai.com/contents/vr360/NE08/exterior/XGE/{n}.png"
+    }
+   ]
   },
   "hyundai-avante": {
    "type": "spin",
@@ -56,7 +300,63 @@
    "frames": 60,
    "digits": 3,
    "start": 0,
-   "source": "https://www.hyundai.com/kr/ko/e/vehicles/the-all-new-avante/intro"
+   "source": "https://www.hyundai.com/kr/ko/e/vehicles/the-all-new-avante/intro",
+   "colors": [
+    {
+     "code": "SAW",
+     "name": "흰색",
+     "hex": "#EDEEED",
+     "url": "https://www.hyundai.com/contents/vr360/FN01/exterior/SAW/{n}.png"
+    },
+    {
+     "code": "A2B",
+     "name": "검은색",
+     "hex": "#19191B",
+     "url": "https://www.hyundai.com/contents/vr360/FN01/exterior/A2B/{n}.png"
+    },
+    {
+     "code": "G2H",
+     "name": "파란색",
+     "hex": "#2F3B39",
+     "url": "https://www.hyundai.com/contents/vr360/FN01/exterior/G2H/{n}.png"
+    },
+    {
+     "code": "KKP",
+     "name": "파란색",
+     "hex": "#162347",
+     "url": "https://www.hyundai.com/contents/vr360/FN01/exterior/KKP/{n}.png"
+    },
+    {
+     "code": "PE2",
+     "name": "검은색",
+     "hex": "#3F413F",
+     "url": "https://www.hyundai.com/contents/vr360/FN01/exterior/PE2/{n}.png"
+    },
+    {
+     "code": "QGP",
+     "name": "회색",
+     "hex": "#6E6E6C",
+     "url": "https://www.hyundai.com/contents/vr360/FN01/exterior/QGP/{n}.png"
+    },
+    {
+     "code": "RAF",
+     "name": "검은색",
+     "hex": "#3C3B39",
+     "url": "https://www.hyundai.com/contents/vr360/FN01/exterior/RAF/{n}.png"
+    },
+    {
+     "code": "V2R",
+     "name": "빨간색",
+     "hex": "#611615",
+     "url": "https://www.hyundai.com/contents/vr360/FN01/exterior/V2R/{n}.png"
+    },
+    {
+     "code": "VC2",
+     "name": "회색",
+     "hex": "#7C746C",
+     "url": "https://www.hyundai.com/contents/vr360/FN01/exterior/VC2/{n}.png"
+    }
+   ]
   },
   "hyundai-sonata": {
    "type": "spin",
@@ -64,7 +364,57 @@
    "frames": 60,
    "digits": 3,
    "start": 0,
-   "source": "https://www.hyundai.com/kr/ko/e/vehicles/sonata-the-edge/intro"
+   "source": "https://www.hyundai.com/kr/ko/e/vehicles/sonata-the-edge/intro",
+   "colors": [
+    {
+     "code": "T4M",
+     "name": "회색",
+     "hex": "#AEAFB1",
+     "url": "https://www.hyundai.com/contents/vr360/DN26/exterior/T4M/{n}.png"
+    },
+    {
+     "code": "A2B",
+     "name": "검은색",
+     "hex": "#151517",
+     "url": "https://www.hyundai.com/contents/vr360/DN26/exterior/A2B/{n}.png"
+    },
+    {
+     "code": "NY9",
+     "name": "회색",
+     "hex": "#575B64",
+     "url": "https://www.hyundai.com/contents/vr360/DN26/exterior/NY9/{n}.png"
+    },
+    {
+     "code": "R2P",
+     "name": "빨간색",
+     "hex": "#711719",
+     "url": "https://www.hyundai.com/contents/vr360/DN26/exterior/R2P/{n}.png"
+    },
+    {
+     "code": "T2G",
+     "name": "회색",
+     "hex": "#43484C",
+     "url": "https://www.hyundai.com/contents/vr360/DN26/exterior/T2G/{n}.png"
+    },
+    {
+     "code": "T9M",
+     "name": "검은색",
+     "hex": "#3B4044",
+     "url": "https://www.hyundai.com/contents/vr360/DN26/exterior/T9M/{n}.png"
+    },
+    {
+     "code": "W6H",
+     "name": "흰색",
+     "hex": "#F3F5F4",
+     "url": "https://www.hyundai.com/contents/vr360/DN26/exterior/W6H/{n}.png"
+    },
+    {
+     "code": "XB9",
+     "name": "검은색",
+     "hex": "#1D2029",
+     "url": "https://www.hyundai.com/contents/vr360/DN26/exterior/XB9/{n}.png"
+    }
+   ]
   },
   "hyundai-tucson": {
    "type": "spin",
@@ -72,7 +422,57 @@
    "frames": 60,
    "digits": 3,
    "start": 0,
-   "source": "https://www.hyundai.com/kr/ko/e/vehicles/the-all-new-tucson/intro"
+   "source": "https://www.hyundai.com/kr/ko/e/vehicles/the-all-new-tucson/intro",
+   "colors": [
+    {
+     "code": "W6H",
+     "name": "흰색",
+     "hex": "#DEDCE1",
+     "url": "https://www.hyundai.com/contents/vr360/GX01/exterior/W6H/{n}.png"
+    },
+    {
+     "code": "DDM",
+     "name": "회색",
+     "hex": "#4A4942",
+     "url": "https://www.hyundai.com/contents/vr360/GX01/exterior/DDM/{n}.png"
+    },
+    {
+     "code": "DGM",
+     "name": "회색",
+     "hex": "#4B4B43",
+     "url": "https://www.hyundai.com/contents/vr360/GX01/exterior/DGM/{n}.png"
+    },
+    {
+     "code": "PE2",
+     "name": "검은색",
+     "hex": "#3D3F3E",
+     "url": "https://www.hyundai.com/contents/vr360/GX01/exterior/PE2/{n}.png"
+    },
+    {
+     "code": "R2T",
+     "name": "회색",
+     "hex": "#A2A4A3",
+     "url": "https://www.hyundai.com/contents/vr360/GX01/exterior/R2T/{n}.png"
+    },
+    {
+     "code": "RRP",
+     "name": "빨간색",
+     "hex": "#512113",
+     "url": "https://www.hyundai.com/contents/vr360/GX01/exterior/RRP/{n}.png"
+    },
+    {
+     "code": "TCM",
+     "name": "검은색",
+     "hex": "#161718",
+     "url": "https://www.hyundai.com/contents/vr360/GX01/exterior/TCM/{n}.png"
+    },
+    {
+     "code": "VC2",
+     "name": "회색",
+     "hex": "#857D76",
+     "url": "https://www.hyundai.com/contents/vr360/GX01/exterior/VC2/{n}.png"
+    }
+   ]
   },
   "hyundai-palisade": {
    "type": "spin",
@@ -80,7 +480,57 @@
    "frames": 60,
    "digits": 3,
    "start": 0,
-   "source": "https://www.hyundai.com/kr/ko/e/vehicles/palisade/intro"
+   "source": "https://www.hyundai.com/kr/ko/e/vehicles/palisade/intro",
+   "colors": [
+    {
+     "code": "R8N",
+     "name": "검은색",
+     "hex": "#0B2317",
+     "url": "https://www.hyundai.com/contents/vr360/FX03/exterior/C/R8N/{n}.png"
+    },
+    {
+     "code": "A2B",
+     "name": "검은색",
+     "hex": "#111112",
+     "url": "https://www.hyundai.com/contents/vr360/FX03/exterior/C/A2B/{n}.png"
+    },
+    {
+     "code": "CBP",
+     "name": "검은색",
+     "hex": "#09182C",
+     "url": "https://www.hyundai.com/contents/vr360/FX03/exterior/C/CBP/{n}.png"
+    },
+    {
+     "code": "CRP",
+     "name": "검은색",
+     "hex": "#33302C",
+     "url": "https://www.hyundai.com/contents/vr360/FX03/exterior/C/CRP/{n}.png"
+    },
+    {
+     "code": "PE2",
+     "name": "검은색",
+     "hex": "#383A39",
+     "url": "https://www.hyundai.com/contents/vr360/FX03/exterior/C/PE2/{n}.png"
+    },
+    {
+     "code": "R2T",
+     "name": "회색",
+     "hex": "#8F8E90",
+     "url": "https://www.hyundai.com/contents/vr360/FX03/exterior/C/R2T/{n}.png"
+    },
+    {
+     "code": "TCP",
+     "name": "검은색",
+     "hex": "#1A1B12",
+     "url": "https://www.hyundai.com/contents/vr360/FX03/exterior/C/TCP/{n}.png"
+    },
+    {
+     "code": "WC9",
+     "name": "흰색",
+     "hex": "#DEDCE1",
+     "url": "https://www.hyundai.com/contents/vr360/FX03/exterior/C/WC9/{n}.png"
+    }
+   ]
   },
   "hyundai-casper": {
    "type": "gallery",
@@ -96,7 +546,51 @@
    "frames": 60,
    "digits": 3,
    "start": 0,
-   "source": "https://www.hyundai.com/kr/ko/e/vehicles/the-new-ioniq6/intro"
+   "source": "https://www.hyundai.com/kr/ko/e/vehicles/the-new-ioniq6/intro",
+   "colors": [
+    {
+     "code": "W6H",
+     "name": "흰색",
+     "hex": "#F2F3ED",
+     "url": "https://www.hyundai.com/contents/vr360/CE03/exterior/W6H/{n}.png"
+    },
+    {
+     "code": "A2B",
+     "name": "검은색",
+     "hex": "#19191B",
+     "url": "https://www.hyundai.com/contents/vr360/CE03/exterior/A2B/{n}.png"
+    },
+    {
+     "code": "M7D",
+     "name": "파란색",
+     "hex": "#4E525B",
+     "url": "https://www.hyundai.com/contents/vr360/CE03/exterior/M7D/{n}.png"
+    },
+    {
+     "code": "NY9",
+     "name": "파란색",
+     "hex": "#555964",
+     "url": "https://www.hyundai.com/contents/vr360/CE03/exterior/NY9/{n}.png"
+    },
+    {
+     "code": "T2G",
+     "name": "파란색",
+     "hex": "#414850",
+     "url": "https://www.hyundai.com/contents/vr360/CE03/exterior/T2G/{n}.png"
+    },
+    {
+     "code": "W3T",
+     "name": "회색",
+     "hex": "#A3A097",
+     "url": "https://www.hyundai.com/contents/vr360/CE03/exterior/W3T/{n}.png"
+    },
+    {
+     "code": "XB9",
+     "name": "검은색",
+     "hex": "#1F202A",
+     "url": "https://www.hyundai.com/contents/vr360/CE03/exterior/XB9/{n}.png"
+    }
+   ]
   },
   "hyundai-staria": {
    "type": "spin",
@@ -104,7 +598,45 @@
    "frames": 60,
    "digits": 3,
    "start": 0,
-   "source": "https://www.hyundai.com/kr/ko/e/vehicles/the-new-staria/intro"
+   "source": "https://www.hyundai.com/kr/ko/e/vehicles/the-new-staria/intro",
+   "colors": [
+    {
+     "code": "YAC",
+     "name": "흰색",
+     "hex": "#FBFBFB",
+     "url": "https://www.hyundai.com/contents/vr360/US30/exterior/TM/YAC/{n}.png"
+    },
+    {
+     "code": "A2B",
+     "name": "검은색",
+     "hex": "#242329",
+     "url": "https://www.hyundai.com/contents/vr360/US30/exterior/TM/A2B/{n}.png"
+    },
+    {
+     "code": "CBP",
+     "name": "파란색",
+     "hex": "#222743",
+     "url": "https://www.hyundai.com/contents/vr360/US30/exterior/TM/CBP/{n}.png"
+    },
+    {
+     "code": "NFA",
+     "name": "노란색",
+     "hex": "#DCB41B",
+     "url": "https://www.hyundai.com/contents/vr360/US30/exterior/TM/NFA/{n}.png"
+    },
+    {
+     "code": "PE2",
+     "name": "회색",
+     "hex": "#47464B",
+     "url": "https://www.hyundai.com/contents/vr360/US30/exterior/TM/PE2/{n}.png"
+    },
+    {
+     "code": "R2T",
+     "name": "흰색",
+     "hex": "#C8C8C8",
+     "url": "https://www.hyundai.com/contents/vr360/US30/exterior/TM/R2T/{n}.png"
+    }
+   ]
   },
   "hyundai-avante-n": {
    "type": "spin",
@@ -112,7 +644,33 @@
    "frames": 60,
    "digits": 3,
    "start": 0,
-   "source": "https://www.hyundai.com/kr/ko/e/vehicles/avante-n/intro"
+   "source": "https://www.hyundai.com/kr/ko/e/vehicles/avante-n/intro",
+   "colors": [
+    {
+     "code": "XFB",
+     "name": "파란색",
+     "hex": "#6991C4",
+     "url": "https://www.hyundai.com/contents/vr360/CN26/exterior/XFB/{n}.png"
+    },
+    {
+     "code": "A2B",
+     "name": "검은색",
+     "hex": "#18181C",
+     "url": "https://www.hyundai.com/contents/vr360/CN26/exterior/A2B/{n}.png"
+    },
+    {
+     "code": "PE2",
+     "name": "회색",
+     "hex": "#44474E",
+     "url": "https://www.hyundai.com/contents/vr360/CN26/exterior/PE2/{n}.png"
+    },
+    {
+     "code": "SAW",
+     "name": "흰색",
+     "hex": "#D4D7DC",
+     "url": "https://www.hyundai.com/contents/vr360/CN26/exterior/SAW/{n}.png"
+    }
+   ]
   },
   "kia-morning": {
    "type": "spin",
@@ -120,7 +678,51 @@
    "frames": 72,
    "digits": 2,
    "start": 63,
-   "source": "https://www.kia.com/kr/vehicles/morning"
+   "source": "https://www.kia.com/kr/vehicles/morning",
+   "colors": [
+    {
+     "code": "ud",
+     "name": "흰색",
+     "hex": "#ECECEA",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/morning/trim/exterior/trendy/ud/ud_{n}.png"
+    },
+    {
+     "code": "a2g",
+     "name": "초록색",
+     "hex": "#4D5E56",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/morning/trim/exterior/trendy/a2g/a2g_{n}.png"
+    },
+    {
+     "code": "abp",
+     "name": "검은색",
+     "hex": "#091113",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/morning/trim/exterior/trendy/abp/abp_{n}.png"
+    },
+    {
+     "code": "beg",
+     "name": "빨간색",
+     "hex": "#9C272B",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/morning/trim/exterior/trendy/beg/beg_{n}.png"
+    },
+    {
+     "code": "kcs",
+     "name": "회색",
+     "hex": "#AAAAAD",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/morning/trim/exterior/trendy/kcs/kcs_{n}.png"
+    },
+    {
+     "code": "m7g",
+     "name": "회색",
+     "hex": "#484A48",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/morning/trim/exterior/trendy/m7g/m7g_{n}.png"
+    },
+    {
+     "code": "m9y",
+     "name": "흰색",
+     "hex": "#CAC7C0",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/morning/trim/exterior/trendy/m9y/m9y_{n}.png"
+    }
+   ]
   },
   "kia-ray": {
    "type": "spin",
@@ -128,7 +730,45 @@
    "frames": 72,
    "digits": 2,
    "start": 63,
-   "source": "https://www.kia.com/kr/vehicles/ray"
+   "source": "https://www.kia.com/kr/vehicles/ray",
+   "colors": [
+    {
+     "code": "ud",
+     "name": "흰색",
+     "hex": "#ECECEA",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/ray/trim/exterior/trendy/ud/ud_{n}.png"
+    },
+    {
+     "code": "a2g",
+     "name": "초록색",
+     "hex": "#4D5E56",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/ray/trim/exterior/trendy/a2g/a2g_{n}.png"
+    },
+    {
+     "code": "abp",
+     "name": "검은색",
+     "hex": "#091113",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/ray/trim/exterior/trendy/abp/abp_{n}.png"
+    },
+    {
+     "code": "aeq",
+     "name": "파란색",
+     "hex": "#83A4A1",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/ray/trim/exterior/trendy/aeq/aeq_{n}.png"
+    },
+    {
+     "code": "m7g",
+     "name": "회색",
+     "hex": "#474846",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/ray/trim/exterior/trendy/m7g/m7g_{n}.png"
+    },
+    {
+     "code": "m9y",
+     "name": "흰색",
+     "hex": "#C5C0AB",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/ray/trim/exterior/trendy/m9y/m9y_{n}.png"
+    }
+   ]
   },
   "kia-k5": {
    "type": "spin",
@@ -136,7 +776,27 @@
    "frames": 72,
    "digits": 2,
    "start": 63,
-   "source": "https://www.kia.com/kr/vehicles/k5"
+   "source": "https://www.kia.com/kr/vehicles/k5",
+   "colors": [
+    {
+     "code": "swp",
+     "name": "흰색",
+     "hex": "#ECECEA",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/k5/trim/exterior/hev/prestige/swp/swp_{n}.png"
+    },
+    {
+     "code": "abp",
+     "name": "검은색",
+     "hex": "#0E121F",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/k5/trim/exterior/hev/prestige/abp/abp_{n}.png"
+    },
+    {
+     "code": "agt",
+     "name": "검은색",
+     "hex": "#262931",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/k5/trim/exterior/hev/prestige/agt/agt_{n}.png"
+    }
+   ]
   },
   "kia-k8": {
    "type": "spin",
@@ -144,7 +804,33 @@
    "frames": 72,
    "digits": 2,
    "start": 63,
-   "source": "https://www.kia.com/kr/vehicles/k8"
+   "source": "https://www.kia.com/kr/vehicles/k8",
+   "colors": [
+    {
+     "code": "swp",
+     "name": "흰색",
+     "hex": "#ECECEA",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/k8/trim/exterior/gsl_2-5/noblesse_light/swp/swp_{n}.png"
+    },
+    {
+     "code": "abp",
+     "name": "검은색",
+     "hex": "#091113",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/k8/trim/exterior/gsl_2-5/noblesse_light/abp/abp_{n}.png"
+    },
+    {
+     "code": "agt",
+     "name": "검은색",
+     "hex": "#262931",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/k8/trim/exterior/gsl_2-5/noblesse_light/agt/agt_{n}.png"
+    },
+    {
+     "code": "klm",
+     "name": "회색",
+     "hex": "#68686A",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/k8/trim/exterior/gsl_2-5/noblesse_light/klm/klm_{n}.png"
+    }
+   ]
   },
   "kia-sportage": {
    "type": "spin",
@@ -152,7 +838,39 @@
    "frames": 72,
    "digits": 2,
    "start": 63,
-   "source": "https://www.kia.com/kr/vehicles/sportage"
+   "source": "https://www.kia.com/kr/vehicles/sportage",
+   "colors": [
+    {
+     "code": "swp",
+     "name": "흰색",
+     "hex": "#ECECEA",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/sportage/trim/exterior/1-6_ice/prestige/swp/swp_{n}.png"
+    },
+    {
+     "code": "c7a",
+     "name": "회색",
+     "hex": "#7B7D7D",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/sportage/trim/exterior/1-6_ice/prestige/c7a/c7a_{n}.png"
+    },
+    {
+     "code": "fsb",
+     "name": "검은색",
+     "hex": "#181716",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/sportage/trim/exterior/1-6_ice/prestige/fsb/fsb_{n}.png"
+    },
+    {
+     "code": "hrb",
+     "name": "파란색",
+     "hex": "#436275",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/sportage/trim/exterior/1-6_ice/prestige/hrb/hrb_{n}.png"
+    },
+    {
+     "code": "kdg",
+     "name": "파란색",
+     "hex": "#292F35",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/sportage/trim/exterior/1-6_ice/prestige/kdg/kdg_{n}.png"
+    }
+   ]
   },
   "kia-seltos": {
    "type": "spin",
@@ -160,7 +878,45 @@
    "frames": 72,
    "digits": 2,
    "start": 63,
-   "source": "https://www.kia.com/kr/vehicles/seltos"
+   "source": "https://www.kia.com/kr/vehicles/seltos",
+   "colors": [
+    {
+     "code": "swp",
+     "name": "흰색",
+     "hex": "#ECECEA",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/seltos/trim/exterior/tgdi/trendy/swp/swp_{n}.png"
+    },
+    {
+     "code": "ebb",
+     "name": "파란색",
+     "hex": "#496F7C",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/seltos/trim/exterior/tgdi/trendy/ebb/ebb_{n}.png"
+    },
+    {
+     "code": "fsb",
+     "name": "검은색",
+     "hex": "#181716",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/seltos/trim/exterior/tgdi/trendy/fsb/fsb_{n}.png"
+    },
+    {
+     "code": "ieg",
+     "name": "파란색",
+     "hex": "#6A807F",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/seltos/trim/exterior/tgdi/trendy/ieg/ieg_{n}.png"
+    },
+    {
+     "code": "isg",
+     "name": "흰색",
+     "hex": "#C1C2BD",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/seltos/trim/exterior/tgdi/trendy/isg/isg_{n}.png"
+    },
+    {
+     "code": "kdg",
+     "name": "파란색",
+     "hex": "#292F35",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/seltos/trim/exterior/tgdi/trendy/kdg/kdg_{n}.png"
+    }
+   ]
   },
   "kia-carnival": {
    "type": "gallery",
@@ -175,7 +931,51 @@
    "frames": 72,
    "digits": 2,
    "start": 63,
-   "source": "https://www.kia.com/kr/vehicles/ev3"
+   "source": "https://www.kia.com/kr/vehicles/ev3",
+   "colors": [
+    {
+     "code": "swp",
+     "name": "흰색",
+     "hex": "#ECECEA",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/ev3/trim/exterior/air/std/swp/swp_{n}.png"
+    },
+    {
+     "code": "abp",
+     "name": "검은색",
+     "hex": "#0B0B0B",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/ev3/trim/exterior/air/std/abp/abp_{n}.png"
+    },
+    {
+     "code": "ag3",
+     "name": "회색",
+     "hex": "#6F7B6F",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/ev3/trim/exterior/air/std/ag3/ag3_{n}.png"
+    },
+    {
+     "code": "ebb",
+     "name": "파란색",
+     "hex": "#59717E",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/ev3/trim/exterior/air/std/ebb/ebb_{n}.png"
+    },
+    {
+     "code": "ebd",
+     "name": "검은색",
+     "hex": "#3A3B3B",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/ev3/trim/exterior/air/std/ebd/ebd_{n}.png"
+    },
+    {
+     "code": "isg",
+     "name": "회색",
+     "hex": "#8D8C88",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/ev3/trim/exterior/air/std/isg/isg_{n}.png"
+    },
+    {
+     "code": "ism",
+     "name": "회색",
+     "hex": "#92918C",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/ev3/trim/exterior/air/std/ism/ism_{n}.png"
+    }
+   ]
   },
   "kia-ev6": {
    "type": "spin",
@@ -183,7 +983,51 @@
    "frames": 72,
    "digits": 2,
    "start": 63,
-   "source": "https://www.kia.com/kr/vehicles/ev6"
+   "source": "https://www.kia.com/kr/vehicles/ev6",
+   "colors": [
+    {
+     "code": "swp",
+     "name": "흰색",
+     "hex": "#ECECEA",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/ev6/trim/exterior/std/std_light/swp/swp_{n}.png"
+    },
+    {
+     "code": "abp",
+     "name": "검은색",
+     "hex": "#091113",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/ev6/trim/exterior/std/std_light/abp/abp_{n}.png"
+    },
+    {
+     "code": "agt",
+     "name": "검은색",
+     "hex": "#262931",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/ev6/trim/exterior/std/std_light/agt/agt_{n}.png"
+    },
+    {
+     "code": "cr5",
+     "name": "빨간색",
+     "hex": "#912D22",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/ev6/trim/exterior/std/std_light/cr5/cr5_{n}.png"
+    },
+    {
+     "code": "du3",
+     "name": "파란색",
+     "hex": "#283952",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/ev6/trim/exterior/std/std_light/du3/du3_{n}.png"
+    },
+    {
+     "code": "ism",
+     "name": "흰색",
+     "hex": "#BDBCB7",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/ev6/trim/exterior/std/std_light/ism/ism_{n}.png"
+    },
+    {
+     "code": "klm",
+     "name": "회색",
+     "hex": "#68686A",
+     "url": "https://www.kia.com/content/dam/kwp/kr/ko/configurator/ev6/trim/exterior/std/std_light/klm/klm_{n}.png"
+    }
+   ]
   },
   "genesis-g90": {
    "type": "gallery",
@@ -226,7 +1070,87 @@
    "frames": 60,
    "digits": 3,
    "start": 0,
-   "source": "https://www.hyundai.com/kr/ko/e/vehicles/kona/intro"
+   "source": "https://www.hyundai.com/kr/ko/e/vehicles/kona/intro",
+   "colors": [
+    {
+     "code": "RRR",
+     "name": "파란색",
+     "hex": "#62767B",
+     "url": "https://www.hyundai.com/contents/vr360/SX19/exterior/RRR/{n}.png"
+    },
+    {
+     "code": "A2B",
+     "name": "검은색",
+     "hex": "#161616",
+     "url": "https://www.hyundai.com/contents/vr360/SX19/exterior/A2B/{n}.png"
+    },
+    {
+     "code": "C50",
+     "name": "회색",
+     "hex": "#9A9FA1",
+     "url": "https://www.hyundai.com/contents/vr360/SX19/exterior/C50/{n}.png"
+    },
+    {
+     "code": "C5G",
+     "name": "회색",
+     "hex": "#9AA0A1",
+     "url": "https://www.hyundai.com/contents/vr360/SX19/exterior/C5G/{n}.png"
+    },
+    {
+     "code": "PE0",
+     "name": "검은색",
+     "hex": "#333437",
+     "url": "https://www.hyundai.com/contents/vr360/SX19/exterior/PE0/{n}.png"
+    },
+    {
+     "code": "PE2",
+     "name": "검은색",
+     "hex": "#343537",
+     "url": "https://www.hyundai.com/contents/vr360/SX19/exterior/PE2/{n}.png"
+    },
+    {
+     "code": "R20",
+     "name": "빨간색",
+     "hex": "#7B201D",
+     "url": "https://www.hyundai.com/contents/vr360/SX19/exterior/R20/{n}.png"
+    },
+    {
+     "code": "R2P",
+     "name": "빨간색",
+     "hex": "#7F211D",
+     "url": "https://www.hyundai.com/contents/vr360/SX19/exterior/R2P/{n}.png"
+    },
+    {
+     "code": "RR0",
+     "name": "파란색",
+     "hex": "#62757B",
+     "url": "https://www.hyundai.com/contents/vr360/SX19/exterior/RR0/{n}.png"
+    },
+    {
+     "code": "SA0",
+     "name": "흰색",
+     "hex": "#DEE0E0",
+     "url": "https://www.hyundai.com/contents/vr360/SX19/exterior/SA0/{n}.png"
+    },
+    {
+     "code": "SAW",
+     "name": "흰색",
+     "hex": "#DFE0E0",
+     "url": "https://www.hyundai.com/contents/vr360/SX19/exterior/SAW/{n}.png"
+    },
+    {
+     "code": "YY0",
+     "name": "노란색",
+     "hex": "#ADB836",
+     "url": "https://www.hyundai.com/contents/vr360/SX19/exterior/YY0/{n}.png"
+    },
+    {
+     "code": "YYY",
+     "name": "노란색",
+     "hex": "#B1B835",
+     "url": "https://www.hyundai.com/contents/vr360/SX19/exterior/YYY/{n}.png"
+    }
+   ]
   }
  }
 }

@@ -36,7 +36,12 @@ data class VehicleCard(
     @SerialName("is_my_car") val isMyCar: Boolean = false,
     @SerialName("vs_my_car") val vsMyCar: List<String> = emptyList(), // 카드 뒷면 '내 차와 비교'
     val eco: String? = null, // ev | eco_option (친환경 배지)
+    @SerialName("seen_color") val seenColor: String? = null, // 도로에서 본 색 (9색 분류)
+    @SerialName("color_code") val colorCode: String? = null, // 직접 고른 공식 색상
 )
+
+@Serializable
+data class CardColorRequest(@SerialName("color_code") val colorCode: String?)
 
 @Serializable
 data class RecognitionResponse(

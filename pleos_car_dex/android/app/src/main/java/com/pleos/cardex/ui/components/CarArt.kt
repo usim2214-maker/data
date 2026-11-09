@@ -111,9 +111,12 @@ fun carStyleFor(id: String, bodyType: String, rarity: String): CarStyle = when (
 @Composable
 fun CarIllustration(
     id: String, bodyType: String, rarity: String, modifier: Modifier = Modifier, silhouette: Boolean = false,
-    interactive: Boolean = false,
+    interactive: Boolean = false, colorCode: String? = null, seenColor: String? = null, onColor: ((String?) -> Unit)? = null,
 ) {
-    OfficialCarView(id, carStyleFor(id, bodyType, rarity), modifier, interactive = interactive, silhouette = silhouette)
+    OfficialCarView(
+        id, carStyleFor(id, bodyType, rarity), modifier, interactive = interactive, silhouette = silhouette,
+        colorCode = colorCode, seenColor = seenColor, onColor = onColor,
+    )
 }
 
 /** 차량 그리기 진입점: 실차 비율 입체 일러스트 ([drawRealCar]). 예전 카툰 버전은 [drawToyCar] */

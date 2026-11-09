@@ -2,7 +2,10 @@ package com.pleos.cardex.ui.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -106,6 +109,19 @@ fun CollectionScreen(
             Column {
                 FlipCard(entry.card, Modifier.fillMaxWidth().aspectRatio(0.72f), onColor = { code -> onColor(entry.card.id, code) })
                 Text("발견 ${entry.seenCount}회", color = Color.Gray, modifier = Modifier.padding(top = 8.dp))
+                if (entry.seenColors.isNotEmpty()) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    run {
+                        Text("만난 색", color = Color.Gray)
+                        entry.seenColors.forEach { c ->
+                            androidx.compose.foundation.layout.Box(
+                                Modifier.size(14.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                                    .border(1.dp, Color.Gray, androidx.compose.foundation.shape.CircleShape)
+                                    .background(Color(com.pleos.cardex.data.SEEN_COLOR_HEX[c] ?: 0xFF9E9E9E)),
+                            )
+                        }
+                        if (entry.seenColors.size >= 3) Text("🎨 컬렉터", color = Color(0xFFFFD54F))
+                    }
+                }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Button(onClick = { onFeature(entry.card.id) }, enabled = featuredId != entry.card.id) {
                         Text(if (featuredId == entry.card.id) "전시 중" else "쇼룸에 전시")

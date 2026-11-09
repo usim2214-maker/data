@@ -198,6 +198,20 @@ class AppScreensScreenshotTest {
         }
     }
 
+    @Config(qualifiers = "w1400dp-h900dp-land-mdpi")
+    @Test fun dexColors() = shot("dex_colors") {
+        val ev6 = com.pleos.cardex.data.VehicleCard("kia-ev9", "기아", "EV9", "SUV", null, "3열 대형 전기 SUV", emptyList(), rarity = "rare", eco = "ev", seenColor = "파란색")
+        val ion = com.pleos.cardex.data.VehicleCard("hyundai-ioniq-5", "현대", "아이오닉 5", "CUV", null, "레트로 감성의 전기 CUV", emptyList(), rarity = "rare", eco = "ev", seenColor = "흰색")
+        com.pleos.cardex.ui.screens.CollectionScreen(
+            entries = listOf(
+                com.pleos.cardex.data.CollectionEntry(ev6, "2026-11-09T00:00:00Z", "2026-11-09T00:00:00Z", seenCount = 4, seenColors = listOf("흰색", "검은색", "파란색")),
+                com.pleos.cardex.data.CollectionEntry(ion, "2026-11-09T00:00:00Z", "2026-11-09T00:00:00Z", seenCount = 2, seenColors = listOf("흰색", "회색")),
+            ),
+            synergy = null, featuredId = null, onRefresh = {}, onFeature = {}, onDelete = {},
+            home = home.copy(dexOwned = 2, dexTotal = 28),
+        )
+    }
+
     @Test fun onboarding() = shot("onboarding") { OnboardingScreen(onFinish = {}) }
 
     @Test fun celebration() = shot("celebration") {

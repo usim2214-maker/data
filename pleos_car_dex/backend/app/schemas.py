@@ -90,6 +90,7 @@ class CollectionEntry(BaseModel):
     last_seen_at: datetime
     seen_count: int = 1
     first_seen_location: GeoPoint | None = None
+    seen_colors: list[str] = []  # 이 모델을 만난 색들 (컬러 컬렉션)
 
 
 class CollectionResponse(BaseModel):

@@ -552,3 +552,16 @@ def test_seen_color_and_card_color(client):
     r2 = client.post("/api/v1/recognize", files={"image": ("hyundai-ioniq-5.jpg", _jpeg(), "image/jpeg")}).json()
     assert r2["card"]["color_code"] == "SAW"
     assert client.put("/api/v1/collection/kia-k5/color", json={"color_code": "abp"}).status_code == 404
+
+
+def test_color_collection(client, monkeypatch):
+    """같은 모델을 다른 색으로 만나면 컬러 컬렉션에 쌓이고 3색부터 보너스"""
+    from app.services import quiz
+    for color in ["흰색", "검은색", "흰색", "빨간색"]:
+        monkeypatch.setattr(quiz, "dominant_color", lambda crop, c=color: c)
+        client.post("/api/v1/recognize", files={"image": ("kia-ev6.jpg", _jpeg(), "image/jpeg")})
+    col = client.get("/api/v1/collection").json()
+    e = next(x for x in col["entries"] if x["card"]["id"] == "kia-ev6")
+    assert e["seen_colors"] == ["흰색", "검은색", "빨간색"]
+    syn = {b["name"]: b for b in col["synergy"]["bonuses"]}
+    assert syn["컬러 컬렉터"]["points"] == 15 and "EV6 3색" in syn["컬러 컬렉터"]["description"]

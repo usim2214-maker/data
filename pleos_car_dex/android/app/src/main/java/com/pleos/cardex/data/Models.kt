@@ -69,6 +69,13 @@ data class CollectionEntry(
     @SerialName("last_seen_at") val lastSeenAt: String,
     @SerialName("seen_count") val seenCount: Int = 1,
     @SerialName("first_seen_location") val firstSeenLocation: GeoPoint? = null,
+    @SerialName("seen_colors") val seenColors: List<String> = emptyList(), // 컬러 컬렉션
+)
+
+/** 9색 분류 → 표시 색 (서버 quiz.COLOR_HEX 와 동일) */
+val SEEN_COLOR_HEX = mapOf(
+    "빨간색" to 0xFFE53935, "주황색" to 0xFFFB8C00, "노란색" to 0xFFFDD835, "초록색" to 0xFF43A047, "파란색" to 0xFF1E88E5,
+    "보라색" to 0xFF8E24AA, "흰색" to 0xFFFAFAFA, "검은색" to 0xFF212121, "회색" to 0xFF9E9E9E,
 )
 
 @Serializable

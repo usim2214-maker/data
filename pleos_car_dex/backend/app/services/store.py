@@ -66,9 +66,12 @@ class JsonStore:
             if existing:
                 existing.card, existing.last_seen_at = card, now
                 existing.seen_count += 1
+                if card.seen_color and card.seen_color not in existing.seen_colors:
+                    existing.seen_colors = existing.seen_colors + [card.seen_color]
                 entry, is_new = existing, False
             else:
-                entry = CollectionEntry(card=card, first_seen_at=now, last_seen_at=now, first_seen_location=location)
+                entry = CollectionEntry(card=card, first_seen_at=now, last_seen_at=now, first_seen_location=location,
+                                        seen_colors=[card.seen_color] if card.seen_color else [])
                 entries[card.id], is_new = entry, True
             self._dump(entries)
         return entry, is_new

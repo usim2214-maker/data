@@ -22,6 +22,7 @@ AREA_COMPLETE_POINTS = 100  # 권역 내 모든 시·도 방문
 TRAVEL_FIND_POINTS = 10  # 수도권 밖에서 처음 발견한 차량 1대당 — 여행지에서의 수집 장려
 HOME_AREA = "수도권"
 EV_SET_SIZE, EV_SET_POINTS = 3, 50  # 전기차 3종 이상 수집 = 전동화 컬렉터
+COLOR_SET_SIZE, COLOR_SET_POINTS = 3, 15  # 한 모델을 3가지 색 이상 만남 = 컬러 컬렉터 (모델당)
 
 
 def compute(
@@ -61,6 +62,11 @@ def compute(
     evs = [e for e in entries if eco_type(e.card.id) == "ev"]
     if len(evs) >= EV_SET_SIZE:
         bonuses.append(SynergyBonus(name="전동화 컬렉터", points=EV_SET_POINTS, description=f"전기차 {len(evs)}종 수집"))
+
+    colorful = [e for e in entries if len(e.seen_colors) >= COLOR_SET_SIZE]
+    if colorful:
+        bonuses.append(SynergyBonus(name="컬러 컬렉터", points=COLOR_SET_POINTS * len(colorful),
+                                    description=", ".join(f"{e.card.model} {len(e.seen_colors)}색" for e in colorful[:3])))
 
     if featured_brand and brands.get(featured_brand, 0) > 1:
         pts = (brands[featured_brand] - 1) * FEATURED_MATCH_POINTS

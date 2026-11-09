@@ -417,6 +417,25 @@ class HomeSummary(BaseModel):
     next_goal: str  # 다음 목표 한 줄 (예: "부산 마스터까지 35점")
 
 
+class QuizQuestion(BaseModel):
+    """아이용 차 맞히기 퀴즈 (YOLO 결과만으로 출제). 정답도 함께 보내고 앱이 채점"""
+
+    id: str
+    type: str  # kind | color
+    prompt: str
+    choices: list[str]
+    choice_icons: list[str]  # 종류: 이모지 / 색깔: #RRGGBB
+    answer: str
+    detection: Detection
+
+
+class QuizResponse(BaseModel):
+    found: bool
+    question: QuizQuestion | None = None
+    detections: list[Detection] = []
+    message: str = ""
+
+
 CollectionResponse.model_rebuild()
 CourseCandidates.model_rebuild()
 LandmarkVisitResponse.model_rebuild()

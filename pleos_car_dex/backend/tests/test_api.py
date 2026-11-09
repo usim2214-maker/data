@@ -347,3 +347,22 @@ def test_course_candidates_and_build_for_pleos_llm(client):
     }).json()
     assert course["title"] == "Pleos LLM 코스" and [s["content_id"] for s in course["stops"]] == [pick_id]
     assert course["est_drive_hours"] > 0
+
+
+def test_kids_quiz_kind_and_color(client):
+    from PIL import Image as _Image
+
+    def img(color):
+        buf = io.BytesIO(); _Image.new("RGB", (640, 360), color).save(buf, format="JPEG"); return buf.getvalue()
+
+    r = client.post("/api/v1/quiz/question", files={"image": ("a.jpg", img((220, 30, 30)), "image/jpeg")}, data={"type": "color"}).json()
+    q = r["question"]
+    assert r["found"] and q["type"] == "color" and q["answer"] == "빨간색"
+    assert len(q["choices"]) == 3 and "빨간색" in q["choices"] and len(set(q["choices"])) == 3
+    assert q["choice_icons"][q["choices"].index("빨간색")] == "#E53935"
+
+    q = client.post("/api/v1/quiz/question", files={"image": ("b.jpg", img((20, 60, 200)), "image/jpeg")}, data={"type": "kind"}).json()["question"]
+    assert q["answer"] == "승용차" and q["choice_icons"][q["choices"].index("승용차")] == "🚗"  # mock 감지기 = car
+
+    for color, name in [((250, 250, 250), "흰색"), ((15, 15, 15), "검은색"), ((40, 160, 60), "초록색"), ((240, 220, 40), "노란색")]:
+        assert client.post("/api/v1/quiz/question", files={"image": ("c.jpg", img(color), "image/jpeg")}, data={"type": "color"}).json()["question"]["answer"] == name

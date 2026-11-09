@@ -18,6 +18,9 @@ class CarDexRepository(private val api: CarDexApi = CarDexApi.create()) {
         )
     }
 
+    suspend fun quiz(jpeg: ByteArray, fileName: String) =
+        api.quiz(MultipartBody.Part.createFormData("image", fileName, jpeg.toRequestBody("image/jpeg".toMediaType())))
+
     suspend fun collection() = api.collection()
     suspend fun delete(id: String) = api.deleteEntry(id)
     suspend fun catalog() = api.catalog()

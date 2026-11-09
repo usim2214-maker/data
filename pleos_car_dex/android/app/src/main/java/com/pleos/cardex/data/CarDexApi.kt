@@ -28,6 +28,10 @@ interface CarDexApi {
         @Part("keywords") keywords: RequestBody? = null,
     ): RecognitionResponse
 
+    @Multipart
+    @POST("api/v1/quiz/question")
+    suspend fun quiz(@Part image: MultipartBody.Part): QuizResponse
+
     @GET("api/v1/collection")
     suspend fun collection(): CollectionResponse
 

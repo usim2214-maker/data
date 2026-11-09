@@ -59,8 +59,18 @@ fun DrivingScreen(
             )
         }
 
+        val quiz = state.quiz?.takeIf { state.quizPicked == null }
         val ch = state.challenge?.takeIf { it.status == "active" }
-        if (ch != null) {
+        if (quiz != null) {
+            // 아이용 퀴즈: 화면은 보기만, 대답은 말로 ('빨간색!', '버스!', '1번!')
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(28.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("🧒 ${quiz.prompt}", fontSize = 34.sp)
+                    Text(quiz.choices.mapIndexed { i, c -> "${i + 1}. $c" }.joinToString("    "), fontSize = 30.sp, color = MaterialTheme.colorScheme.secondary)
+                    Text("🎙 말로 대답해요 · ⭐ ${state.quizStars}", fontSize = 22.sp, color = Color.Gray)
+                }
+            }
+        } else if (ch != null) {
             val here = state.driving?.location
             val next = ch.course.stops.firstOrNull { it.contentId !in ch.visited }
             Card(Modifier.fillMaxWidth()) {

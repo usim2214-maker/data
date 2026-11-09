@@ -200,6 +200,21 @@ data class HomeSummary(
     @SerialName("next_goal") val nextGoal: String,
 )
 
+/** 아이용 차 맞히기 퀴즈 (YOLO 결과로 출제, 정답 포함 → 앱이 채점) */
+@Serializable
+data class QuizQuestion(
+    val id: String,
+    val type: String, // kind | color
+    val prompt: String,
+    val choices: List<String>,
+    @SerialName("choice_icons") val choiceIcons: List<String>,
+    val answer: String,
+    val detection: Detection,
+)
+
+@Serializable
+data class QuizResponse(val found: Boolean, val question: QuizQuestion? = null, val detections: List<Detection> = emptyList(), val message: String = "")
+
 /** Pleos LLM 이 코스를 고를 수 있도록 서버가 주는 후보·프롬프트 */
 @Serializable
 data class CourseCandidates(val prompt: String, val source: String = "")

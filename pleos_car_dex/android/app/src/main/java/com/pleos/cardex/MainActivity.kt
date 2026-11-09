@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Quiz
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -54,6 +55,7 @@ import com.pleos.cardex.ui.theme.CarDexTheme
 private enum class Dest(val route: String, val label: String, val icon: ImageVector) {
     Collection("collection", "도감", Icons.Filled.CollectionsBookmark), // 메인: 주행 중 마주친 차량 카드 수집
     Scan("scan", "수집", Icons.Filled.CameraAlt), // YOLOv8 인식 -> 차량 정보 카드 (영상 입력 경로는 차량 영상 API 공개 시 연결)
+    Quiz("quiz", "퀴즈", Icons.Filled.Quiz), // 아이용 차 맞히기
     Showroom("showroom", "쇼룸", Icons.Filled.DirectionsCar),
     Travel("travel", "여행", Icons.Filled.Map), // 희귀 차량을 만나러 새 지역으로
     Ranking("ranking", "랭킹", Icons.Filled.EmojiEvents),
@@ -123,6 +125,9 @@ class MainActivity : ComponentActivity() {
                                     catalog = state.catalog,
                                     home = state.home,
                                 )
+                            }
+                            composable(Dest.Quiz.route) {
+                                com.pleos.cardex.ui.screens.QuizScreen(state, vm::nextQuiz, vm::answerQuiz, vm::listenVoice)
                             }
                             composable(Dest.Showroom.route) {
                                 ShowroomScreen(

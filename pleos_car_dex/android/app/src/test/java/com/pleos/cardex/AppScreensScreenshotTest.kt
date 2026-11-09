@@ -122,6 +122,21 @@ class AppScreensScreenshotTest {
         }
     }
 
+    /** 아이용 퀴즈: 실제 YOLOv8 감지(도로 장면) 기준. 대답 전(흐림) / 대답 후(정답 공개) */
+    private fun quizState(picked: String?): UiState? {
+        val img = File("build/demo_video/road_scene.png"); val json = File("build/demo_video/road_scene.json")
+        if (!img.exists() || !json.exists()) return null
+        val b = org.json.JSONObject(json.readText()).getJSONObject("primary").getJSONObject("bbox")
+        val det = com.pleos.cardex.data.Detection("car", 0.4f, com.pleos.cardex.data.BoundingBox(b.getInt("x1"), b.getInt("y1"), b.getInt("x2"), b.getInt("y2")))
+        val q = com.pleos.cardex.data.QuizQuestion("q1", "color", "방금 지나간 차는 무슨 색일까요?", listOf("빨간색", "파란색", "흰색"),
+            listOf("#E53935", "#1E88E5", "#FAFAFA"), "파란색", det)
+        return UiState(quiz = q, quizFrameJpeg = img.readBytes(), quizPicked = picked, quizStars = if (picked == null) 4 else 5)
+    }
+
+    @Test fun quizAsk() { val st = quizState(null); org.junit.Assume.assumeTrue(st != null); shot("quiz_ask") { com.pleos.cardex.ui.screens.QuizScreen(st!!, {}, {}, {}) } }
+
+    @Test fun quizReveal() { val st = quizState("파란색"); org.junit.Assume.assumeTrue(st != null); shot("quiz_reveal") { com.pleos.cardex.ui.screens.QuizScreen(st!!, {}, {}, {}) } }
+
     @Test fun onboarding() = shot("onboarding") { OnboardingScreen(onFinish = {}) }
 
     @Test fun celebration() = shot("celebration") {

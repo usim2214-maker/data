@@ -76,6 +76,13 @@ data class UiState(
     val courseLoading: Boolean = false,
     /** 코스를 고른 주체: "Pleos LLM" | "서버" */
     val courseBy: String = "",
+    /** 아이용 차 맞히기 퀴즈 */
+    val quiz: com.pleos.cardex.data.QuizQuestion? = null,
+    val quizFrameJpeg: ByteArray? = null,
+    val quizPicked: String? = null, // null = 답 기다리는 중
+    val quizStars: Int = 0,
+    val quizLoading: Boolean = false,
+    val quizMessage: String? = null,
     /** 음성 명령 듣는 중 / 마지막으로 들은 말 */
     val listening: Boolean = false,
     val heard: String? = null,
@@ -164,7 +171,7 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
     val videoPositionMs = AtomicLong(0)
     private var frames: FrameSource = AssetFrameSource(app)
 
-    private val _state = MutableStateFlow(UiState(onboardingDone = prefs.getBoolean("onboarding_done", false)))
+    private val _state = MutableStateFlow(UiState(onboardingDone = prefs.getBoolean("onboarding_done", false), quizStars = prefs.getInt("quiz_stars", 0)))
     val state: StateFlow<UiState> = _state.asStateFlow()
     private var scanJob: Job? = null
     private var locationJob: Job? = null
@@ -469,6 +476,53 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // ---------------- 아이용 차 맞히기 퀴즈 ----------------
+    /** 방금 지나간 장면으로 문제 내기 (문제와 보기는 음성으로도 읽어 줌) */
+    fun nextQuiz() {
+        if (_state.value.quizLoading) return
+        _state.update { it.copy(quizLoading = true, quizMessage = null) }
+        viewModelScope.launch {
+            val frame = withContext(Dispatchers.IO) { frames.next() }
+            if (frame == null) {
+                _state.update { it.copy(quizLoading = false, quizMessage = "시연 영상이나 이미지를 넣어 주세요") }; return@launch
+            }
+            call { repo.quiz(frame.jpeg, frame.name) }
+                .onSuccess { r ->
+                    val q = r.question
+                    _state.update {
+                        it.copy(quiz = q, quizFrameJpeg = if (q != null) frame.jpeg else it.quizFrameJpeg, quizPicked = null, quizMessage = r.message.takeIf { m -> q == null && m.isNotBlank() })
+                    }
+                    if (q != null) say("${q.prompt} ${q.choices.joinToString(", ")}")
+                }
+                .onFailure { e -> _state.update { it.copy(quizMessage = e.message) } }
+            _state.update { it.copy(quizLoading = false) }
+        }
+    }
+
+    fun answerQuiz(choice: String) {
+        val q = _state.value.quiz ?: return
+        if (_state.value.quizPicked != null) return
+        val correct = choice == q.answer
+        val stars = _state.value.quizStars + if (correct) 1 else 0
+        prefs.edit().putInt("quiz_stars", stars).apply()
+        _state.update { it.copy(quizPicked = choice, quizStars = stars) }
+        say(if (correct) "정답이에요! 별 하나 받았어요" else "아쉬워요. 정답은 ${q.answer}이에요")
+    }
+
+    /** 말로 한 대답을 보기 중 하나로 (번호 / 색·종류 이름) */
+    private fun matchQuizAnswer(text: String, q: com.pleos.cardex.data.QuizQuestion): String? {
+        val t = text.replace(" ", "")
+        listOf("1번" to 0, "첫번째" to 0, "2번" to 1, "두번째" to 1, "3번" to 2, "세번째" to 2).firstOrNull { it.first in t }
+            ?.let { (_, i) -> return q.choices.getOrNull(i) }
+        val synonyms = mapOf(
+            "빨간색" to listOf("빨간", "빨강"), "주황색" to listOf("주황"), "노란색" to listOf("노란", "노랑"),
+            "초록색" to listOf("초록", "녹색"), "파란색" to listOf("파란", "파랑"), "보라색" to listOf("보라"),
+            "흰색" to listOf("흰", "하얀", "하양"), "검은색" to listOf("검은", "검정", "까만"), "회색" to listOf("회색", "은색", "쥐색"),
+            "버스" to listOf("버스"), "트럭" to listOf("트럭"), "오토바이" to listOf("오토바이", "바이크"), "승용차" to listOf("승용차", "자동차", "차"),
+        )
+        return q.choices.firstOrNull { c -> synonyms[c].orEmpty().any { it in t } }
+    }
+
     // ---------------- 음성 명령 (Pleos SpeechToText) ----------------
     fun listenVoice() {
         if (!voiceCommand.listen()) _state.update { it.copy(notice = "음성 인식을 사용할 수 없어요") }
@@ -479,7 +533,13 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
         val t = text.replace(" ", "")
         _state.update { it.copy(heard = text) }
         val s = _state.value
+        // 퀴즈 답을 기다리는 중이면 먼저 대답으로 처리
+        val q = s.quiz
+        if (q != null && s.quizPicked == null) {
+            matchQuizAnswer(text, q)?.let { answerQuiz(it); return }
+        }
         when {
+            listOf("퀴즈", "문제", "다음").any { it in t } -> nextQuiz()
             listOf("안내", "길안내", "가자", "출발").any { it in t } -> {
                 if (s.challenge?.status == "active") { resumeNavigation(); say("남은 곳으로 길안내를 시작할게요") }
                 else say("진행 중인 코스가 없어요. 정차 후 코스를 추천받아 주세요")
@@ -491,7 +551,7 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
             listOf("도감", "몇종", "카드").any { it in t } -> s.home?.let { say("도감 ${it.dexOwned}종, 전설 ${it.legendaryOwned}종을 모았어요") }
                 ?: say("도감을 불러오는 중이에요")
             listOf("조용", "음성꺼", "그만").any { it in t } -> { _state.update { it.copy(voiceOn = false) } }
-            else -> say("'길안내', '인식', '순위', '도감' 이라고 말해 보세요")
+            else -> say("'퀴즈', '길안내', '인식', '순위', '도감' 이라고 말해 보세요")
         }
     }
 

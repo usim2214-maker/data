@@ -27,28 +27,27 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
-import com.pleos.cardex.data.CarDexApi
 import com.pleos.cardex.data.VehicleCard
 import com.pleos.cardex.ui.theme.rarityColor
 
 /**
  * 탭하면 Y축으로 뒤집히는 대형 카드.
- * 앞면: 일러스트(MVP 는 크롭 이미지) + 이름 / 뒷면: 유저 키워드 요약
+ * 앞면: 카툰 일러스트 + 이름 / 뒷면: 사용자가 고른 키워드로 AI 가 요약한 정보
+ * flipped 를 넘기면 외부에서 앞/뒤를 제어 (시연 등), null 이면 탭으로 뒤집기
  */
 @Composable
-fun FlipCard(card: VehicleCard, modifier: Modifier = Modifier, startFlipped: Boolean = false) {
-    var flipped by remember(card.id) { mutableStateOf(startFlipped) }
-    val rotation by animateFloatAsState(if (flipped) 180f else 0f, tween(500), label = "flip")
+fun FlipCard(card: VehicleCard, modifier: Modifier = Modifier, startFlipped: Boolean = false, flipped: Boolean? = null) {
+    var tapped by remember(card.id) { mutableStateOf(startFlipped) }
+    val showBack = flipped ?: tapped
+    val rotation by animateFloatAsState(if (showBack) 180f else 0f, tween(600), label = "flip")
     val accent = rarityColor(card.rarity)
 
     Card(
         modifier = modifier
             .graphicsLayer { rotationY = rotation; cameraDistance = 16 * density }
-            .clickable { flipped = !flipped },
+            .clickable { tapped = !tapped },
         shape = RoundedCornerShape(24.dp),
         border = BorderStroke(3.dp, accent),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -65,16 +64,12 @@ fun FlipCard(card: VehicleCard, modifier: Modifier = Modifier, startFlipped: Boo
 @Composable
 private fun CardFront(card: VehicleCard, accent: Color) {
     Column(Modifier.fillMaxSize()) {
-        if (card.imageUrl != null) {
-            AsyncImage(
-                model = CarDexApi.absolute(card.imageUrl),
-                contentDescription = card.model,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxWidth().weight(1f).background(Color.Black),
-            )
-        } else { // 사진이 없으면(시연 데이터 등) 카툰 일러스트
-            CarIllustration(card.id, card.bodyType, card.rarity, Modifier.fillMaxWidth().weight(1f).background(Color(0xFF232A36)))
-        }
+        // 앞면은 항상 일러스트 (희귀도 색 그라데이션 배경)
+        CarIllustration(
+            card.id, card.bodyType, card.rarity,
+            Modifier.fillMaxWidth().weight(1f)
+                .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(accent.copy(alpha = 0.35f), Color(0xFF161B22)))),
+        )
         Column(Modifier.padding(20.dp)) {
             Text(card.rarity.uppercase(), color = accent, style = MaterialTheme.typography.labelLarge)
             Text("${card.brand} ${card.model}", style = MaterialTheme.typography.headlineMedium)
@@ -87,6 +82,7 @@ private fun CardFront(card: VehicleCard, accent: Color) {
 private fun CardBack(card: VehicleCard, accent: Color) {
     Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("${card.brand} ${card.model}", style = MaterialTheme.typography.titleLarge, color = accent)
+        Text("✨ 내가 고른 정보 · AI 요약", style = MaterialTheme.typography.labelLarge, color = Color.Gray)
         HorizontalDivider(color = accent.copy(alpha = 0.4f))
         card.facts.forEach { fact ->
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

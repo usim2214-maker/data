@@ -61,7 +61,7 @@ fun CollectionScreen(
             return@Column
         }
         LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 300.dp),
+            columns = GridCells.Adaptive(minSize = 230.dp), // 1280px 차량 화면에서 한 줄 4장, 카드 전체가 보이게
             horizontalArrangement = Arrangement.spacedBy(24.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),
             modifier = Modifier.padding(top = 24.dp),

@@ -134,6 +134,19 @@ class DemoVideoFramesTest {
     private data object Ranking : Scene
     private data class Garage(val showroom: Showroom, val tab: Int) : Scene
     private data class Recognize(val revealed: Int) : Scene
+    private data object Keywords : Scene
+    private data class CardMake(val flipped: Boolean) : Scene
+    private data object Dex : Scene
+
+    private val myKeywords = listOf("가격", "브랜드", "마력", "연비")
+    private val ev9Card = VehicleCard(
+        "kia-ev9", "기아", "EV9", "SUV", null, "3열 대형 전기 SUV",
+        listOf(
+            KeywordFact("가격", "약 7,000만 원대~"), KeywordFact("브랜드", "기아 (대한민국)"),
+            KeywordFact("마력", "최대 약 380마력 (듀얼모터)"), KeywordFact("연비", "전비 약 4km/kWh"),
+        ),
+        rarity = "rare",
+    )
 
     // 차량 인식 장면: RoadSceneRenderTest 가 그린 장면 + scripts/detect_demo_scene.py 의 실제 YOLOv8 감지 결과
     private data class Det(val label: String, val conf: Double, val x1: Int, val y1: Int, val x2: Int, val y2: Int)
@@ -234,14 +247,21 @@ class DemoVideoFramesTest {
         show(Ranking, "속도가 아닌 '방문·수집'으로만 경쟁 — 주간 랭킹과 시·도별 지역 마스터", "6")
         hold(4.0)
 
-        // 7. 차량 인식 (베타): 실제 YOLOv8 감지 결과
+        // 7. 차량 카드 수집: YOLOv8 인식 -> 내가 고른 정보(키워드) -> AI 요약 -> 카드(앞 일러스트 / 뒤 요약) -> 도감
         if (roadImage != null && roadDets.isNotEmpty()) {
-            val cap = "차량 인식(베타) — 측면 카메라 화면을 YOLOv8 이 실제로 분석한 결과예요"
+            val cap = "YOLOv8 로 차량 인식 — 화면 속 차량을 찾아요 (박스는 실제 감지 결과)"
             show(Recognize(0), cap, "7"); hold(1.2)
             roadDets.indices.forEach { i -> show(Recognize(i + 1), cap, "7"); hold(0.8) }
-            show(Recognize(roadDets.size + 1), "가장 가까운 차를 잘라 → 차종 판별·키워드 요약(LLM) → 도감 등록 → 쇼룸 전시", "7")
-            hold(4.0)
+            show(Recognize(roadDets.size + 1), "가장 가깝게 보인 차를 골라 카드로 만들어요", "7")
+            hold(2.5)
         }
+        show(Keywords, "카드 뒷면에 담을 정보는 내가 직접 골라요 — 고른 키워드가 그대로 AI 프롬프트가 돼요", "7")
+        hold(3.5)
+        show(CardMake(false), "카드 앞면 — 차량 일러스트", "7")
+        hold(2.5)
+        animatedScene(CardMake(true), "카드 뒷면 — 내가 고른 정보를 AI 가 요약", "7", 3.0)
+        show(Dex, "도감에 차곡차곡 — 같은 차를 다시 만나면 재회 보너스", "7")
+        hold(3.0)
 
         // 8. 쇼룸 꾸미기
         val base = Showroom(car = ioniq5, floor = catalog.items[0], signText = "MY GARAGE")
@@ -315,6 +335,18 @@ class DemoVideoFramesTest {
                     )
                 }
                 is Recognize -> RecognizeScene(s.revealed)
+                Keywords -> com.pleos.cardex.ui.screens.KeywordSettingsScreen(myKeywords) {}
+                is CardMake -> CardMakeScene(s.flipped)
+                Dex -> Column(Modifier.fillMaxSize()) {
+                    Box(Modifier.fillMaxWidth().padding(top = 10.dp), contentAlignment = Alignment.Center) { CaptionBar(caption, step, Modifier) }
+                    Box(Modifier.weight(1f)) { com.pleos.cardex.ui.screens.CollectionScreen(
+                    entries = listOf(ev9Card, ioniq5, ioniq5n, ev9Card.copy(id = "genesis-g80", brand = "제네시스", model = "G80", bodyType = "세단", oneLiner = "럭셔리 세단")).map {
+                        CollectionEntry(it, "2026-11-09T00:00:00Z", "2026-11-09T00:00:00Z", seenCount = if (it.id == "kia-ev9") 2 else 1)
+                    },
+                    synergy = com.pleos.cardex.data.SynergyScore(472, 180, 160, listOf(com.pleos.cardex.data.SynergyBonus("재회", 2, ""), com.pleos.cardex.data.SynergyBonus("그룹 트리오", 100, ""))),
+                    featuredId = "hyundai-ioniq-5-n", onRefresh = {}, onFeature = {}, onDelete = {},
+                ) }
+                }
                 is Garage -> ShowroomScreen(
                     showroom = s.showroom, collection = listOf(
                         CollectionEntry(ioniq5, "2026-11-08T00:00:00Z", "2026-11-08T00:00:00Z"),
@@ -324,7 +356,7 @@ class DemoVideoFramesTest {
                     onAddProp = {}, onMoveProp = { _, _, _, _ -> }, onResizeProp = {}, onRemoveProp = {}, animate = true, initialTab = s.tab,
                 )
             }
-            if (caption.isNotEmpty() && scene !is Driving) CaptionBar(caption, step, Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp))
+            if (caption.isNotEmpty() && scene !is Driving && scene != Dex) CaptionBar(caption, step, Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp))
         }
     }
 
@@ -334,7 +366,7 @@ class DemoVideoFramesTest {
         Row(Modifier.fillMaxSize().padding(24.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
             Column(Modifier.weight(1.45f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("📷 측면 카메라", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    Text("🔎 차량 인식", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
                     Text(if (revealed == 0) "분석 중…" else "YOLOv8n 감지 ${minOf(revealed, roadDets.size)}대",
                         color = Color(0xFF4DA3FF), fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                 }
@@ -361,22 +393,36 @@ class DemoVideoFramesTest {
                         }
                     }
                 }
-                Text("※ 시연용으로 직접 그린 도로 장면 · 박스는 백엔드 YOLOv8 감지 코드의 실제 출력", color = Color.Gray, fontSize = 15.sp)
+                Text("※ 시연용 그림 · 박스는 백엔드 YOLOv8 감지 코드의 실제 출력", color = Color.Gray, fontSize = 15.sp)
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Text("인식 → 도감 등록", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Black)
+                Text("차량 → 카드", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Black)
                 val done = revealed > roadDets.size
-                Step("①", "YOLOv8 차량 감지", roadDets.take(minOf(revealed, roadDets.size)).joinToString(" · ") { "${it.label} ${"%.2f".format(it.conf)}" }.ifEmpty { "분석 중…" }, revealed > 0)
-                Step("②", "가장 가까운 차 선택·잘라내기", if (done) "화면에서 가장 크게 보인 차량" else "", done)
+                Step("①", "YOLOv8 차량 인식", roadDets.take(minOf(revealed, roadDets.size)).joinToString(" · ") { "${it.label} ${"%.2f".format(it.conf)}" }.ifEmpty { "분석 중…" }, revealed > 0)
+                Step("②", "가장 가깝게 보인 차 선택", if (done) "카드로 만들 차량" else "", done)
                 if (done && roadCrop != null) {
                     androidx.compose.foundation.Image(
                         roadCrop.asImageBitmap(), null,
                         Modifier.size(220.dp, (220f * roadCrop.height / roadCrop.width).dp).clip(RoundedCornerShape(12.dp)),
                     )
                 }
-                Step("③", "차종 판별 · 키워드 요약 (LLM)", if (done) "API 키 연동 시 자동 — 이 영상에서는 생략" else "", false)
-                Step("④", "도감 등록 → 쇼룸 전시", if (done) "새 차량이면 카드 생성 + 시너지 점수" else "", false)
+                Step("③", "내가 고른 정보로 AI 요약", if (done) "키워드를 프롬프트에 넣어 생성" else "", false)
+                Step("④", "카드 완성 → 도감 등록", if (done) "앞면 일러스트 · 뒷면 요약" else "", false)
             }
+        }
+    }
+
+    @Composable
+    private fun CardMakeScene(flipped: Boolean) {
+        Row(Modifier.fillMaxSize().padding(28.dp), horizontalArrangement = Arrangement.spacedBy(40.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text("새 차량 카드!", color = Color(0xFFFFC94D), fontSize = 40.sp, fontWeight = FontWeight.Black)
+                Step("①", "YOLOv8 차량 인식", "car ${"%.2f".format(roadDets.minOfOrNull { it.conf } ?: 0.4)}", true)
+                Step("②", "내가 고른 정보", myKeywords.joinToString(" · "), true)
+                Step("③", "AI 요약 (프롬프트 = 차량 + 내 키워드)", if (flipped) "카드 뒷면에 표시" else "생성 중…", flipped)
+                Text("※ 요약 문구는 시연 데이터 — AI(LLM) 연동 시 자동 생성", color = Color.Gray, fontSize = 15.sp)
+            }
+            com.pleos.cardex.ui.components.FlipCard(ev9Card, Modifier.padding(bottom = 60.dp).size(330.dp, 470.dp), flipped = flipped)
         }
     }
 

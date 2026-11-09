@@ -32,15 +32,15 @@ fun HomeSummaryCard(home: HomeSummary?, modifier: Modifier = Modifier) {
             Text("내 여행 현황을 불러오는 중…", color = Color.White, fontSize = 20.sp); return@Column
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("나의 여행", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+            Text("나의 차량 도감", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
             home.titles.takeIf { it.isNotEmpty() }?.let { Text("👑 ${it.joinToString(" · ") { t -> "$t 마스터" }}", color = Color(0xFFFFD54F), fontSize = 18.sp) }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Stat("도감", "${home.dexOwned}/${home.dexTotal}")
+            Stat("전설", "${home.legendaryOwned}/${home.legendaryTotal}")
             Stat("시너지", "${home.synergyTotal}")
             Stat("이번 주", "${home.weeklyRank}위")
             Stat("지역 스탬프", "${home.regionStamps}/${home.regionTotal}")
-            Stat("히든", "${home.hiddenStamps}")
-            Stat("쇼룸 아이템", "${home.itemsUnlocked}/${home.itemsTotal}")
         }
         Row(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color.Black.copy(alpha = 0.25f)).padding(14.dp),

@@ -31,6 +31,9 @@ interface CarDexApi {
     @GET("api/v1/collection")
     suspend fun collection(): CollectionResponse
 
+    @GET("api/v1/collection/catalog")
+    suspend fun catalog(): List<CatalogVehicle>
+
     @DELETE("api/v1/collection/{id}")
     suspend fun deleteEntry(@Path("id") id: String)
 

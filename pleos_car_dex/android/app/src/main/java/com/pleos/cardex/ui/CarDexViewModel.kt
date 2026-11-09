@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.pleos.cardex.BuildConfig
 import com.pleos.cardex.data.CarDexRepository
 import com.pleos.cardex.data.Challenge
+import com.pleos.cardex.data.CatalogVehicle
 import com.pleos.cardex.data.CollectionEntry
 import com.pleos.cardex.data.HomeSummary
 import com.pleos.cardex.data.DecorCatalog
@@ -55,6 +56,7 @@ data class UiState(
     val busy: Boolean = false,
     val lastResult: RecognitionResponse? = null,
     val collection: List<CollectionEntry> = emptyList(),
+    val catalog: List<CatalogVehicle> = emptyList(),
     val synergy: SynergyScore? = null,
     val showroom: Showroom = Showroom(),
     val decor: DecorCatalog? = null,
@@ -293,6 +295,8 @@ class CarDexViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             call { repo.collection() }
                 .onSuccess { c -> _state.update { it.copy(collection = c.entries, synergy = c.synergy) } }
+            if (_state.value.catalog.isEmpty()) call { repo.catalog() }.onSuccess { c -> _state.update { it.copy(catalog = c) } }
+            loadHome()
         }
     }
 

@@ -32,15 +32,15 @@ import com.pleos.cardex.ui.components.CarIllustration
 private data class Page(val emoji: String, val title: String, val lines: List<String>)
 
 private val PAGES = listOf(
-    Page("🗺️", "달리면서 모으는 여행 도감", listOf(
-        "AI 가 아직 안 가 본 지역과 축제를 엮어 드라이브 코스를 추천해요",
-        "지역 스탬프 · 명소 히든 스탬프를 모아 시너지 점수를 쌓고",
-        "이번 주 랭킹과 '지역 마스터' 칭호에 도전하세요",
+    Page("🚗", "도로 위 차량을 카드로 모아요", listOf(
+        "주행 중 마주친 차량을 YOLOv8 이 인식하면 나만의 차량 카드가 생겨요",
+        "앞면은 차량 일러스트, 뒷면은 내가 고른 정보(가격·마력 등)를 AI 가 요약",
+        "28종 도감을 채우고 전설 차량을 찾아보세요",
     )),
-    Page("🏆", "나만의 쇼룸을 꾸며요", listOf(
-        "대표 차량을 전시하고, 여행으로 얻은 아이템으로 차고를 꾸며요",
-        "지역 풍경 배경 · 네온 간판 · 골드 포디움 · 소품 배치",
-        "덜 알려진 지역일수록 점수가 높아요 — 국내 곳곳을 달려 보세요",
+    Page("🏆", "쇼룸에 자랑하고, 새 지역으로", listOf(
+        "모은 차량을 쇼룸에 전시하고 아이템으로 차고를 꾸며요",
+        "희귀 차량은 새 지역에서 — AI 가 아직 안 가 본 지역·축제로 코스를 추천해요",
+        "지역 스탬프와 '지역 마스터' 칭호로 쇼룸 아이템을 열어요",
     )),
     Page("🛡️", "운전이 먼저예요", listOf(
         "주행 중에는 화면이 '주행 모드'로 잠기고 알림은 음성으로 들려드려요",
@@ -60,8 +60,8 @@ fun OnboardingScreen(onFinish: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(48.dp),
     ) {
         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-            if (page == 1) {
-                CarIllustration("hyundai-ioniq-5", "CUV", "rare", Modifier.size(420.dp, 260.dp))
+            if (page == 0) {
+                CarIllustration("hyundai-ioniq-5-n", "CUV", "legendary", Modifier.size(420.dp, 260.dp))
             } else {
                 Text(p.emoji, fontSize = 160.sp)
             }

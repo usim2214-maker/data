@@ -8,7 +8,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -61,6 +64,34 @@ fun carStyleFor(id: String, bodyType: String, rarity: String): CarStyle = when (
         Color(0xFFB0B8C1), Roof.SUV, LampStyle.VERTICAL, length = 1.0f, bodyH = 0.29f, cabinH = 0.21f, wheel = 0.13f, clearance = 0.06f,
         rails = true, rearSlope = 0.1f, twoToneRoof = true,
     )
+    // ---- 현대 ----
+    "hyundai-avante" -> CarStyle(Color(0xFFECEFF1), Roof.SEDAN, LampStyle.HORIZON, length = 1.04f, bodyH = 0.26f, cabinH = 0.2f, wheel = 0.12f)
+    "hyundai-avante-n" -> CarStyle(
+        Color(0xFF2F5FA8), Roof.SEDAN, LampStyle.HORIZON, length = 1.04f, bodyH = 0.25f, cabinH = 0.19f, wheel = 0.135f,
+        clearance = 0.03f, spoiler = true, stripe = Color(0xFFE53935), caliper = Color(0xFFE53935),
+    )
+    "hyundai-sonata" -> CarStyle(Color(0xFF8FA8C8), Roof.SEDAN, LampStyle.HORIZON, length = 1.08f, bodyH = 0.25f, cabinH = 0.2f, wheel = 0.12f, chromeLine = true)
+    "hyundai-tucson" -> CarStyle(Color(0xFF5E7D5A), Roof.SUV, LampStyle.PIXEL, length = 1.0f, bodyH = 0.29f, cabinH = 0.21f, clearance = 0.06f, rails = true, rearSlope = 0.08f)
+    "hyundai-palisade" -> CarStyle(Color(0xFF2B2F36), Roof.SUV, LampStyle.VERTICAL, length = 1.1f, bodyH = 0.31f, cabinH = 0.23f, wheel = 0.135f, clearance = 0.06f, rails = true)
+    "hyundai-casper" -> CarStyle(Color(0xFFF2C94C), Roof.SUV, LampStyle.ROUND, length = 0.8f, bodyH = 0.32f, cabinH = 0.24f, wheel = 0.14f, clearance = 0.05f)
+    "hyundai-ioniq-6" -> CarStyle(Color(0xFFE76F51), Roof.SEDAN, LampStyle.PIXEL, length = 1.06f, bodyH = 0.25f, cabinH = 0.2f, wheel = 0.125f, rearSlope = 0.3f, pixelLine = true)
+    "hyundai-staria" -> CarStyle(Color(0xFF9AA5B1), Roof.SUV, LampStyle.HORIZON, length = 1.12f, bodyH = 0.3f, cabinH = 0.3f, wheel = 0.12f, clearance = 0.05f)
+    "hyundai-kona" -> CarStyle(Color(0xFF7FB069), Roof.SUV, LampStyle.HORIZON, length = 0.95f, bodyH = 0.29f, cabinH = 0.21f, clearance = 0.06f, rearSlope = 0.07f)
+    // ---- 기아 ----
+    "kia-morning" -> CarStyle(Color(0xFFF4A6C0), Roof.HATCH, LampStyle.ROUND, length = 0.82f, bodyH = 0.3f, cabinH = 0.24f, wheel = 0.13f)
+    "kia-ray" -> CarStyle(Color(0xFF9ED9C8), Roof.SUV, LampStyle.ROUND, length = 0.84f, bodyH = 0.31f, cabinH = 0.3f, wheel = 0.125f)
+    "kia-k5" -> CarStyle(Color(0xFFC0392B), Roof.SEDAN, LampStyle.TWO_LINE, length = 1.06f, bodyH = 0.25f, cabinH = 0.19f, wheel = 0.125f, rearSlope = 0.24f)
+    "kia-k8" -> CarStyle(Color(0xFF1F2A37), Roof.SEDAN, LampStyle.HORIZON, length = 1.1f, bodyH = 0.25f, cabinH = 0.2f, wheel = 0.125f, chromeLine = true, rearSlope = 0.22f)
+    "kia-sportage" -> CarStyle(Color(0xFFE59A3C), Roof.SUV, LampStyle.VERTICAL, length = 1.0f, bodyH = 0.29f, cabinH = 0.21f, clearance = 0.06f, rails = true, rearSlope = 0.09f, twoToneRoof = true)
+    "kia-seltos" -> CarStyle(Color(0xFF3D7DCA), Roof.SUV, LampStyle.HORIZON, length = 0.95f, bodyH = 0.29f, cabinH = 0.21f, clearance = 0.06f, rails = true)
+    "kia-carnival" -> CarStyle(Color(0xFFF5F5F5), Roof.SUV, LampStyle.HORIZON, length = 1.12f, bodyH = 0.3f, cabinH = 0.26f, wheel = 0.12f, clearance = 0.05f)
+    "kia-ev3" -> CarStyle(Color(0xFF7FC8A9), Roof.SUV, LampStyle.VERTICAL, length = 0.93f, bodyH = 0.29f, cabinH = 0.21f, clearance = 0.05f, twoToneRoof = true)
+    "kia-ev6" -> CarStyle(Color(0xFF7D8590), Roof.HATCH, LampStyle.HORIZON, length = 1.04f, bodyH = 0.27f, cabinH = 0.19f, wheel = 0.13f, clearance = 0.04f, rearSlope = 0.12f)
+    // ---- 제네시스 ----
+    "genesis-g90" -> CarStyle(Color(0xFF1B1B1F), Roof.SEDAN, LampStyle.TWO_LINE, length = 1.14f, bodyH = 0.26f, cabinH = 0.21f, wheel = 0.125f, chromeLine = true)
+    "genesis-gv70" -> CarStyle(Color(0xFF8E2B2B), Roof.SUV, LampStyle.TWO_LINE, length = 1.0f, bodyH = 0.29f, cabinH = 0.21f, clearance = 0.06f, rearSlope = 0.1f)
+    "genesis-gv80" -> CarStyle(Color(0xFF243B55), Roof.SUV, LampStyle.TWO_LINE, length = 1.08f, bodyH = 0.3f, cabinH = 0.22f, wheel = 0.135f, clearance = 0.06f, chromeLine = true)
+    "genesis-gv60" -> CarStyle(Color(0xFF3E6B5A), Roof.HATCH, LampStyle.TWO_LINE, length = 0.98f, bodyH = 0.28f, cabinH = 0.2f, wheel = 0.13f, clearance = 0.04f)
     else -> {
         val paint = when (rarity) { "legendary" -> Color(0xFFF2B33D); "rare" -> Color(0xFF8E7CF0); else -> Color(0xFF4F8EF7) }
         when {
@@ -72,14 +103,24 @@ fun carStyleFor(id: String, bodyType: String, rarity: String): CarStyle = when (
     }
 }
 
-/** 단독 일러스트 (목록 썸네일 등) */
+/** 단독 일러스트 (목록 썸네일 등). silhouette=true 면 아직 못 모은 차량용 그림자 실루엣 */
 @Composable
-fun CarIllustration(id: String, bodyType: String, rarity: String, modifier: Modifier = Modifier) {
+fun CarIllustration(id: String, bodyType: String, rarity: String, modifier: Modifier = Modifier, silhouette: Boolean = false) {
     val style = carStyleFor(id, bodyType, rarity)
     Canvas(modifier) {
         // 키 큰 SUV 도 잘리지 않게 높이에 맞춰 축소
         val w = minOf(size.width * 0.8f, size.height * 0.78f / style.heightRatio)
-        drawCartoonCar(style, centerX = size.width / 2, groundY = size.height * 0.9f, width = w)
+        if (!silhouette) {
+            drawCartoonCar(style, centerX = size.width / 2, groundY = size.height * 0.9f, width = w)
+        } else {
+            // 별도 레이어에 차를 그린 뒤, 그려진 픽셀만 단색으로 덮어 실루엣을 만든다 (배경은 그대로)
+            drawIntoCanvas { canvas ->
+                canvas.saveLayer(Rect(Offset.Zero, size), Paint())
+                drawCartoonCar(style, centerX = size.width / 2, groundY = size.height * 0.9f, width = w)
+                drawRect(Color(0xFF2E3644), blendMode = BlendMode.SrcIn)
+                canvas.restore()
+            }
+        }
     }
 }
 

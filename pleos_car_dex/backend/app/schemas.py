@@ -361,9 +361,23 @@ class DecorCatalog(BaseModel):
     total: int
 
 
-class HomeSummary(BaseModel):
-    """여행 탭 상단 '한눈에 보기' 카드"""
+class CatalogVehicle(BaseModel):
+    """도감 칸 (미발견 차량은 앱에서 실루엣 '???' 로 표시)"""
 
+    id: str
+    brand: str
+    model: str
+    body_type: str
+    rarity: str
+
+
+class HomeSummary(BaseModel):
+    """도감/여행 탭 상단 '한눈에 보기' 카드"""
+
+    dex_owned: int = 0
+    dex_total: int = 0
+    legendary_owned: int = 0
+    legendary_total: int = 0
     synergy_total: int
     weekly_rank: int
     weekly_points: int

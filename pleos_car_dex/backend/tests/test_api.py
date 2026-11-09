@@ -244,14 +244,14 @@ def test_decor_unlocks(client):
 def test_home_and_demo_tools(client):
     h = client.get("/api/v1/home").json()
     assert h["collection"] == 0 and h["region_total"] == 17
-    assert "한 계단" in h["next_goal"] or "첫 지역 스탬프" in h["next_goal"]
+    assert "첫 카드" in h["next_goal"]  # 도감 중심: 첫 목표는 첫 카드
 
     seeded = client.post("/api/v1/demo/seed").json()
     assert seeded["cars"] == 4 and set(seeded["region_names"]) == {"서울", "경기", "강원"}
     h = client.get("/api/v1/home").json()
     assert h["collection"] == 4 and h["region_stamps"] == 3 and h["hidden_stamps"] == 2
     assert h["synergy_total"] > 0 and h["weekly_points"] > 0
-    assert "마스터까지" in h["next_goal"]  # 점수가 있는 지역 중 가장 가까운 마스터 목표
+    assert "현대 차량 1종 더" in h["next_goal"]  # 시드: 현대 2종(아이오닉 5·그랜저) -> 브랜드 컬렉터 목표
     assert client.get("/api/v1/showroom").json()["car"]["id"] == "hyundai-ioniq-5"
 
     client.post("/api/v1/challenge", json=_course())
@@ -281,3 +281,17 @@ def test_iou_fallback_tracker():
     f2 = det._iou_track([car(130), car(630)], first=False)  # 조금씩 이동
     f3 = det._iou_track([car(1000)], first=False)  # 새 차
     assert [t for t, _ in f1] == [0, 1] and [t for t, _ in f2] == [0, 1] and [t for t, _ in f3] == [2]
+
+
+def test_catalog_and_dex_home(client):
+    cat = client.get("/api/v1/collection/catalog").json()
+    assert len(cat) == 28 and cat[0]["rarity"] == "legendary"
+    assert {c["id"] for c in cat} >= {"hyundai-ioniq-5-n", "hyundai-avante-n", "genesis-g90"}
+    h = client.get("/api/v1/home").json()
+    assert h["dex_total"] == 28 and h["legendary_total"] == 3 and "첫 카드" in h["next_goal"]
+
+    for name in ["hyundai-avante-n.jpg", "hyundai-avante.jpg", "hyundai-sonata.jpg"]:
+        client.post("/api/v1/recognize", files={"image": (name, _jpeg(), "image/jpeg")})
+    h = client.get("/api/v1/home").json()
+    assert h["dex_owned"] == 3 and h["legendary_owned"] == 1  # 아반떼 N 이 아반떼로 잘못 잡히지 않음
+    assert "현대" in h["next_goal"] or "마스터" in h["next_goal"] or "계단" in h["next_goal"]

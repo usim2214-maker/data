@@ -172,9 +172,17 @@ data class DriveCourse(
     @SerialName("completion_bonus") val completionBonus: Int = 0,
 )
 
-/** 여행 탭 상단 '한눈에 보기' */
+/** 도감 칸 (미발견은 실루엣) */
+@Serializable
+data class CatalogVehicle(val id: String, val brand: String, val model: String, @SerialName("body_type") val bodyType: String, val rarity: String)
+
+/** 도감/여행 탭 상단 '한눈에 보기' */
 @Serializable
 data class HomeSummary(
+    @SerialName("dex_owned") val dexOwned: Int = 0,
+    @SerialName("dex_total") val dexTotal: Int = 0,
+    @SerialName("legendary_owned") val legendaryOwned: Int = 0,
+    @SerialName("legendary_total") val legendaryTotal: Int = 0,
     @SerialName("synergy_total") val synergyTotal: Int,
     @SerialName("weekly_rank") val weeklyRank: Int,
     @SerialName("weekly_points") val weeklyPoints: Int,

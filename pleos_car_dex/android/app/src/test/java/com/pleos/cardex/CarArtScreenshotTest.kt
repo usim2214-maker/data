@@ -30,31 +30,31 @@ import java.io.File
 /** 시연 차종 카툰 일러스트 모음 (app/build/screenshots 폴더에 PNG) */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [34], qualifiers = "w1200dp-h560dp-land-mdpi")
+@Config(sdk = [34], qualifiers = "w1400dp-h860dp-land-mdpi")
 class CarArtScreenshotTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
 
-    private val cars = listOf(
-        Triple("hyundai-ioniq-5", "CUV", "현대 아이오닉 5") to "common",
-        Triple("kia-ev9", "SUV", "기아 EV9") to "rare",
-        Triple("genesis-g80", "세단", "제네시스 G80") to "rare",
-        Triple("hyundai-grandeur", "세단", "현대 그랜저") to "common",
-        Triple("kia-sorento", "SUV", "기아 쏘렌토") to "common",
-        Triple("hyundai-ioniq-5-n", "CUV", "현대 아이오닉 5 N") to "legendary",
-    )
+    // 카탈로그 28종 전체 (backend/app/data/vehicle_catalog.json)
+    private val cars: List<Pair<Triple<String, String, String>, String>> = run {
+        val arr = org.json.JSONObject(File("../../backend/app/data/vehicle_catalog.json").readText()).getJSONArray("vehicles")
+        val order = mapOf("legendary" to 0, "rare" to 1, "common" to 2)
+        (0 until arr.length()).map { i -> arr.getJSONObject(i) }
+            .sortedBy { order[it.getString("rarity")] ?: 3 }
+            .map { Triple(it.getString("id"), it.getString("body_type"), "${it.getString("brand")} ${it.getString("model")}") to it.getString("rarity") }
+    }
 
     @Test fun gallery() {
         rule.setContent {
-            Column(Modifier.fillMaxSize().background(Color(0xFF0D1117)).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                cars.chunked(3).forEach { row ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(Modifier.fillMaxSize().background(Color(0xFF0D1117)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                cars.chunked(7).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         row.forEach { (c, rarity) ->
                             Column(
-                                Modifier.clip(RoundedCornerShape(20.dp)).background(Color(0xFF1C2330)).padding(12.dp),
+                                Modifier.clip(RoundedCornerShape(14.dp)).background(Color(0xFF1C2330)).padding(6.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
-                                CarIllustration(c.first, c.second, rarity, Modifier.size(360.dp, 200.dp))
-                                Text(c.third, color = Color.White, fontSize = 20.sp)
+                                CarIllustration(c.first, c.second, rarity, Modifier.size(180.dp, 150.dp))
+                                Text(c.third, color = com.pleos.cardex.ui.theme.rarityColor(rarity), fontSize = 15.sp)
                             }
                         }
                     }

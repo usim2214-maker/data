@@ -32,6 +32,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.printToString
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -101,8 +102,10 @@ class DemoVideoFramesTest {
         "강원 바다·산 드라이브", "남이섬에서 설악산을 거쳐 속초 축제까지 — 강원 스탬프와 히든 3곳을 모아요.",
         stops, 4.6, 115, "mock", LimitedEvent("mock-fest", "속초 바다 축제 (시연용)", "20261116"), 87,
     )
-    private fun home(synergy: Int, rank: Int, stamps: Int, hidden: Int, goal: String, titles: List<String> = emptyList()) = HomeSummary(
-        synergy, rank, synergy / 4, 6, stamps, 17, hidden, 4, 14 + hidden, 47, titles, nextGoal = goal,
+    private fun home(synergy: Int, rank: Int, stamps: Int, hidden: Int, goal: String, titles: List<String> = emptyList(), dex: Int = 4, legendary: Int = 0) = HomeSummary(
+        dexOwned = dex, dexTotal = 28, legendaryOwned = legendary, legendaryTotal = 3,
+        synergyTotal = synergy, weeklyRank = rank, weeklyPoints = synergy / 4, gapToNext = 6, regionStamps = stamps, regionTotal = 17,
+        hiddenStamps = hidden, collection = dex, itemsUnlocked = 14 + hidden, itemsTotal = 47, titles = titles, nextGoal = goal,
     )
     private val landmarks = listOf(
         LandmarkNearby(Attraction("a", "경복궁", lat = 37.58, lon = 126.98), 1500, true, 20),
@@ -135,18 +138,41 @@ class DemoVideoFramesTest {
     private data class Garage(val showroom: Showroom, val tab: Int) : Scene
     private data class Recognize(val revealed: Int) : Scene
     private data object Keywords : Scene
-    private data class CardMake(val flipped: Boolean) : Scene
-    private data object Dex : Scene
+    private data class CardMake(val flipped: Boolean, val card: VehicleCard, val legendary: Boolean = false) : Scene
+    private data class Dex(val entries: List<VehicleCard>, val home: HomeSummary) : Scene
+    private data object LegendaryGet : Scene
 
-    private val myKeywords = listOf("가격", "브랜드", "마력", "연비")
-    private val ev9Card = VehicleCard(
-        "kia-ev9", "기아", "EV9", "SUV", null, "3열 대형 전기 SUV",
-        listOf(
-            KeywordFact("가격", "약 7,000만 원대~"), KeywordFact("브랜드", "기아 (대한민국)"),
-            KeywordFact("마력", "최대 약 380마력 (듀얼모터)"), KeywordFact("연비", "전비 약 4km/kWh"),
-        ),
-        rarity = "rare",
-    )
+    // scripts/generate_ai_cards.py 가 만든 '실제 Claude 요약'이 있으면 사용, 없으면 시연 데이터
+    private val aiCards: org.json.JSONObject? = File("../../docs/demo/ai_cards.json").takeIf { it.exists() }
+        ?.let { org.json.JSONObject(it.readText()) }
+    private val myKeywords: List<String> = aiCards?.getJSONArray("keywords")?.let { a -> (0 until a.length()).map { a.getString(it) } }
+        ?: listOf("가격", "브랜드", "마력", "연비")
+    private val aiNote: String = aiCards?.let { "※ 뒷면 요약: ${it.getString("model")} 실제 생성 결과 (${it.getString("generated_at").take(10)})" }
+        ?: "※ 요약 문구는 시연 데이터 — AI(LLM) 연동 시 자동 생성"
+
+    private fun card(id: String, brand: String, model: String, body: String, rarity: String, oneLiner: String, sample: List<Pair<String, String>>): VehicleCard {
+        val ai = aiCards?.getJSONObject("cards")?.optJSONObject(id)
+        val facts = ai?.getJSONArray("facts")?.let { a -> (0 until a.length()).map { KeywordFact(a.getJSONObject(it).getString("keyword"), a.getJSONObject(it).getString("value")) } }
+            ?: sample.map { KeywordFact(it.first, it.second) }
+        return VehicleCard(id, brand, model, body, null, ai?.getString("one_liner") ?: oneLiner, facts, rarity = rarity)
+    }
+
+    private val ev9Card = card("kia-ev9", "기아", "EV9", "SUV", "rare", "3열 대형 전기 SUV",
+        listOf("가격" to "약 7,000만 원대~", "브랜드" to "기아 (대한민국)", "마력" to "최대 약 380마력 (듀얼모터)", "연비" to "전비 약 4km/kWh"))
+    private val ioniq5nCard = card("hyundai-ioniq-5-n", "현대", "아이오닉 5 N", "CUV", "legendary", "현대 N 의 고성능 전기차",
+        listOf("가격" to "약 7,600만 원대~", "브랜드" to "현대자동차 N (고성능)", "마력" to "최대 약 650마력 (N 그린 부스트)", "연비" to "전비 약 3.5km/kWh"))
+    private val g80Card = card("genesis-g80", "제네시스", "G80", "세단", "rare", "럭셔리 세단",
+        listOf("가격" to "약 5,800만 원대~", "브랜드" to "제네시스", "마력" to "약 304~380마력", "연비" to "약 9~10km/L"))
+    private val dexBefore by lazy { listOf(ioniq5, g80Card, card("kia-k5", "기아", "K5", "세단", "common", "스포티 중형 세단", emptyList()),
+        card("hyundai-casper", "현대", "캐스퍼", "경형 SUV", "common", "귀여운 경형 SUV", emptyList())) }
+    private val dexAfter by lazy { listOf(ioniq5nCard, ev9Card) + dexBefore }
+    private val dexCatalog: List<com.pleos.cardex.data.CatalogVehicle> = File("../../backend/app/data/vehicle_catalog.json").takeIf { it.exists() }?.let { f ->
+        val arr = org.json.JSONObject(f.readText()).getJSONArray("vehicles")
+        val order = mapOf("legendary" to 0, "rare" to 1, "common" to 2)
+        (0 until arr.length()).map { i -> arr.getJSONObject(i).let { o ->
+            com.pleos.cardex.data.CatalogVehicle(o.getString("id"), o.getString("brand"), o.getString("model"), o.getString("body_type"), o.getString("rarity"))
+        } }.sortedBy { order[it.rarity] ?: 3 }
+    }.orEmpty()
 
     // 차량 인식 장면: RoadSceneRenderTest 가 그린 장면 + scripts/detect_demo_scene.py 의 실제 YOLOv8 감지 결과
     private data class Det(val label: String, val conf: Double, val x1: Int, val y1: Int, val x2: Int, val y2: Int)
@@ -209,86 +235,84 @@ class DemoVideoFramesTest {
         rule.setContent { CarDexTheme { Surface { Frame() } } }
 
         // 1. 타이틀
-        show(Title("CarDex", "달리면서 모으는 여행 도감", listOf("Pleos Connect 차량용 앱 · AI 드라이브 코스 · 지역 스탬프 · 쇼룸")), "", "")
+        show(Title("CarDex", "도로 위 차량을 카드로 모으는 차량 도감", listOf("Pleos Connect 차량용 앱 · YOLOv8 차량 인식 · AI 맞춤 요약 카드 · 쇼룸")), "", "")
         hold(3.5)
 
         // 2. 첫 실행 안내 (실제 버튼 클릭으로 넘김)
         show(Onboarding, "첫 실행 안내 — 서비스 소개와 위치·주행 정보 사용 목적을 먼저 설명해요", "1")
         hold(2.5)
-        rule.onNodeWithText("다음").performClick(); tick(); hold(2.5)
-        rule.onNodeWithText("다음").performClick(); tick(); hold(3.0)
+        rule.onNodeWithText("다음").performClick(); tick(); hold(2.0)
+        rule.onNodeWithText("다음").performClick(); tick(); hold(2.0)
 
-        // 3. 여행 홈 -> AI 코스 추천 (실제 '코스 추천받기' 클릭)
-        val home0 = home(180, 5, 3, 2, "⛰️ 강원 마스터까지 35점")
-        show(Travel(null, home0), "여행 홈 — 내 점수·순위·스탬프와 '다음 목표'를 한눈에", "2")
-        hold(3.0)
-        caption = "왕복 시간을 고르고 'AI 코스 추천' — 아직 안 가 본 지역·축제·명소를 엮어 줘요"
-        tick(); hold(2.5)
-        rule.onNodeWithText("코스 추천받기").performClick()
-        show(Travel(course, home0), "AI 추천 코스 — 새 지역 스탬프 + 히든 스탬프 3곳 + 축제 한정 배지 기회", "3")
-        rule.onNodeWithText("🏁 챌린지 시작 + Pleos 길안내").performScrollTo(); tick() // 코스 카드 전체가 보이도록
-        hold(4.5)
+        // 3. 도감 홈
+        show(Dex(dexBefore, home(180, 5, 3, 2, "도로에서 마주친 차량으로 다음 카드를 만들어 보세요", dex = 4, legendary = 0)), "앱의 첫 화면은 차량 도감 — 28종 중 4종 수집", "2")
+        hold(2.5)
+        // 실제 스크롤로 미발견 칸(실루엣)까지 내려가기: 0=요약카드, 1=필터, 2~5=보유 카드, 6~=미발견
+        rule.onNode(androidx.compose.ui.test.hasScrollToIndexAction()).performScrollToIndex(6)
+        caption = "아직 못 만난 차는 '???' 실루엣 — 전설 차량은 어디서 만날까?"; tick()
+        hold(2.8)
 
-        // 4. 챌린지 시작 -> 주행 모드 (실제 버튼 클릭)
-        rule.onNodeWithText("🏁 챌린지 시작 + Pleos 길안내").performClick()
-        show(Driving(emptyList(), "🏁 챌린지 시작! 완주하면 +87"), "챌린지 시작 → Pleos 내비로 길안내 · 주행 중엔 화면이 '주행 모드'로 잠겨요", "4")
-        hold(3.5)
-        show(Driving(listOf("mock-nami"), "✨ 히든 스탬프 '남이섬' 획득! +35 · 코스 1/3"), "명소 500m 안에 들어서면 Pleos 근접 알림으로 히든 스탬프 자동 획득 (음성 안내)", "4")
-        hold(3.5)
-        show(Driving(listOf("mock-nami", "mock-seorak"), "✨ 히든 스탬프 '설악산 국립공원' 획득! +35 · 코스 2/3"), "버튼은 '남은 곳 길안내' 하나 — 운전에 집중할 수 있게", "4")
-        hold(3.0)
-
-        // 5. 완주 / 마스터 축하 (정차 후 화면 연출)
-        val home1 = home(472, 2, 4, 5, "🏆 이번 주 1위까지 6점", listOf("강원"))
-        animatedScene(Celebrate(Celebration("🎖️", "코스 완주 + 축제 한정 배지!", "강원 바다·산 드라이브 · 완주 +87 · 배지 +50"), home1), "정차하면 축하 연출 — 축제 기간 안에 완주해야만 받는 한정 배지", "5", 3.0)
-        animatedScene(Celebrate(Celebration("👑", "강원 마스터 등극!", "쇼룸에 왕관·골드 아이템이 열렸어요"), home1), "이번 달 강원 여행 점수 1위 → '강원 마스터' 칭호 (다른 사람이 넘으면 빼앗겨요)", "5", 3.0)
-
-        // 6. 랭킹
-        show(Ranking, "속도가 아닌 '방문·수집'으로만 경쟁 — 주간 랭킹과 시·도별 지역 마스터", "6")
-        hold(4.0)
-
-        // 7. 차량 카드 수집: YOLOv8 인식 -> 내가 고른 정보(키워드) -> AI 요약 -> 카드(앞 일러스트 / 뒤 요약) -> 도감
+        // 4. 차량 인식 -> 키워드 -> AI 요약 -> 카드
         if (roadImage != null && roadDets.isNotEmpty()) {
             val cap = "YOLOv8 로 차량 인식 — 화면 속 차량을 찾아요 (박스는 실제 감지 결과)"
-            show(Recognize(0), cap, "7"); hold(1.2)
-            roadDets.indices.forEach { i -> show(Recognize(i + 1), cap, "7"); hold(0.8) }
-            show(Recognize(roadDets.size + 1), "가장 가깝게 보인 차를 골라 카드로 만들어요", "7")
-            hold(2.5)
+            show(Recognize(0), cap, "3"); hold(1.0)
+            roadDets.indices.forEach { i -> show(Recognize(i + 1), cap, "3"); hold(0.7) }
+            show(Recognize(roadDets.size + 1), "가장 가깝게 보인 차를 골라 카드로 만들어요", "3")
+            hold(2.0)
         }
-        show(Keywords, "카드 뒷면에 담을 정보는 내가 직접 골라요 — 고른 키워드가 그대로 AI 프롬프트가 돼요", "7")
-        hold(3.5)
-        show(CardMake(false), "카드 앞면 — 차량 일러스트", "7")
-        hold(2.5)
-        animatedScene(CardMake(true), "카드 뒷면 — 내가 고른 정보를 AI 가 요약", "7", 3.0)
-        show(Dex, "도감에 차곡차곡 — 같은 차를 다시 만나면 재회 보너스", "7")
+        show(Keywords, "카드 뒷면에 담을 정보는 내가 직접 골라요 — 고른 키워드가 그대로 AI 프롬프트가 돼요", "4")
         hold(3.0)
+        show(CardMake(false, ev9Card), "카드 앞면 — 차량 일러스트", "5")
+        hold(2.2)
+        animatedScene(CardMake(true, ev9Card), "카드 뒷면 — 내가 고른 정보를 AI 가 요약", "5", 3.0)
 
-        // 8. 쇼룸 꾸미기
-        val base = Showroom(car = ioniq5, floor = catalog.items[0], signText = "MY GARAGE")
-        animatedScene(Garage(base, 0), "쇼룸 — 대표 차량을 전시하고 여행으로 얻은 아이템으로 꾸며요", "8", 2.0)
-        val s1 = base.copy(car = ioniq5n)
-        animatedScene(Garage(s1, 0), "대표 차량 변경 — 실제 차의 특징을 살린 카툰 일러스트 (로고 없음)", "8", 2.0)
-        val s2 = s1.copy(background = gangwon, backgroundMastered = true, titles = listOf("강원"))
-        animatedScene(Garage(s2, 1), "배경: 방문한 지역의 풍경 — 강원 설악산", "8", 2.0)
-        val s3 = s2.copy(
+        // 5. 전설 차량 등장
+        show(CardMake(false, ioniq5nCard, legendary = true), "희귀도가 있어요 — 일반 · 희귀 · 전설", "6")
+        hold(1.5)
+        animatedScene(LegendaryGet, "전설 차량을 만나면 특별 연출!", "6", 2.8)
+
+        // 6. 도감이 채워짐 + 세트 보너스
+        show(Dex(dexAfter, home(352, 3, 3, 2, "현대 차량 1종 더 모으면 '현대 컬렉터' +50", dex = 6, legendary = 1)), "도감 6/28 · 전설 1/3 — 브랜드 세트·재회 보너스로 시너지 점수", "7")
+        hold(3.5)
+
+        // 7. 쇼룸에 전시
+        val base = Showroom(car = ioniq5n, floor = catalog.items[0], signText = "MY GARAGE")
+        animatedScene(Garage(base, 0), "쇼룸 — 가장 아끼는 카드를 대표 차량으로 전시해요", "8", 2.5)
+        val s2 = base.copy(background = gangwon, backgroundMastered = true, titles = listOf("강원"),
             floor = catalog.items[4], light = item("light-aurora", "light", "#B388FF", "오로라"),
-            pedestal = item("pedestal-neon", "pedestal", "neon", "네온 링"), signText = "강원 MASTER",
-        )
-        animatedScene(Garage(s3, 2), "바닥·조명·전시대·네온 간판 — 코스 완주·배지·마스터로 해금", "8", 2.5)
-        val s4 = s3.copy(props = listOf(
+            pedestal = item("pedestal-neon", "pedestal", "neon", "네온 링"), signText = "강원 MASTER")
+        animatedScene(Garage(s2, 2), "배경·바닥·조명·전시대·간판 — 수집과 여행으로 아이템이 열려요", "8", 2.5)
+        val s3 = s2.copy(props = listOf(
             PlacedPropOut("prop-crown", 0.12f, 0.84f, 1.4f, catalog.items[8]),
             PlacedPropOut("region:gangwon", 0.88f, 0.84f, 1.3f, catalog.items[9]),
             PlacedPropOut("prop-checker", 0.2f, 0.62f, 1f, catalog.items[7]),
             PlacedPropOut("prop-flag", 0.8f, 0.62f, 1f, catalog.items[6]),
         ))
-        animatedScene(Garage(s4, 6), "소품은 드래그로 자유롭게 배치 — 꾸미고 싶어서 다시 여행을 떠나요", "8", 3.0)
+        animatedScene(Garage(s3, 6), "소품은 드래그로 자유롭게 배치", "8", 2.5)
 
-        // 9. 마무리
-        show(Title("CarDex", "달릴수록 넓어지는 나의 대한민국", listOf(
-            "Pleos SDK: FusedLocation(위치·근접 알림) · NaviHelper(길안내) · Vehicle(주행 상태) · TextToSpeech(음성)",
-            "한국관광공사 TourAPI · LLM 코스 추천 · 덜 알려진 지역일수록 높은 점수",
+        // 8. 희귀 차량은 새 지역에서 -> 여행 (서브)
+        val homeT = home(352, 3, 3, 2, "⛰️ 강원 마스터까지 35점", dex = 6, legendary = 1)
+        show(Travel(null, homeT), "희귀 차량은 새 지역에서 — AI 가 아직 안 가 본 지역·축제로 코스를 추천해요", "9")
+        hold(2.0)
+        rule.onNodeWithText("코스 추천받기").performClick()
+        show(Travel(course, homeT), "AI 추천 코스 — 새 지역 스탬프 + 명소 히든 스탬프 + 축제 한정 배지", "9")
+        rule.onNodeWithText("🏁 챌린지 시작 + Pleos 길안내").performScrollTo(); tick()
+        hold(3.0)
+        rule.onNodeWithText("🏁 챌린지 시작 + Pleos 길안내").performClick()
+        show(Driving(listOf("mock-nami"), "✨ 히든 스탬프 '남이섬' 획득! +35 · 코스 1/3"), "Pleos 내비로 길안내 · 주행 중엔 '주행 모드'로 잠기고 알림은 음성으로", "10")
+        hold(3.0)
+        animatedScene(Celebrate(Celebration("👑", "강원 마스터 등극!", "쇼룸에 왕관·골드 아이템이 열렸어요"), homeT), "정차하면 축하 연출 — 지역 마스터 칭호와 쇼룸 아이템", "10", 2.5)
+
+        // 9. 랭킹
+        show(Ranking, "속도가 아닌 '수집·방문'으로만 경쟁 — 주간 랭킹과 지역 마스터", "11")
+        hold(3.0)
+
+        // 10. 마무리
+        show(Title("CarDex", "달릴수록 채워지는 나만의 차량 도감", listOf(
+            "YOLOv8 차량 인식 · 사용자 키워드 기반 AI 요약 카드 · 28종 도감 · 쇼룸",
+            "Pleos SDK: FusedLocation · NaviHelper · Vehicle · TextToSpeech  |  한국관광공사 TourAPI",
         )), "", "")
-        hold(4.5)
+        hold(4.0)
 
         File("build/demo_video/concat.txt").writeText(concat.toString() + "file 'frames/%04d.png'\n".format(frameNo - 1))
     }
@@ -336,15 +360,18 @@ class DemoVideoFramesTest {
                 }
                 is Recognize -> RecognizeScene(s.revealed)
                 Keywords -> com.pleos.cardex.ui.screens.KeywordSettingsScreen(myKeywords) {}
-                is CardMake -> CardMakeScene(s.flipped)
-                Dex -> Column(Modifier.fillMaxSize()) {
+                is CardMake -> CardMakeScene(s.flipped, s.card, s.legendary)
+                LegendaryGet -> {
+                    CardMakeScene(false, ioniq5nCard, true)
+                    CelebrationOverlay(Celebration("🌟", "LEGENDARY 카드 획득!", "현대 아이오닉 5 N · 전설 1/3"), {}, animate = true)
+                }
+                is Dex -> Column(Modifier.fillMaxSize()) {
                     Box(Modifier.fillMaxWidth().padding(top = 10.dp), contentAlignment = Alignment.Center) { CaptionBar(caption, step, Modifier) }
                     Box(Modifier.weight(1f)) { com.pleos.cardex.ui.screens.CollectionScreen(
-                    entries = listOf(ev9Card, ioniq5, ioniq5n, ev9Card.copy(id = "genesis-g80", brand = "제네시스", model = "G80", bodyType = "세단", oneLiner = "럭셔리 세단")).map {
-                        CollectionEntry(it, "2026-11-09T00:00:00Z", "2026-11-09T00:00:00Z", seenCount = if (it.id == "kia-ev9") 2 else 1)
-                    },
-                    synergy = com.pleos.cardex.data.SynergyScore(472, 180, 160, listOf(com.pleos.cardex.data.SynergyBonus("재회", 2, ""), com.pleos.cardex.data.SynergyBonus("그룹 트리오", 100, ""))),
+                    entries = s.entries.map { CollectionEntry(it, "2026-11-09T00:00:00Z", "2026-11-09T00:00:00Z", seenCount = if (it.id == "genesis-g80") 2 else 1) },
+                    synergy = com.pleos.cardex.data.SynergyScore(s.home.synergyTotal, 180, 160, listOf(com.pleos.cardex.data.SynergyBonus("재회", 2, ""), com.pleos.cardex.data.SynergyBonus("그룹 트리오", 100, ""))),
                     featuredId = "hyundai-ioniq-5-n", onRefresh = {}, onFeature = {}, onDelete = {},
+                    catalog = dexCatalog, home = s.home,
                 ) }
                 }
                 is Garage -> ShowroomScreen(
@@ -356,7 +383,7 @@ class DemoVideoFramesTest {
                     onAddProp = {}, onMoveProp = { _, _, _, _ -> }, onResizeProp = {}, onRemoveProp = {}, animate = true, initialTab = s.tab,
                 )
             }
-            if (caption.isNotEmpty() && scene !is Driving && scene != Dex) CaptionBar(caption, step, Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp))
+            if (caption.isNotEmpty() && scene !is Driving && scene !is Dex) CaptionBar(caption, step, Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp))
         }
     }
 
@@ -413,16 +440,16 @@ class DemoVideoFramesTest {
     }
 
     @Composable
-    private fun CardMakeScene(flipped: Boolean) {
+    private fun CardMakeScene(flipped: Boolean, card: VehicleCard, legendary: Boolean = false) {
         Row(Modifier.fillMaxSize().padding(28.dp), horizontalArrangement = Arrangement.spacedBy(40.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text("새 차량 카드!", color = Color(0xFFFFC94D), fontSize = 40.sp, fontWeight = FontWeight.Black)
+                Text(if (legendary) "전설 차량 발견!" else "새 차량 카드!", color = if (legendary) Color(0xFFFFB300) else Color(0xFFFFC94D), fontSize = 40.sp, fontWeight = FontWeight.Black)
                 Step("①", "YOLOv8 차량 인식", "car ${"%.2f".format(roadDets.minOfOrNull { it.conf } ?: 0.4)}", true)
                 Step("②", "내가 고른 정보", myKeywords.joinToString(" · "), true)
                 Step("③", "AI 요약 (프롬프트 = 차량 + 내 키워드)", if (flipped) "카드 뒷면에 표시" else "생성 중…", flipped)
-                Text("※ 요약 문구는 시연 데이터 — AI(LLM) 연동 시 자동 생성", color = Color.Gray, fontSize = 15.sp)
+                Text(aiNote, color = Color.Gray, fontSize = 15.sp)
             }
-            com.pleos.cardex.ui.components.FlipCard(ev9Card, Modifier.padding(bottom = 60.dp).size(330.dp, 470.dp), flipped = flipped)
+            com.pleos.cardex.ui.components.FlipCard(card, Modifier.padding(bottom = 60.dp).size(330.dp, 470.dp), flipped = flipped)
         }
     }
 

@@ -253,6 +253,25 @@ def pose_from_bumper(bx: float, by: float, heading_deg: float) -> CarPose:
                    entry_dist_cm=float(bx * np.tan(psi) - by))
 
 
+def ground_truth_slot(pose: CarPose, layout: LotLayout | None = None):
+    """자세와 바닥 배치로 계산한 '정답' 주차칸 (차량 좌표계). 안내 로직 시험용."""
+    from .detector import EndLine, LineEstimate, SlotEstimate
+
+    lay = layout or LotLayout()
+    psi = np.radians(pose.yaw_deg)
+    c, s = np.cos(psi), np.sin(psi)
+    b = float(np.tan(psi))
+    half = lay.slot_width_cm / 2
+
+    def line(sx):
+        return LineEstimate(float(-pose.lateral_offset_cm + sx / c), b, lay.line_width_cm, 0.0,
+                            float((pose.entry_dist_cm + lay.slot_length_cm) * c), 1000)
+
+    along = pose.entry_dist_cm + lay.slot_length_cm - lay.line_width_cm / 2
+    end = EndLine(float((along - s * pose.lateral_offset_cm) / c), float(-b), lay.line_width_cm, -400.0, 400.0)
+    return SlotEstimate(line(-half), line(half), end if lay.end_line else None)
+
+
 def render_scene(
     pose: CarPose | None = None,
     layout: LotLayout | None = None,

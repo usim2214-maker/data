@@ -48,6 +48,88 @@ def predict_path(v: VehicleSpec, steer_wheel_deg: float, dist_cm: float, n: int 
     return out
 
 
+def _move_points(pts: np.ndarray, k: float, s: float, ya: float) -> np.ndarray:
+    """차체 위 점들을 '뒷바퀴 축이 s만큼 후진(곡률 k)'한 뒤의 위치로 옮긴다."""
+    pts = np.asarray(pts, np.float64)
+    if abs(k) < 1e-7:
+        return pts + np.array([0.0, s])
+    R, phi = 1.0 / k, s * k
+    vx, vy = pts[:, 0] - R, pts[:, 1] - ya
+    return np.column_stack([R + vx * np.cos(phi) + vy * np.sin(phi), ya - vx * np.sin(phi) + vy * np.cos(phi)])
+
+
+@dataclass
+class FinalPrediction:
+    """지금 핸들 각도를 그대로 유지했을 때 끝선 앞에서 멈춘 모습."""
+
+    corners: np.ndarray  # (4,2) 뒤왼쪽, 뒤오른쪽, 앞오른쪽, 앞왼쪽 (현재 차량 좌표계)
+    clear_left_cm: float
+    clear_right_cm: float
+    offset_cm: float  # + = 주차칸 중심보다 오른쪽 (뒷범퍼 위치)
+    yaw_deg: float  # 주차칸 축 대비 남는 각도
+    travel_cm: float
+    front_offset_cm: float = 0.0  # 앞범퍼 위치의 치우침
+
+    @property
+    def cost(self) -> float:
+        """뒤·앞 중심이 주차칸 중심에서 벗어난 정도 (작을수록 반듯하게 가운데)."""
+        pen = max(0.0, -self.clear_left_cm) + max(0.0, -self.clear_right_cm)
+        return self.offset_cm ** 2 + self.front_offset_cm ** 2 + 20.0 * pen ** 2
+
+    @property
+    def status(self) -> str:
+        if min(self.clear_left_cm, self.clear_right_cm) < 0:
+            return "danger"
+        if abs(self.offset_cm) < 8 and abs(self.yaw_deg) < 1.5:
+            return "good"
+        return "adjust"
+
+
+def predict_final(slot: SlotEstimate, v: VehicleSpec, steer_deg: float,
+                  end_dist_cm: float | None, stop_margin_cm: float = 25.0,
+                  default_travel_cm: float = 300.0) -> FinalPrediction:
+    k = wheel_to_curvature(steer_deg, v)
+    ya = -v.rear_overhang_cm
+    travel = default_travel_cm if end_dist_cm is None else max(0.0, end_dist_cm - stop_margin_cm)
+    hw, L = v.width_cm / 2, v.length_cm
+    body = np.array([[-hw, 0.0], [hw, 0.0], [hw, -L], [-hw, -L], [0.0, 0.0], [0.0, -L]])
+    moved = _move_points(body, k, travel, ya)
+    corners, rear_c, front_c = moved[:4], moved[4], moved[5]
+
+    cos_t = float(np.cos(np.arctan(slot.slope)))
+
+    def side_clear(p):
+        left_in = slot.left.x_at(p[1]) + slot.left.width_cm / 2
+        right_in = slot.right.x_at(p[1]) - slot.right.width_cm / 2
+        return (p[0] - left_in) * cos_t, (right_in - p[0]) * cos_t
+
+    cl = min(side_clear(corners[0])[0], side_clear(corners[3])[0])
+    cr = min(side_clear(corners[1])[1], side_clear(corners[2])[1])
+    offset = float((rear_c[0] - slot.center_x_at(rear_c[1])) * cos_t)
+    front_off = float((front_c[0] - slot.center_x_at(front_c[1])) * cos_t)
+    axis = rear_c - front_c  # 차의 후진 방향
+    car_ang = np.degrees(np.arctan2(axis[0], axis[1]))
+    yaw = float(slot.yaw_deg - car_ang)
+    return FinalPrediction(corners, float(cl), float(cr), offset, yaw, travel, front_off)
+
+
+def best_constant_steering(slot: SlotEstimate, v: VehicleSpec, end_dist_cm: float | None) -> float:
+    """핸들을 그 각도로 고정한 채 끝까지 갔을 때 가장 반듯하게 가운데 멈추는 핸들 각도.
+
+    고스트카(지금 핸들 유지 시 예상 위치)와 같은 모델을 쓰므로, 화면 안내와 고스트카가 서로 다른 말을 하지 않는다.
+    """
+    full = v.max_steer_wheel_deg
+    grid = np.arange(-full, full + 1e-6, 15.0)
+    costs = [predict_final(slot, v, w, end_dist_cm).cost for w in grid]
+    best = float(grid[int(np.argmin(costs))])
+    for step in (5.0, 1.0):  # 주변을 촘촘히 다시 찾기
+        cand = np.arange(best - 3 * step, best + 3 * step + 1e-6, step)
+        cand = cand[np.abs(cand) <= full]
+        costs = [predict_final(slot, v, w, end_dist_cm).cost for w in cand]
+        best = float(cand[int(np.argmin(costs))])
+    return best
+
+
 def desired_steering(slot: SlotEstimate, v: VehicleSpec, lookahead_cm: float = 250.0) -> float:
     """뒷바퀴 축이 주차칸 중심선 위의 목표점(lookahead 앞)을 향하게 하는 핸들 각도 (pure pursuit)."""
     ya = -v.rear_overhang_cm
@@ -96,6 +178,9 @@ class Guidance:
     current_steer_deg: float | None = None
 
 
+FINAL_ZONE_CM = 250.0  # 끝선까지 이 거리 안쪽을 마무리 구간으로 본다
+
+
 def build_guidance(
     align: Alignment | None,
     slot: SlotEstimate | None,
@@ -116,14 +201,25 @@ def build_guidance(
     if end is not None and end <= stop_cm:
         return Guidance("stop", "stop", "멈추세요", "STOP", 0, sub_ko, sub_en)
 
-    # 끝선에 가까워질수록 목표점을 당겨서 남은 치우침을 더 적극적으로 바로잡는다
-    lookahead = 250.0 if end is None else float(np.clip(end + 80.0, 150.0, 250.0))
-    desired = desired_steering(slot, v, lookahead)
     near = end is not None and end <= slow_cm
+    final_zone = end is not None and end <= FINAL_ZONE_CM
+
+    if final_zone:
+        # 마무리 구간: 남은 거리가 짧아 '지금 핸들 유지' 모델이 잘 맞는다. 고스트카와 같은 기준으로 판단
+        desired = best_constant_steering(slot, v, end)
+        if predict_final(slot, v, desired, end).status == "danger":
+            g = Guidance("warn", "retry", "앞으로 나갔다가 다시 넣으세요", "Pull forward and try again")
+            g.sub_ko, g.sub_en = sub_ko, sub_en
+            g.desired_steer_deg, g.current_steer_deg = desired, steer_deg
+            return g
+    else:
+        # 멀리서: 한쪽으로 꺾었다 푸는 S자 조작이 필요하므로 pure pursuit로 목표 핸들 각도를 정한다
+        desired = desired_steering(slot, v, 250.0)
 
     if steer_deg is not None:
         diff = desired - steer_deg
-        if abs(diff) < tolerance_deg:
+        landing_ok = final_zone and predict_final(slot, v, steer_deg, end).status == "good"
+        if abs(diff) < tolerance_deg or landing_ok:
             if near:
                 g = Guidance("ok", "slow", "천천히, 거의 다 왔어요", "Slowly, almost there")
             else:

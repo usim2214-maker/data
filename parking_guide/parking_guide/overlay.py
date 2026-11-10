@@ -17,7 +17,7 @@ import numpy as np
 
 from .camera import CameraModel
 from .detector import Alignment, AlignmentThresholds, SlotEstimate
-from .guidance import Guidance, predict_path, turns_phrase_en, turns_phrase_ko
+from .guidance import FINAL_ZONE_CM, FinalPrediction, Guidance, predict_final, predict_path, turns_phrase_en, turns_phrase_ko
 from .text import draw_texts, korean_available, text_width
 from .vehicles import VehicleSpec
 
@@ -114,6 +114,19 @@ def draw_steering_icon(img, cx, cy, r, color, arrow: int) -> None:
         cv2.fillPoly(img, [np.round([head, p1, p2]).astype(np.int32)], color, cv2.LINE_AA)
 
 
+def draw_retry_icon(img, cx, cy, r, color) -> None:
+    """다시 하기(↻) 아이콘."""
+    t = max(3, r // 4)
+    cv2.ellipse(img, (cx, cy), (r, r), 0, -60, 230, color, t, cv2.LINE_AA)
+    a = np.radians(-60)
+    tip = np.array([cx + r * np.cos(a), cy + r * np.sin(a)])
+    tangent = np.array([np.sin(a), -np.cos(a)])  # 반시계 방향 끝
+    normal = np.array([np.cos(a), np.sin(a)])
+    head = tip + tangent * r * 0.55
+    pts = np.round([head, tip + normal * r * 0.45, tip - normal * r * 0.45]).astype(np.int32)
+    cv2.fillPoly(img, [pts], color, cv2.LINE_AA)
+
+
 def draw_check_icon(img, cx, cy, r, color) -> None:
     pts = np.array([[cx - r * 0.6, cy], [cx - r * 0.15, cy + r * 0.45], [cx + r * 0.65, cy - r * 0.45]])
     cv2.polylines(img, [np.round(pts).astype(np.int32)], False, color, max(3, r // 4), cv2.LINE_AA)
@@ -184,6 +197,11 @@ class GuideRenderer:
                guidance: Guidance | None = None, steer_deg: float | None = None) -> np.ndarray:
         out = img.copy()
         path = self._path(align, steer_deg)
+        final = None
+        # 고스트카는 마무리 구간에서만: 멀리서는 '핸들 고정' 가정이 맞지 않아 오해를 부른다
+        if (slot is not None and align is not None and steer_deg is not None
+                and align.end_dist_cm is not None and align.end_dist_cm <= FINAL_ZONE_CM):
+            final = predict_final(slot, self.vehicle, steer_deg, align.end_dist_cm)
         # 1) 바닥 통로 (옅은 면)
         corridor = np.zeros_like(out)
         self._draw_corridor(corridor, path, guidance)
@@ -194,13 +212,15 @@ class GuideRenderer:
         self._draw_corridor_edges(layer, path)
         if slot is not None and align is not None:
             self._draw_slot(layer, slot, align)
+        if final is not None:
+            self._draw_ghost(layer, final)
         m = _nonzero(layer)
         out[m] = cv2.addWeighted(out, 0.15, layer, 0.95, 0)[m]
         # 3) UI
         texts: list = []
         self._draw_badge(out, texts, guidance)
         if align is not None:
-            self._draw_balance(out, texts, align)
+            self._draw_balance(out, texts, align, final)
             if self.show_minimap:
                 self._draw_minimap(out, slot, align, path)
         self._draw_steering_dial(out, texts, guidance)
@@ -294,6 +314,8 @@ class GuideRenderer:
             draw_stop_icon(out, cx, cy, int(icon * 0.45), WHITE)
         elif g.level == "ok":
             draw_check_icon(out, cx, cy, int(icon * 0.42), WHITE)
+        elif g.key == "retry":
+            draw_retry_icon(out, cx, cy, int(icon * 0.34), WHITE)
         elif g.arrow:
             draw_steering_icon(out, cx, cy + int(7 * k), int(icon * 0.28), WHITE, g.arrow)
         else:
@@ -308,7 +330,26 @@ class GuideRenderer:
                          int(18 * k), DARK, 0.62)
             texts.append((sub, (sx, sy), ss, WHITE))
 
-    def _draw_balance(self, out, texts, a: Alignment) -> None:
+    def _draw_ghost(self, layer, f: FinalPrediction) -> None:
+        """고스트카: 지금 핸들 그대로 가면 멈추게 될 자리. 차 뒷면과 바닥 윤곽만 점선 느낌으로."""
+        c = STATUS_COLOR[f.status]
+        rl, rr, fr, fl = f.corners
+        h = 95.0  # 차 뒷면 높이 (트렁크 정도)
+        if min(rl[1], rr[1]) > self.y_near + 20:
+            face = np.array([[rl[0], rl[1], 0], [rr[0], rr[1], 0], [rr[0], rr[1], h], [rl[0], rl[1], h]])
+            ts = np.linspace(0, 1, 10)[:, None]
+            edges = np.vstack([face[i] + (face[(i + 1) % 4] - face[i]) * ts for i in range(4)])
+            p = self._poly(edges)
+            if p is not None and len(p) > 2:
+                cv2.polylines(layer, [p], True, c, max(2, int(3 * self.k)), cv2.LINE_AA)
+                # 뒷유리/후미등 느낌의 가로선
+                q = self._poly(np.array([[rl[0], rl[1], h * 0.55], [rr[0], rr[1], h * 0.55]]))
+                if q is not None and len(q) == 2:
+                    cv2.line(layer, tuple(q[0]), tuple(q[1]), c, max(1, int(2 * self.k)), cv2.LINE_AA)
+        for a, b in ((rl, fl), (rr, fr)):
+            self._ground_dashed(layer, a[0], a[1], b[0], b[1], c, max(2, int(3 * self.k)), dash_cm=20.0)
+
+    def _draw_balance(self, out, texts, a: Alignment, final: FinalPrediction | None = None) -> None:
         """수평계 모양 균형 게이지: 주차칸 안쪽 폭 안에서 차가 어디 있는지."""
         H, W = out.shape[:2]
         k = self.k
@@ -353,9 +394,19 @@ class GuideRenderer:
         box = cv2.boxPoints(rect).astype(np.int32)
         status = display_status(a, self.thr)
         sc = STATUS_COLOR[status]
+        if final is not None:
+            # 예상 최종 위치: 속이 빈 윤곽 (지금 위치는 채운 상자)
+            fc = (final.clear_left_cm - final.clear_right_cm) / 2
+            gx = (X(fc - half) + X(fc + half)) / 2
+            grect = ((gx, ty + th / 2), (cw, th + int(10 * k)), float(np.clip(final.yaw_deg * 2, -10, 10)))
+            gbox = cv2.boxPoints(grect).astype(np.int32)
+            cv2.polylines(out, [gbox], True, STATUS_COLOR[final.status], max(1, int(2 * k)), cv2.LINE_AA)
         cv2.fillPoly(out, [box], (62, 62, 64), cv2.LINE_AA)
         cv2.polylines(out, [box], True, sc, max(2, int(3 * k)), cv2.LINE_AA)
         cv2.circle(out, (int(cx), int(ty + th / 2)), max(3, int(5 * k)), sc, -1, cv2.LINE_AA)
+        if final is not None:
+            # 상자가 겹치면 지금 위치가 위에 보이도록 예상 위치는 한 번 더 얇게
+            cv2.polylines(out, [gbox], True, STATUS_COLOR[final.status], 1, cv2.LINE_AA)
 
         parts = []
         if abs(a.offset_cm) >= self.thr.good_offset_cm:
@@ -364,7 +415,11 @@ class GuideRenderer:
                                  f"{abs(a.offset_cm):.0f}cm to the {side}"))
         if abs(a.yaw_deg) >= self.thr.good_yaw_deg or (status != "good" and abs(a.yaw_deg) >= 0.8):
             parts.append(self._t(f"각도 {abs(a.yaw_deg):.1f}°", f"angle {abs(a.yaw_deg):.1f}°"))
-        if parts:
+        if final is not None:
+            fl_, fr_ = final.clear_left_cm, final.clear_right_cm
+            info = self._t(f"이대로 가면  왼쪽 {fl_:.0f}cm · 오른쪽 {fr_:.0f}cm",
+                           f"If you keep this:  L {fl_:.0f}cm · R {fr_:.0f}cm")
+        elif parts:
             info = "  ·  ".join(parts)
         elif status == "good":
             info = self._t("가운데 정렬됨", "Centered")
@@ -417,7 +472,8 @@ class GuideRenderer:
 
         '오른쪽으로'만으로는 얼마나 돌릴지 알기 어려워서, 목표 위치를 눈으로 보여 준다.
         """
-        if g is None or g.current_steer_deg is None or g.desired_steer_deg is None or g.level == "stop":
+        if (g is None or g.current_steer_deg is None or g.desired_steer_deg is None
+                or g.level == "stop" or g.key == "retry"):
             return
         H = out.shape[0]
         k = self.k

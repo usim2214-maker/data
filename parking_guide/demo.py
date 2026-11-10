@@ -30,6 +30,7 @@ SCENES = {
     "04_inside_good": (CarPose(3, 0.5, -300), LotLayout(), Photometric(), 0.0),
     "05_slow_near_end": (CarPose(2, 0.3, -390), LotLayout(), Photometric(), 0.0),
     "06_worn_lines": (CarPose(14, 3, 100), LotLayout(line_wear=0.6), Photometric(), -60.0),
+    "08_retry": (CarPose(55, 1, -310), LotLayout(), Photometric(), 0.0),
     "07_dark_shadow": (CarPose(-8, 2, 80), LotLayout(shadow=True), Photometric(brightness=0.6, noise_sigma=7), None),
 }
 

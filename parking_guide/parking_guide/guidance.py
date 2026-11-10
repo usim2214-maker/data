@@ -58,6 +58,31 @@ def desired_steering(slot: SlotEstimate, v: VehicleSpec, lookahead_cm: float = 2
     return curvature_to_wheel(kappa, v)
 
 
+def turns_phrase_ko(deg: float) -> str:
+    """핸들 회전량을 초보도 감이 오는 '바퀴' 단위로 바꾼다."""
+    a = abs(deg)
+    if a < 60:
+        return "살짝"
+    if a < 135:
+        return "1/4바퀴"
+    if a < 225:
+        return "반 바퀴"
+    if a < 315:
+        return "3/4바퀴"
+    if a < 450:
+        return "한 바퀴"
+    return "한 바퀴 반"
+
+
+def turns_phrase_en(deg: float) -> str:
+    a = abs(deg)
+    for lim, txt in ((60, "slightly"), (135, "a quarter turn"), (225, "half a turn"),
+                     (315, "three quarters"), (450, "one turn")):
+        if a < lim:
+            return txt
+    return "one and a half turns"
+
+
 @dataclass
 class Guidance:
     level: str  # "ok" | "warn" | "stop" | "info"
@@ -108,12 +133,12 @@ def build_guidance(
             side_ko, side_en = ("오른쪽", "right") if arrow > 0 else ("왼쪽", "left")
             if abs(desired) < tolerance_deg and abs(steer_deg) >= tolerance_deg:
                 g = Guidance("warn", f"unwind{arrow}", "핸들을 풀어 주세요", "Straighten the wheel", arrow)
-            elif abs(diff) < 150:
-                g = Guidance("warn", f"turn{arrow}s", f"핸들을 {side_ko}으로 조금 더",
-                             f"Turn wheel a bit more {side_en}", arrow)
             else:
-                g = Guidance("warn", f"turn{arrow}", f"핸들을 {side_ko}으로 돌리세요",
-                             f"Turn wheel {side_en}", arrow)
+                amount_ko, amount_en = turns_phrase_ko(diff), turns_phrase_en(diff)
+                # key에는 방향과 대략의 양만 넣어 문구가 자잘하게 바뀌지 않게 한다
+                g = Guidance("warn", f"turn{arrow}{'s' if abs(diff) < 150 else ''}",
+                             f"핸들을 {side_ko}으로 {amount_ko} 더",
+                             f"Turn {amount_en} more {side_en}", arrow)
     else:
         # 핸들 각도를 모를 때: 영상만으로 위치 상태를 알려 준다
         if align.status == "good":

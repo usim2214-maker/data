@@ -17,7 +17,7 @@ import numpy as np
 
 from .camera import CameraModel
 from .detector import Alignment, AlignmentThresholds, SlotEstimate
-from .guidance import Guidance, predict_path
+from .guidance import Guidance, predict_path, turns_phrase_en, turns_phrase_ko
 from .text import draw_texts, korean_available, text_width
 from .vehicles import VehicleSpec
 
@@ -203,6 +203,7 @@ class GuideRenderer:
             self._draw_balance(out, texts, align)
             if self.show_minimap:
                 self._draw_minimap(out, slot, align, path)
+        self._draw_steering_dial(out, texts, guidance)
         self._draw_footer(texts)
         draw_texts(out, texts)
         return out
@@ -410,6 +411,58 @@ class GuideRenderer:
         cv2.polylines(view, [car], True, STATUS_COLOR[display_status(a, self.thr)], max(2, int(2 * k)), cv2.LINE_AA)
         seg(P(-Wv / 2 + 18, -8), P(Wv / 2 - 18, -8), (60, 60, 225), max(2, int(4 * k)))  # 후미등
         seg(P(-Wv / 2 + 22, -L * 0.62), P(Wv / 2 - 22, -L * 0.62), (150, 150, 150), max(1, int(2 * k)))
+
+    def _draw_steering_dial(self, out, texts, g: Guidance | None, tol_deg: float = 30.0) -> None:
+        """핸들 맞추기 다이얼: 흰 바늘(지금 핸들)을 초록 구간(목표)에 넣으면 된다.
+
+        '오른쪽으로'만으로는 얼마나 돌릴지 알기 어려워서, 목표 위치를 눈으로 보여 준다.
+        """
+        if g is None or g.current_steer_deg is None or g.desired_steer_deg is None or g.level == "stop":
+            return
+        H = out.shape[0]
+        k = self.k
+        pw, ph = int(200 * k), int(214 * k)
+        x0, y0 = int(16 * k), int(H * 0.40)
+        rounded_rect(out, x0, y0, x0 + pw, y0 + ph, int(20 * k), DARK, 0.62)
+        cx, cy, R = x0 + pw // 2, y0 + int(118 * k), int(66 * k)
+        full = self.vehicle.max_steer_wheel_deg
+
+        def ang(w):  # 핸들 각도 → 화면 각도 (위쪽 = -90°)
+            return -90.0 + float(np.clip(w, -full, full)) / full * 135.0
+
+        t = max(6, int(10 * k))
+        cv2.ellipse(out, (cx, cy), (R, R), 0, -225, 45, (90, 90, 90), t, cv2.LINE_AA)
+        d, cur = g.desired_steer_deg, g.current_steer_deg
+        cv2.ellipse(out, (cx, cy), (R, R), 0, ang(d - tol_deg), ang(d + tol_deg), GREEN, t + 2, cv2.LINE_AA)
+        # 가운데(핸들 똑바로) 눈금
+        cv2.line(out, (cx, cy - R - t), (cx, cy - R + t), SOFT, max(1, int(2 * k)), cv2.LINE_AA)
+        # 지금 핸들 모양을 실제 회전각대로 그려서 직관적으로
+        self._wheel_icon(out, cx, cy, int(R * 0.55), cur)
+        a = np.radians(ang(cur))
+        tip = (int(cx + (R + t) * np.cos(a)), int(cy + (R + t) * np.sin(a)))
+        base = (int(cx + (R - t * 1.6) * np.cos(a)), int(cy + (R - t * 1.6) * np.sin(a)))
+        cv2.line(out, base, tip, WHITE, max(3, int(5 * k)), cv2.LINE_AA)
+
+        texts.append((self._t("핸들 맞추기", "Wheel target"), (x0 + int(18 * k), y0 + int(12 * k)), int(17 * k), SOFT))
+        diff = d - cur
+        if abs(diff) < tol_deg:
+            msg, col = self._t("딱 맞아요", "On target"), GREEN
+        else:
+            side = self._t("오른쪽", "right") if diff > 0 else self._t("왼쪽", "left")
+            msg = self._t(f"{side} {turns_phrase_ko(diff)}", f"{turns_phrase_en(diff)} {side}")
+            col = AMBER
+        ms = int(20 * k)
+        texts.append((msg, (cx - text_width(msg, ms) // 2, y0 + ph - int(36 * k)), ms, col))
+
+    def _wheel_icon(self, out, cx, cy, r, rot_deg) -> None:
+        t = max(2, r // 6)
+        cv2.circle(out, (cx, cy), r, SOFT, t, cv2.LINE_AA)
+        for base in (180.0, 0.0, 90.0):  # 9시·3시·6시 방향 살
+            a = np.radians(base + rot_deg)
+            cv2.line(out, (cx, cy), (int(cx + r * np.cos(a)), int(cy + r * np.sin(a))), SOFT, t, cv2.LINE_AA)
+        a = np.radians(-90 + rot_deg)  # 12시 표시점: 몇 바퀴 돌았는지 보이게
+        cv2.circle(out, (int(cx + r * np.cos(a)), int(cy + r * np.sin(a))), max(3, t), AMBER, -1, cv2.LINE_AA)
+        cv2.circle(out, (cx, cy), max(3, r // 4), SOFT, -1, cv2.LINE_AA)
 
     def _draw_footer(self, texts) -> None:
         k, H = self.k, self.camera.height

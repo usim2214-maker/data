@@ -71,19 +71,27 @@ class DrivingAssistEngine(
     private val navigationPolicy: NavigationAlertPolicy = NavigationAlertPolicy(),
     private val arbiter: AlertArbiter = AlertArbiter(),
     private val sirenCooldownMs: Long = 20_000,
+    val frameScheduler: FrameScheduler = FrameScheduler(),
 ) {
+    private var lastSignal: EngineOutput? = null
+
     private var sirenWasOn = false
     private var lastSirenAlertMs: Long? = null
 
     fun process(input: DrivingInput): DrivingOutput {
         val p = profile
-        val signal = if (p.signalAssist && input.frame != null) {
+        // 영상 처리는 필요할 때만 (FrameScheduler). 건너뛴 프레임에서는 직전 신호 상태를 그대로 보여준다
+        val fresh = if (p.signalAssist && input.frame != null &&
+            frameScheduler.shouldProcess(input.timestampMs, input.vehicle, input.navigation)
+        ) {
             signalEngine.process(input.frame, input.vehicle, input.timestampMs, input.navigation)
+                .also { frameScheduler.observe(input.timestampMs, it); lastSignal = it }
         } else {
             null
         }
+        val signal = fresh ?: lastSignal?.takeIf { p.signalAssist }?.copy(change = null, alerts = emptyList())
         val alerts = ArrayList<Alert>()
-        signal?.alerts?.filterTo(alerts) { p.accepts(it) }
+        fresh?.alerts?.filterTo(alerts) { p.accepts(it) }
         alerts += vehiclePolicy.evaluate(input.cabin, input.vehicle, input.timestampMs, input.navigation, p.vehicleFeatures)
         if (p.navigationCards) alerts += navigationPolicy.evaluate(input.navigation, input.timestampMs)
         // 사이렌: 들리기 시작한 순간 한 번 (청각장애 프로필). 계속 들리면 20초마다
@@ -106,6 +114,8 @@ class DrivingAssistEngine(
         vehiclePolicy.reset()
         navigationPolicy.reset()
         arbiter.reset()
+        frameScheduler.reset()
+        lastSignal = null
         sirenWasOn = false
         lastSirenAlertMs = null
     }

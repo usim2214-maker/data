@@ -1,5 +1,6 @@
 package com.signalassist.demo
 
+import com.signalassist.core.DetectorConfig
 import com.signalassist.core.DriverProfile
 import com.signalassist.core.DrivingAssistEngine
 import com.signalassist.core.Frame
@@ -26,6 +27,7 @@ fun main(args: Array<String>) {
 
     for (scenario in Scenario.ALL) runScenario(scenario, outDir)
     evaluateDetector()
+    benchmarkDetector()
     println("\n샘플 프레임 저장 위치: ${outDir.absolutePath}")
 }
 
@@ -67,6 +69,25 @@ private fun runScenario(scenario: Scenario, outDir: File) {
         }
     }
     if (known > 0) println("  안정화된 신호 상태 정확도: $correct / $known (UNKNOWN 제외)")
+    val fs = engine.frameScheduler
+    if (fs.offered > 0) println("  영상 처리: ${fs.processed} / ${fs.offered} 프레임 (%.0f%%)".format(100.0 * fs.processed / fs.offered))
+}
+
+/** 검출기 처리 시간 (JVM 기준, 참고용) */
+private fun benchmarkDetector() {
+    val frames = (0 until 30).map { i ->
+        SyntheticSceneGenerator.render(SceneSpec(signal = SignalState(SignalColor.RED), lampRadius = 6f, seed = i))
+    }
+    println("\n=== 검출기 처리 시간 (960x540 입력, JVM)")
+    for (w in listOf(960, 480)) {
+        val det = TrafficLightDetector(DetectorConfig(workingWidth = w))
+        repeat(20) { det.detect(frames[it % frames.size]) } // 워밍업
+        val t0 = System.nanoTime()
+        val n = 200
+        repeat(n) { det.detect(frames[it % frames.size]) }
+        val ms = (System.nanoTime() - t0) / 1e6 / n
+        println("  처리 폭 ${w}px: %.2f ms/프레임".format(ms))
+    }
 }
 
 /** 무작위 장면(색·크기·위치·조명·노출)에 대한 단일 프레임 검출 정확도 */

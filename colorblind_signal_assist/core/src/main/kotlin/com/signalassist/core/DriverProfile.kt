@@ -15,7 +15,14 @@ data class OutputPlan(
     /** 화면 전체 깜빡임 (소리 대신) */
     val visualFlash: Boolean,
     val largeText: Boolean,
-)
+    /** 야간: 화면 깜빡임 밝기를 낮춰 눈부심 방지 */
+    val dimmed: Boolean = false,
+) {
+    /** 화면 배너·헤드업 알림만 (소리·음성·깜빡임 없음) */
+    val silent get() = !tone && !voice && !visualFlash
+
+    fun silenced() = copy(tone = false, voice = false, visualFlash = false)
+}
 
 /**
  * 운전자 프로필. 고른 특성에 따라 ① 어떤 기능을 켤지 ② 알림을 어떤 감각으로 낼지 정한다.

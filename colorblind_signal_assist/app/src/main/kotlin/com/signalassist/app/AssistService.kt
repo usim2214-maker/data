@@ -97,10 +97,9 @@ class AssistService : Service() {
     }
 
     private fun onOutput(out: com.signalassist.core.DrivingOutput, frame: com.signalassist.core.Frame?) {
-        val profile = controller.profile
         scope.launch {
-            for (alert in out.alerts) {
-                val plan = profile.outputFor(alert)
+            // 중재(AlertArbiter)를 거친 전달 목록: 같은 순간엔 가장 중요한 알림만 소리·음성·깜빡임
+            for ((alert, plan) in out.deliveries) {
                 notifier.notify(alert, plan)
                 AssistBus.alerts.tryEmit(alert to plan)
             }

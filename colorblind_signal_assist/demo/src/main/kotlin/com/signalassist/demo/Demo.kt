@@ -54,12 +54,12 @@ private fun runScenario(scenario: Scenario, outDir: File) {
                 ),
             )
         }
-        for (a in out.alerts) {
-            val plan = profile.outputFor(a)
+        for ((a, plan) in out.deliveries) {
             val channels = listOfNotNull(
                 "소리".takeIf { plan.tone }, "음성".takeIf { plan.voice },
-                "화면깜빡임".takeIf { plan.visualFlash }, "큰글씨".takeIf { plan.largeText },
-            ).joinToString("+")
+                (if (plan.dimmed) "화면깜빡임(야간 감광)" else "화면깜빡임").takeIf { plan.visualFlash },
+                "큰글씨".takeIf { plan.largeText },
+            ).joinToString("+").let { if (plan.silent) "화면 표시만(중재)" + (if (plan.largeText) "+큰글씨" else "") else it }
             println("%6.1fs  🔔 %s %s  [%s/%s → %s]".format(a.timestampMs / 1000.0, a.symbol, a.message, a.level, a.tone, channels))
         }
         if (sample.timestampMs % 2000 == 0L) {

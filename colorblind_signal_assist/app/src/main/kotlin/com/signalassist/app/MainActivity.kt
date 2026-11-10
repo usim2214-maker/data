@@ -156,8 +156,10 @@ class MainActivity : AppCompatActivity() {
             },
         )
         flash.visibility = View.VISIBLE
-        // 두 번 깜빡인 뒤 사라짐 (소리를 못 듣는 운전자가 주변 시야로도 알아챌 수 있게)
-        ObjectAnimator.ofFloat(flash, View.ALPHA, 1f, 0.2f, 1f, 0.2f, 1f, 0f).apply {
+        // 두 번 깜빡인 뒤 사라짐 (소리를 못 듣는 운전자가 주변 시야로도 알아챌 수 있게).
+        // 초당 3회 미만으로 깜빡여 광과민성 발작 기준을 넘지 않고, 야간에는 밝기를 낮춰 눈부심을 막는다.
+        val peak = if (plan.dimmed) 0.45f else 1f
+        ObjectAnimator.ofFloat(flash, View.ALPHA, peak, 0.2f * peak, peak, 0.2f * peak, peak, 0f).apply {
             duration = if (alert.level == AlertLevel.URGENT) 2_400 else 1_800
             addListener(object : android.animation.AnimatorListenerAdapter() {
                 override fun onAnimationEnd(a: android.animation.Animator) { flash.visibility = View.GONE }

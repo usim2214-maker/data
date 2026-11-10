@@ -53,6 +53,8 @@ data class DrivingOutput(
     /** 신호 인식 결과 (프로필에서 꺼져 있거나 영상이 없으면 null) */
     val signal: EngineOutput?,
     val alerts: List<Alert>,
+    /** 중재를 거친 실제 전달 목록 (알림마다 소리·음성·깜빡임 여부) */
+    val deliveries: List<Delivery> = emptyList(),
 ) {
     val signalState: SignalState get() = signal?.state ?: SignalState.UNKNOWN
 }
@@ -65,6 +67,7 @@ class DrivingAssistEngine(
     private val signalEngine: SignalAssistEngine = SignalAssistEngine(),
     private val vehiclePolicy: VehicleAlertPolicy = VehicleAlertPolicy(),
     private val navigationPolicy: NavigationAlertPolicy = NavigationAlertPolicy(),
+    private val arbiter: AlertArbiter = AlertArbiter(),
 ) {
     fun process(input: DrivingInput): DrivingOutput {
         val p = profile
@@ -78,12 +81,14 @@ class DrivingAssistEngine(
         alerts += vehiclePolicy.evaluate(input.cabin, input.vehicle, input.timestampMs, input.navigation, p.vehicleFeatures)
         if (p.navigationCards) alerts += navigationPolicy.evaluate(input.navigation, input.timestampMs)
         alerts.sortByDescending { it.level }
-        return DrivingOutput(input, signal, alerts)
+        val deliveries = arbiter.arbitrate(alerts, p, input.timestampMs, input.cabin.isDark)
+        return DrivingOutput(input, signal, alerts, deliveries)
     }
 
     fun reset() {
         signalEngine.reset()
         vehiclePolicy.reset()
         navigationPolicy.reset()
+        arbiter.reset()
     }
 }

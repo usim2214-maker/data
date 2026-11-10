@@ -2,6 +2,7 @@ package com.signalassist.app
 
 import android.graphics.Bitmap
 import com.signalassist.core.Alert
+import com.signalassist.core.AlertType
 import com.signalassist.core.DriverProfile
 import com.signalassist.core.DrivingOutput
 import com.signalassist.core.OutputPlan
@@ -27,6 +28,14 @@ sealed class AssistMode(val key: String) {
     }
 }
 
+/** 화면에서 서비스로 보내는 요청 */
+sealed class UserRequest {
+    /** 마지막 알림 다시 듣기 */
+    data object Replay : UserRequest()
+    /** 알림 배우기: 해당 알림을 시범으로 */
+    data class Lesson(val type: AlertType) : UserRequest()
+}
+
 data class AssistConfig(val mode: AssistMode, val profile: DriverProfile, val restartToken: Int = 0)
 
 data class UiSnapshot(
@@ -44,6 +53,7 @@ object AssistBus {
     val config = MutableStateFlow<AssistConfig?>(null)
     val snapshot = MutableStateFlow<UiSnapshot?>(null)
     val alerts = MutableSharedFlow<Pair<Alert, OutputPlan>>(extraBufferCapacity = 16)
+    val requests = MutableSharedFlow<UserRequest>(extraBufferCapacity = 8)
 
     /** Pleos 에뮬레이터는 차속을 시뮬레이션하지 못하므로 시연용 차속 (null 이면 실제 값) */
     @Volatile var speedOverrideKmh: Float? = null

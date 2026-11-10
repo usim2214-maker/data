@@ -27,6 +27,9 @@ import com.signalassist.app.vehicle.PleosCabinDataSource
 import com.signalassist.app.vehicle.ScenarioCabinDataSource
 import com.signalassist.app.vehicle.ScenarioNavigationSource
 import com.signalassist.app.vehicle.ScenarioVehicleDataSource
+import com.signalassist.core.Alert
+import com.signalassist.core.AlertGuide
+import com.signalassist.core.AlertHistory
 import com.signalassist.core.Scenario
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -48,6 +51,7 @@ class AssistService : Service() {
     private var activeKey: String? = null
     private var activeToken = -1
     private var micWanted = false
+    private val history = AlertHistory()
     private var sourceDescription = ""
 
     override fun onCreate() {
@@ -55,6 +59,26 @@ class AssistService : Service() {
         notifier = AlertNotifier(this)
         controller = AssistController(scope, ::onOutput)
         startAsForeground()
+        scope.launch {
+            AssistBus.requests.collect { req ->
+                val profile = controller.profile
+                val now = System.currentTimeMillis()
+                when (req) {
+                    UserRequest.Replay -> history.replayLast(profile, now)?.let { (alert, plan) ->
+                        notifier.notify(alert, plan, postHeadsUp = false)
+                        AssistBus.alerts.tryEmit(alert to plan)
+                    }
+                    is UserRequest.Lesson -> {
+                        val lesson = AlertGuide.lessonsFor(profile).firstOrNull { it.type == req.type } ?: return@collect
+                        // 소리 패턴을 들려준 뒤 의미를 한 문장으로 (청각장애는 화면으로)
+                        val alert = Alert(req.type, now, customMessage = lesson.explanationKo)
+                        val plan = AlertGuide.lessonPlan(profile, req.type)
+                        notifier.notify(alert, plan, postHeadsUp = false)
+                        AssistBus.alerts.tryEmit(alert to plan)
+                    }
+                }
+            }
+        }
         scope.launch {
             AssistBus.config.filterNotNull().collect { cfg ->
                 controller.profile = cfg.profile
@@ -108,6 +132,7 @@ class AssistService : Service() {
     private fun onOutput(out: com.signalassist.core.DrivingOutput, frame: com.signalassist.core.Frame?) {
         scope.launch {
             // 중재(AlertArbiter)를 거친 전달 목록: 같은 순간엔 가장 중요한 알림만 소리·음성·깜빡임
+            history.record(out.deliveries)
             for ((alert, plan) in out.deliveries) {
                 notifier.notify(alert, plan)
                 AssistBus.alerts.tryEmit(alert to plan)

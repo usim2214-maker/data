@@ -49,14 +49,14 @@ class AlertNotifier(private val context: Context) : TextToSpeech.OnInitListener 
         )
     }
 
-    fun notify(alert: Alert, plan: OutputPlan) {
+    fun notify(alert: Alert, plan: OutputPlan, postHeadsUp: Boolean = true) {
         if (plan.tone) runCatching { tone.play(alert.tone) }
         if (plan.voice && ttsReady) {
             // 긴급 경고는 진행 중인 안내를 끊고 즉시
             val mode = if (alert.level == AlertLevel.URGENT) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
             tts.speak(alert.message, mode, Bundle(), "alert-${alert.timestampMs}")
         }
-        postNotification(alert)
+        if (postHeadsUp) postNotification(alert)
     }
 
     private fun postNotification(alert: Alert) {

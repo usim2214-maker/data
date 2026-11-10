@@ -17,6 +17,7 @@ import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.SeekBar
@@ -30,6 +31,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.signalassist.app.ui.SafePalette
 import com.signalassist.app.ui.SignalPanelView
 import com.signalassist.core.Alert
+import com.signalassist.core.AlertGuide
 import com.signalassist.core.AlertLevel
 import com.signalassist.core.CabinState
 import com.signalassist.core.DriverNeed
@@ -64,6 +66,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var controls: LinearLayout
     private lateinit var flash: TextView
     private lateinit var speedRow: LinearLayout
+    private lateinit var lessonRow: LinearLayout
     private var restartToken = 0
     private var drivingRestricted = false
     private var car: Car? = null
@@ -74,6 +77,7 @@ class MainActivity : AppCompatActivity() {
         settings = Settings(this)
         setContentView(buildUi())
         publishConfig()
+        rebuildLessons(settings.profile)
         AssistService.start(this)
         requestPermissionsIfNeeded()
         connectUxRestrictions()
@@ -204,6 +208,21 @@ class MainActivity : AppCompatActivity() {
         flash.textSize = 54f * scale
         panel.visibility = if (p.signalAssist) View.VISIBLE else View.GONE
         preview.visibility = if (p.signalAssist && !drivingRestricted) View.VISIBLE else View.GONE
+        rebuildLessons(p)
+    }
+
+    /** 알림 배우기 버튼 (주차 중에만 보이는 설정 영역 안) */
+    private fun rebuildLessons(p: DriverProfile) {
+        if (!::lessonRow.isInitialized) return
+        lessonRow.removeAllViews()
+        lessonRow.addView(label(18f, Color.LTGRAY).apply { text = "알림 배우기: " })
+        for (lesson in AlertGuide.lessonsFor(p)) {
+            lessonRow.addView(Button(this).apply {
+                text = "${lesson.type.symbol} ${lesson.titleKo}"
+                contentDescription = "${lesson.titleKo} 알림 들어보기. ${lesson.explanationKo}"
+                setOnClickListener { AssistBus.requests.tryEmit(UserRequest.Lesson(lesson.type)) }
+            })
+        }
     }
 
     // ---- UI 구성 ----
@@ -229,7 +248,18 @@ class MainActivity : AppCompatActivity() {
 
         banner = label(30f, Color.WHITE).apply { typeface = Typeface.DEFAULT_BOLD }
         status = label(18f, Color.GRAY)
-        content.addView(banner)
+        // 마지막 알림 + 큰 '다시 듣기' 버튼 (주행 중에도 한 번 누르기로 사용 가능, 터치 영역 76dp 이상)
+        val bannerRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        bannerRow.addView(banner, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        bannerRow.addView(Button(this).apply {
+            text = "↻ 다시 듣기"
+            textSize = 24f
+            contentDescription = "마지막 알림 다시 듣기"
+            minimumHeight = dp(76)
+            minimumWidth = dp(180)
+            setOnClickListener { AssistBus.requests.tryEmit(UserRequest.Replay) }
+        })
+        content.addView(bannerRow)
         content.addView(status)
 
         controls = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -237,6 +267,8 @@ class MainActivity : AppCompatActivity() {
         controls.addView(buildProfileRow())
         speedRow = buildSpeedRow()
         controls.addView(speedRow)
+        lessonRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        controls.addView(HorizontalScrollView(this).apply { addView(lessonRow) })
         content.addView(controls)
         root.addView(content)
 
@@ -335,6 +367,8 @@ class MainActivity : AppCompatActivity() {
             })
         }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
     }
+
+    private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
     private fun label(sizeSp: Float, color: Int) = TextView(this).apply {
         textSize = sizeSp; setTextColor(color); setPadding(0, 6, 0, 6)

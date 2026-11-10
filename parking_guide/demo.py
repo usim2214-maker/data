@@ -167,6 +167,45 @@ def run_video(args) -> None:
     print(f"저장: {path} ({n} frames, 최종 치우침 {sim.bx:.1f}cm, 각도 {sim.heading_deg:.1f}°)")
 
 
+def run_report(args) -> None:
+    """화면 없이 후진 주차를 시뮬레이션하고 리포트 카드와 지자체 공유 데이터를 만든다."""
+    import json
+
+    from parking_guide.overlay import render_report
+    from parking_guide.report import History, municipal_payload
+
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    cam = make_camera(args.lens)
+    vehicle = get_vehicle(args.vehicle)
+    pa = ParkingAssistant(cam, vehicle, args.door)
+    layout = LotLayout(line_wear=args.wear)
+    world = ParkingLotWorld(layout, seed=3)
+    rng = np.random.default_rng(0)
+    sim = DriverSim(vehicle)
+    stop_by = layout.slot_length_cm - layout.line_width_cm - 25.0
+    fps, ds, t = 10.0, 0.0, 0.0
+    img = None
+    for n in range(400):
+        img, _ = world.render(sim.pose(), cam, Photometric(), rng)
+        g = pa.step(img, sim.steer_deg, ds, t).guidance
+        if sim.by >= stop_by:
+            break
+        sim.step(args.speed, g.desired_steer_deg if g.level == "warn" else None)
+        ds, t = args.speed, t + 1 / fps
+    report = History(out / "history.json").add(pa.finish())
+    cv2.imwrite(str(out / "report_card.png"), render_report(report, cam.width, cam.height, img))
+    (out / "report.json").write_text(json.dumps(report.to_dict(), ensure_ascii=False, indent=1), encoding="utf-8")
+    payload = municipal_payload(report, lat=36.4466, lon=127.1190)  # 예시 좌표 (공주시청 부근)
+    (out / "municipal_payload.json").write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
+    print(f"점수 {report.score} ({report.grade_ko}) · {report.trend_ko}")
+    print(f"리포트 최종 위치: 치우침 {report.offset_cm:+.1f}cm, 각도 {report.yaw_deg:+.2f}°  "
+          f"| 실제(시뮬레이션): 치우침 {sim.bx - pa.session.last_align.target_bias_cm:+.1f}cm, 각도 {-sim.heading_deg:+.2f}°")
+    print("조언:", report.tips_ko[0])
+    print("지자체 공유:", json.dumps(payload, ensure_ascii=False))
+    print(f"저장: {out}/report_card.png, report.json, municipal_payload.json")
+
+
 def run_image(args) -> None:
     img = cv2.imread(args.path)
     if img is None:
@@ -203,6 +242,9 @@ def main() -> None:
     v.add_argument("--fps", type=int, default=20)
     v.add_argument("--speed", type=float, default=4.0, help="프레임당 후진 거리 cm")
     v.add_argument("--max-frames", type=int, default=400)
+    rp = sub.add_parser("report", help="주차 시뮬레이션 후 리포트 카드")
+    rp.add_argument("--speed", type=float, default=5.0)
+    rp.add_argument("--wear", type=float, default=0.25, help="주차선 마모 정도 0~1")
     im = sub.add_parser("image")
     im.add_argument("path")
     im.add_argument("--height", type=float, default=100.0, help="카메라 설치 높이 cm")
@@ -211,7 +253,7 @@ def main() -> None:
     im.add_argument("--fisheye", action="store_true", help="광각(어안) 렌즈")
     im.add_argument("--steer", type=float, default=None, help="핸들 각도(도, 오른쪽 +)")
     args = ap.parse_args()
-    {"scenes": run_scenes, "video": run_video, "image": run_image}[args.cmd](args)
+    {"scenes": run_scenes, "video": run_video, "report": run_report, "image": run_image}[args.cmd](args)
 
 
 if __name__ == "__main__":

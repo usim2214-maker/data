@@ -17,6 +17,7 @@ from .camera import CameraModel
 from .detector import Alignment, DetectionResult, SlotDetector, SlotEstimate, SlotTracker, compute_alignment
 from .guidance import Guidance, GuidanceStabilizer, build_guidance, wheel_to_curvature
 from .vehicles import VehicleSpec
+from .report import ParkingReport, ParkingSession
 from .voice import VoicePrompter, beep_interval_s
 
 
@@ -39,6 +40,7 @@ class ParkingAssistant:
         self.tracker = SlotTracker()
         self.stabilizer = GuidanceStabilizer()
         self.voice = VoicePrompter()
+        self.session = ParkingSession()
         self.prev_steer: float | None = None
 
     def reset(self) -> None:
@@ -46,6 +48,11 @@ class ParkingAssistant:
         self.tracker.reset()
         self.stabilizer = GuidanceStabilizer()
         self.voice.reset()
+        self.session = ParkingSession()
+
+    def finish(self) -> ParkingReport | None:
+        """주차 완료 (P단 또는 R단 해제 시): 리포트를 만든다."""
+        return self.session.finish()
 
     def step(self, img: np.ndarray, steer_deg: float | None = None, ds_cm: float = 0.0,
              t: float = 0.0) -> FrameOutput:
@@ -57,5 +64,6 @@ class ParkingAssistant:
         align = compute_alignment(slot, self.vehicle, self.detector.thr) if slot is not None else None
         g = self.stabilizer.update(build_guidance(align, slot, self.vehicle, steer_deg))
         end = align.end_dist_cm if align else None
+        self.session.add(align, slot, g, steer_deg, t, measured=res.slot)
         return FrameOutput(res, slot, align, g, self.voice.update(g, end, t), beep_interval_s(end),
                            self.tracker.last_rejected)

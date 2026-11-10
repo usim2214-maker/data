@@ -574,3 +574,90 @@ class GuideRenderer:
         txt = self._t(f"{self.vehicle.name} · 폭 {self.vehicle.width_cm:.0f}cm   ·   주변을 직접 확인하세요",
                       f"{self.vehicle.name} · {self.vehicle.width_cm:.0f}cm wide   ·   Always check surroundings")
         texts.append((txt, (int(16 * k), H - int(30 * k)), int(15 * k), SOFT))
+
+
+# ---------------------------------------------------------------------- 주차 리포트 카드
+def render_report(report, width: int = 1280, height: int = 720, background: np.ndarray | None = None) -> np.ndarray:
+    """주차가 끝나면 보여 주는 리포트 카드. report: report.ParkingReport"""
+    k = width / 1280.0
+    if background is not None:
+        out = cv2.GaussianBlur(cv2.resize(background, (width, height)), (0, 0), 12)
+        out = (out * 0.35).astype(np.uint8)
+    else:
+        out = np.full((height, width, 3), (24, 24, 26), np.uint8)
+    texts: list = []
+    cw, ch = int(1040 * k), int(560 * k)
+    x0, y0 = (width - cw) // 2, (height - ch) // 2
+    rounded_rect(out, x0, y0, x0 + cw, y0 + ch, int(28 * k), (40, 40, 44), 0.96)
+
+    # 왼쪽: 점수 링
+    cx, cy, R = x0 + int(200 * k), y0 + int(230 * k), int(120 * k)
+    color = GREEN if report.score >= 75 else AMBER if report.score >= 55 else RED
+    cv2.circle(out, (cx, cy), R, (70, 70, 74), int(18 * k), cv2.LINE_AA)
+    cv2.ellipse(out, (cx, cy), (R, R), -90, 0, 360 * report.score / 100, color, int(18 * k), cv2.LINE_AA)
+    sc = str(report.score)
+    ss = int(84 * k)
+    texts.append((sc, (cx - text_width(sc, ss) // 2, cy - int(60 * k)), ss, WHITE))
+    texts.append(("점", (cx + text_width(sc, ss) // 2 + int(4 * k), cy + int(2 * k)), int(24 * k), SOFT))
+    gs = int(34 * k)
+    texts.append((report.grade_ko, (cx - text_width(report.grade_ko, gs) // 2, cy + R + int(26 * k)), gs, color))
+    if report.trend_ko:
+        ts = int(18 * k)
+        texts.append((report.trend_ko, (cx - text_width(report.trend_ko, ts) // 2, cy + R + int(74 * k)), ts, SOFT))
+
+    # 오른쪽: 항목
+    mx = x0 + int(420 * k)
+    texts.append(("이번 주차", (mx, y0 + int(36 * k)), int(26 * k), WHITE))
+    side = "오른쪽" if report.offset_cm > 0 else "왼쪽"
+    ref = "목표 " if report.target_bias_cm else "가운데 "
+    rows = [
+        (f"{ref}치우침", "딱 맞음" if abs(report.offset_cm) < 3 else f"{side} {abs(report.offset_cm):.0f}cm",
+         abs(report.offset_cm) < 8),
+        ("각도", f"{abs(report.yaw_deg):.1f}°", abs(report.yaw_deg) < 1.5),
+        ("운전석 쪽 / 동승석 쪽", f"{report.clear_driver_cm:.0f}cm / {report.clear_passenger_cm:.0f}cm",
+         min(report.clear_driver_cm, report.clear_passenger_cm) >= 5),
+        ("걸린 시간 · 핸들 수정", f"{report.duration_s:.0f}초 · {report.corrections}번", report.corrections <= 6),
+    ]
+    ry = y0 + int(92 * k)
+    for label, value, ok in rows:
+        texts.append((label, (mx, ry), int(19 * k), SOFT))
+        vs = int(24 * k)
+        texts.append((value, (x0 + cw - int(48 * k) - text_width(value, vs), ry - int(3 * k)), vs, GREEN if ok else AMBER))
+        cv2.line(out, (mx, ry + int(40 * k)), (x0 + cw - int(48 * k), ry + int(40 * k)), (64, 64, 68), 1)
+        ry += int(56 * k)
+
+    # 조언 한 줄
+    tip = report.tips_ko[0] if report.tips_ko else ""
+    ty = ry + int(14 * k)
+    rounded_rect(out, mx, ty, x0 + cw - int(48 * k), ty + int(88 * k), int(16 * k), (60, 74, 54), 0.95)
+    texts.append(("TIP", (mx + int(18 * k), ty + int(10 * k)), int(16 * k), GREEN))
+    tsz = int(19 * k)
+    # 길면 두 줄로
+    max_w = cw - int(48 * k) - (mx - x0) - int(36 * k)
+    line1, line2 = tip, ""
+    if text_width(tip, tsz) > max_w:
+        words = tip.split(" ")
+        line1 = ""
+        for i, w_ in enumerate(words):
+            if text_width((line1 + " " + w_).strip(), tsz) > max_w:
+                line2 = " ".join(words[i:])
+                break
+            line1 = (line1 + " " + w_).strip()
+    texts.append((line1, (mx + int(18 * k), ty + int(32 * k)), tsz, WHITE))
+    if line2:
+        texts.append((line2, (mx + int(18 * k), ty + int(57 * k)), tsz, WHITE))
+
+    # 아래: 주차선 상태 (지자체 공유)
+    if report.line is not None:
+        ln = report.line
+        lc = GREEN if ln.label_ko == "양호" else AMBER if ln.label_ko == "약간 닳음" else RED
+        chip = f"이 주차칸의 선 상태: {ln.label_ko} (페인트 {ln.worst_coverage * 100:.0f}%)"
+        cs = int(17 * k)
+        by = y0 + ch - int(56 * k)
+        rounded_rect(out, x0 + int(40 * k), by, x0 + int(40 * k) + text_width(chip, cs) + int(36 * k),
+                     by + int(34 * k), int(16 * k), lc, 0.9)
+        texts.append((chip, (x0 + int(58 * k), by + int(6 * k)), cs, DARK))
+        note = "익명으로 지자체 주차선 관리에 보탤 수 있어요"
+        texts.append((note, (x0 + int(64 * k) + text_width(chip, cs) + int(36 * k), by + int(8 * k)), int(15 * k), SOFT))
+    draw_texts(out, texts)
+    return out

@@ -37,7 +37,11 @@ data class Scenario(
     val cabin: List<CabinKey> = emptyList(),
     val route: List<RouteManeuver> = emptyList(),
     val gears: List<GearKey> = listOf(GearKey(0, Gear.DRIVE)),
+    /** 긴급차량 사이렌이 들리는 구간 (ms) */
+    val sirenWindows: List<LongRange> = emptyList(),
 ) {
+    fun sirenAt(tMs: Long): Boolean = sirenWindows.any { tMs in it }
+
     fun signalAt(tMs: Long): SignalState? = phases.lastOrNull { it.startMs <= tMs }?.state
 
     fun cabinAt(tMs: Long): CabinState = cabin.lastOrNull { it.timeMs <= tMs }?.cabin ?: CabinState()
@@ -156,7 +160,7 @@ data class Scenario(
         val HEARING_DRIVE = Scenario(
             name = "hearing_drive",
             titleKo = "청각장애 · 소리 경고 시각화",
-            description = "벨트 미착용 출발 → 내비 좌회전 안내(카드) → 방향지시등 끄는 것을 잊음 → 타이어 저압",
+            description = "벨트 미착용 출발 → 내비 좌회전 안내(카드) → 타이어 저압 → 뒤에서 구급차 사이렌 → 방향지시등 끄는 것을 잊음",
             targetNeeds = setOf(DriverNeed.HEARING),
             durationMs = 40_000,
             phases = listOf(SignalPhase(0, null)),
@@ -172,6 +176,7 @@ data class Scenario(
                 RouteManeuver(250f, Maneuver.LEFT, "강남대로"),
                 RouteManeuver(1_200f, Maneuver.RIGHT, "도산대로"),
             ),
+            sirenWindows = listOf(29_000L..33_000L),
         )
 
         /** 주의력·고령 운전자: 야간 전조등 미점등, 도착 후 뒷좌석 아이 확인 */
@@ -206,8 +211,9 @@ data class ScenarioSample(
     val navigation: NavigationState?,
     val distanceM: Float,
     val frame: Frame,
+    val sirenNearby: Boolean = false,
 ) {
-    fun toInput() = DrivingInput(timestampMs, vehicle, frame, cabin, navigation)
+    fun toInput() = DrivingInput(timestampMs, vehicle, frame, cabin, navigation, sirenNearby)
 }
 
 /**
@@ -278,6 +284,7 @@ class ScenarioPlayer(
             navigation = scenario.navigationAt(traveled[i]),
             distanceM = distance,
             frame = SyntheticSceneGenerator.render(spec),
+            sirenNearby = scenario.sirenAt(t),
         )
     }
 

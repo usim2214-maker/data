@@ -46,6 +46,8 @@ data class DrivingInput(
     val frame: Frame? = null,
     val cabin: CabinState = CabinState(),
     val navigation: NavigationState? = null,
+    /** 실내 마이크로 긴급차량 사이렌 감지 ([SirenDetector]). 모르면 null */
+    val sirenNearby: Boolean? = null,
 )
 
 data class DrivingOutput(
@@ -68,7 +70,11 @@ class DrivingAssistEngine(
     private val vehiclePolicy: VehicleAlertPolicy = VehicleAlertPolicy(),
     private val navigationPolicy: NavigationAlertPolicy = NavigationAlertPolicy(),
     private val arbiter: AlertArbiter = AlertArbiter(),
+    private val sirenCooldownMs: Long = 20_000,
 ) {
+    private var sirenWasOn = false
+    private var lastSirenAlertMs: Long? = null
+
     fun process(input: DrivingInput): DrivingOutput {
         val p = profile
         val signal = if (p.signalAssist && input.frame != null) {
@@ -80,6 +86,16 @@ class DrivingAssistEngine(
         signal?.alerts?.filterTo(alerts) { p.accepts(it) }
         alerts += vehiclePolicy.evaluate(input.cabin, input.vehicle, input.timestampMs, input.navigation, p.vehicleFeatures)
         if (p.navigationCards) alerts += navigationPolicy.evaluate(input.navigation, input.timestampMs)
+        // 사이렌: 들리기 시작한 순간 한 번 (청각장애 프로필). 계속 들리면 20초마다
+        val siren = input.sirenNearby == true
+        if (p.sirenAlerts && siren) {
+            val last = lastSirenAlertMs
+            if (!sirenWasOn || (last != null && input.timestampMs - last >= sirenCooldownMs)) {
+                lastSirenAlertMs = input.timestampMs
+                alerts += Alert(AlertType.SIREN_NEARBY, input.timestampMs)
+            }
+        }
+        sirenWasOn = siren
         alerts.sortByDescending { it.level }
         val deliveries = arbiter.arbitrate(alerts, p, input.timestampMs, input.cabin.isDark)
         return DrivingOutput(input, signal, alerts, deliveries)
@@ -90,5 +106,7 @@ class DrivingAssistEngine(
         vehiclePolicy.reset()
         navigationPolicy.reset()
         arbiter.reset()
+        sirenWasOn = false
+        lastSirenAlertMs = null
     }
 }

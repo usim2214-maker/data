@@ -13,6 +13,9 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import com.signalassist.app.alert.AlertNotifier
+import com.signalassist.app.audio.MicSirenSource
+import com.signalassist.app.audio.NoSirenSource
+import com.signalassist.app.audio.ScenarioSirenSource
 import com.signalassist.app.camera.AssetImageFrameSource
 import com.signalassist.app.camera.ScenarioFrameSource
 import com.signalassist.app.camera.ScenarioSession
@@ -44,6 +47,7 @@ class AssistService : Service() {
     private var liveVehicle: CarPropertyVehicleDataSource? = null
     private var activeKey: String? = null
     private var activeToken = -1
+    private var micWanted = false
     private var sourceDescription = ""
 
     override fun onCreate() {
@@ -54,9 +58,12 @@ class AssistService : Service() {
         scope.launch {
             AssistBus.config.filterNotNull().collect { cfg ->
                 controller.profile = cfg.profile
-                if (cfg.mode.key != activeKey || cfg.restartToken != activeToken) {
+                val wantMic = cfg.profile.sirenAlerts
+                if (cfg.mode.key != activeKey || cfg.restartToken != activeToken || wantMic != micWanted) {
                     activeKey = cfg.mode.key
                     activeToken = cfg.restartToken
+                    micWanted = wantMic
+                    startAsForeground() // 마이크 사용 여부에 따라 포그라운드 서비스 유형 갱신
                     startMode(cfg.mode)
                 }
             }
@@ -80,7 +87,8 @@ class AssistService : Service() {
             is AssistMode.Simulated -> {
                 val scenario = Scenario.ALL.firstOrNull { it.name == mode.scenarioName } ?: Scenario.ALL.first()
                 val s = ScenarioSession(scenario)
-                Sources(ScenarioFrameSource(s), ScenarioVehicleDataSource(s), ScenarioCabinDataSource(s), ScenarioNavigationSource(s))
+                Sources(ScenarioFrameSource(s), ScenarioVehicleDataSource(s), ScenarioCabinDataSource(s), ScenarioNavigationSource(s),
+                    ScenarioSirenSource(s))
             }
             else -> {
                 val vehicle = CarPropertyVehicleDataSource(this) { AssistBus.speedOverrideKmh }.also { liveVehicle = it }
@@ -89,7 +97,8 @@ class AssistService : Service() {
                     AssistMode.LiveTestImages -> AssetImageFrameSource(this).takeUnless { it.isEmpty }
                     else -> null // 카메라 없이: 차량 경고·내비 카드만 동작
                 }
-                Sources(frames, vehicle, PleosCabinDataSource(this), NaviHelperNavigationSource(this))
+                val siren = if (micWanted) MicSirenSource(this) else NoSirenSource
+                Sources(frames, vehicle, PleosCabinDataSource(this), NaviHelperNavigationSource(this), siren)
             }
         }
         sourceDescription = sources.description
@@ -127,7 +136,9 @@ class AssistService : Service() {
             .setContentIntent(open)
             .setOngoing(true)
             .build()
-        val type = if (Build.VERSION.SDK_INT >= 34) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0
+        val micGranted = checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        var type = if (Build.VERSION.SDK_INT >= 34) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0
+        if (micWanted && micGranted && Build.VERSION.SDK_INT >= 30) type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
         ServiceCompat.startForeground(this, NOTIFICATION_ID, n, type)
     }
 

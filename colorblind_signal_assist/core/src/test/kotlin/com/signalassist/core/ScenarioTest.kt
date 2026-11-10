@@ -54,8 +54,12 @@ class ScenarioTest {
         assertEquals(1, types.count { it == AlertType.SEATBELT_UNBUCKLED }, "$types")
         assertTrue(alerts.any { it.message == "100m 앞 좌회전 (강남대로)" }, alerts.map { it.message }.toString())
         val turn = alerts.single { it.type == AlertType.TURN_SIGNAL_LEFT_ON }
+        // 사이렌 알림은 청각장애 프로필에서만
+        assertTrue(run(Scenario.HEARING_DRIVE, DriverProfile(setOf(DriverNeed.ATTENTION))).none { it.type == AlertType.SIREN_NEARBY })
         assertTrue(turn.timestampMs in 34_000..36_000, "turn signal at ${turn.timestampMs}")
         assertTrue(AlertType.LOW_TIRE_PRESSURE in types, "$types")
+        val siren = alerts.single { it.type == AlertType.SIREN_NEARBY }
+        assertTrue(siren.timestampMs in 29_000..29_200, "siren at ${siren.timestampMs}")
         // 신호등이 없는 구간이고 색각 기능도 꺼져 있으므로 신호 알림은 없어야 함
         assertTrue(alerts.none { it.category == AlertCategory.SIGNAL }, "$types")
         assertTrue(alerts.all { !profile.outputFor(it).tone && profile.outputFor(it).visualFlash })

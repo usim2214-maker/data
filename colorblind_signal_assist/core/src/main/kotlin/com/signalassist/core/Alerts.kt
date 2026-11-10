@@ -2,7 +2,7 @@ package com.signalassist.core
 
 enum class AlertLevel { INFO, CAUTION, WARNING, URGENT }
 
-enum class AlertCategory { SIGNAL, VEHICLE, NAVIGATION }
+enum class AlertCategory { SIGNAL, VEHICLE, NAVIGATION, ENVIRONMENT }
 
 /**
  * 알림 종류마다 '음높이 방향 + 리듬'이 다른 소리를 준다.
@@ -52,6 +52,9 @@ enum class AlertType(
     TURN_SIGNAL_LEFT_ON(AlertCategory.VEHICLE, AlertLevel.CAUTION, TonePattern.DOUBLE_MID, "방향지시등이 계속 켜져 있습니다.", "⇆"),
     HEADLIGHTS_OFF_DARK(AlertCategory.VEHICLE, AlertLevel.CAUTION, TonePattern.DOUBLE_MID, "주변이 어둡습니다. 전조등을 켜 주세요.", "☼"),
     REAR_SEAT_CHECK(AlertCategory.VEHICLE, AlertLevel.WARNING, TonePattern.SINGLE_LONG, "내리기 전에 뒷좌석을 확인하세요.", "◉"),
+
+    // ---- 주변 소리 (청각: 사이렌을 듣지 못함) ----
+    SIREN_NEARBY(AlertCategory.ENVIRONMENT, AlertLevel.WARNING, TonePattern.RAPID_BEEPS, "긴급차량 사이렌이 들립니다. 주변을 살피고 길을 양보하세요.", "🚨"),
 
     // ---- 내비 (청각: 음성 안내를 큰 화면 카드로 / 주의력: 미리 한 번 더) ----
     NAV_MANEUVER_SOON(AlertCategory.NAVIGATION, AlertLevel.INFO, TonePattern.SOFT_CHIME, "곧 안내 지점입니다.", "↑"),

@@ -1,5 +1,7 @@
 package com.signalassist.app
 
+import com.signalassist.app.audio.NoSirenSource
+import com.signalassist.app.audio.SirenSource
 import com.signalassist.app.camera.FrameSource
 import com.signalassist.app.nav.NavigationDataSource
 import com.signalassist.app.vehicle.CabinDataSource
@@ -22,12 +24,13 @@ class Sources(
     val vehicle: VehicleDataSource,
     val cabin: CabinDataSource,
     val navigation: NavigationDataSource,
+    val siren: SirenSource = NoSirenSource,
 ) {
     val description: String
-        get() = listOfNotNull(frames?.name ?: "영상 없음", vehicle.name, cabin.name, navigation.name).joinToString(" · ")
+        get() = listOfNotNull(frames?.name ?: "영상 없음", vehicle.name, cabin.name, navigation.name, siren.name).joinToString(" · ")
 
-    fun start() { frames?.start(); vehicle.start(); cabin.start(); navigation.start() }
-    fun stop() { frames?.stop(); vehicle.stop(); cabin.stop(); navigation.stop() }
+    fun start() { frames?.start(); vehicle.start(); cabin.start(); navigation.start(); siren.start() }
+    fun stop() { frames?.stop(); vehicle.stop(); cabin.stop(); navigation.stop(); siren.stop() }
 }
 
 /**
@@ -65,6 +68,7 @@ class AssistController(
                     frame = frame,
                     cabin = newSources.cabin.current(now),
                     navigation = newSources.navigation.current(now),
+                    sirenNearby = newSources.siren.current(now),
                 )
                 onOutput(engine.process(input), frame)
                 delay((interval - (System.currentTimeMillis() - now)).coerceAtLeast(5))

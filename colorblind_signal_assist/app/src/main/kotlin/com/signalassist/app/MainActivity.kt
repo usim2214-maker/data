@@ -294,6 +294,7 @@ class MainActivity : AppCompatActivity() {
                     val needs = profileChecks.filter { it.value.isChecked }.keys
                     settings.profile = DriverProfile(needs)
                     publishConfig()
+                    requestPermissionsIfNeeded()
                 }
             }
             profileChecks[need] = cb
@@ -343,6 +344,8 @@ class MainActivity : AppCompatActivity() {
         val wanted = buildList {
             add("android.car.permission.CAR_SPEED")
             if (Build.VERSION.SDK_INT >= 33) add(Manifest.permission.POST_NOTIFICATIONS)
+            // 청각장애 프로필: 사이렌 감지용 마이크 (기기 안에서만 분석, 저장·전송 없음)
+            if (settings.profile.sirenAlerts) add(Manifest.permission.RECORD_AUDIO)
         }.filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
         if (wanted.isNotEmpty()) requestPermissions(wanted.toTypedArray(), 1)
     }

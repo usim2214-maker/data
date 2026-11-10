@@ -10,6 +10,10 @@ data class AlertPolicyConfig(
      * 일반적인 편안한 제동이 약 2~3 m/s² 이므로, 이 이상이 필요하면 '지금 밟아야 하는' 상황이다.
      */
     val urgentDecelMps2: Float = 2.5f,
+    /** 황색에서 이 감속도(m/s²) 이하로 설 수 있으면 '정지 준비', 아니면 딜레마 구간으로 본다 */
+    val comfortableStopDecelMps2: Float = 3.0f,
+    /** 운전자 반응 시간(s). 알림을 듣고 브레이크를 밟기까지 */
+    val reactionTimeS: Float = 1.0f,
     /** 국내 신호등은 대부분 교차로 건너편에 있어, 정지선은 신호등보다 이만큼 앞에 있다고 본다 */
     val stopLineOffsetM: Float = 12f,
     /** 이 이상 감속 중이면(km/h/s) 운전자가 이미 반응한 것으로 보고 반복 경고를 멈춤 */
@@ -63,7 +67,9 @@ class SignalAlertPolicy(private val config: AlertPolicyConfig = AlertPolicyConfi
         val braking = decelKmhPerS >= config.brakingDecelKmhPerS || vehicle.brakePedal == true
         val required = requiredDecelMps2(vehicle.speedKmh, distanceToLightM)
         // 적색에서 '지금 강하게 제동해야 하는가': 거리를 알면 필요한 감속도로, 모르면 차속으로
-        val redUrgent = !braking && !stopped && if (required != null) {
+        // 이미 정지선을 지나 교차로 안에 있으면(신호등까지 거리가 정지선 간격보다 짧음) 적색 경고는 오히려 위험
+        val pastStopLine = distanceToLightM != null && distanceToLightM < config.stopLineOffsetM - 2f
+        val redUrgent = !braking && !stopped && !pastStopLine && if (required != null) {
             required >= config.urgentDecelMps2
         } else {
             vehicle.speedKmh >= config.urgentSpeedKmh
@@ -77,10 +83,13 @@ class SignalAlertPolicy(private val config: AlertPolicyConfig = AlertPolicyConfi
                     val fromStop = change.from.color == SignalColor.RED || change.from.color == SignalColor.YELLOW
                     if (fromStop && stopped) fire(AlertType.GREEN_GO, nowMs, out)
                 }
-                SignalColor.YELLOW -> if (!stopped) fire(AlertType.YELLOW_CAUTION, nowMs, out)
+                SignalColor.YELLOW -> if (!stopped) {
+                    val stoppable = canStopComfortably(vehicle.speedKmh, distanceToLightM)
+                    fire(if (stoppable == false) AlertType.YELLOW_DILEMMA else AlertType.YELLOW_CAUTION, nowMs, out)
+                }
                 SignalColor.RED -> when {
                     redUrgent -> fire(AlertType.RED_URGENT, nowMs, out)
-                    !stopped -> fire(AlertType.RED_STOP, nowMs, out)
+                    !stopped && !pastStopLine -> fire(AlertType.RED_STOP, nowMs, out)
                 }
                 SignalColor.UNKNOWN -> Unit
             }
@@ -122,6 +131,18 @@ class SignalAlertPolicy(private val config: AlertPolicyConfig = AlertPolicyConfi
         val stopDist = (d - config.stopLineOffsetM).coerceAtLeast(1f)
         val v = speedKmh / 3.6f
         return v * v / (2f * stopDist)
+    }
+
+    /**
+     * 황색 딜레마 구간 판단: 반응 시간 동안 달리는 거리를 빼고도 편안한 감속으로 정지선에 설 수 있는가.
+     * 서기 어려운데 "정지하세요"라고 하면 급정거로 뒤차 추돌을 부를 수 있다. 거리를 모르면 null.
+     */
+    private fun canStopComfortably(speedKmh: Float, distanceToLightM: Float?): Boolean? {
+        val d = distanceToLightM ?: return null
+        val v = speedKmh / 3.6f
+        val brakingRoom = d - config.stopLineOffsetM - v * config.reactionTimeS
+        if (brakingRoom <= 0f) return false
+        return v * v / (2f * brakingRoom) <= config.comfortableStopDecelMps2
     }
 
     /** 다음 안내 지점이 가까우면 그 회전 방향, 아니면 직진으로 본다. 경로 안내 중이 아니면 null */

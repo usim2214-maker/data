@@ -38,6 +38,8 @@ enum class AlertType(
     LEFT_ARROW_FOR_ROUTE(AlertCategory.SIGNAL, AlertLevel.INFO, TonePattern.RISING_DOUBLE, "좌회전 신호입니다. 안내 경로도 좌회전입니다.", "←"),
     LEFT_ARROW_NOT_FOR_ROUTE(AlertCategory.SIGNAL, AlertLevel.CAUTION, TonePattern.SOFT_CHIME, "좌회전 신호입니다. 직진은 기다리세요.", "←"),
     YELLOW_CAUTION(AlertCategory.SIGNAL, AlertLevel.CAUTION, TonePattern.SINGLE_LONG, "황색 신호입니다. 정지를 준비하세요.", "▲"),
+    /** 정지선이 너무 가까워 편안하게 설 수 없을 때: 급정거(추돌 위험)를 유도하지 않는다 */
+    YELLOW_DILEMMA(AlertCategory.SIGNAL, AlertLevel.CAUTION, TonePattern.SINGLE_LONG, "황색 신호입니다. 급정거하지 말고 주의해서 진행하세요.", "▲"),
     RED_STOP(AlertCategory.SIGNAL, AlertLevel.WARNING, TonePattern.FALLING_TRIPLE, "적색 신호입니다. 정지하세요.", "■"),
     RED_URGENT(AlertCategory.SIGNAL, AlertLevel.URGENT, TonePattern.RAPID_BEEPS, "적색 신호! 즉시 감속하세요.", "■"),
 

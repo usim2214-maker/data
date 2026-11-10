@@ -96,4 +96,24 @@ class SignalAlertPolicyTest {
         val slowButClose = SignalAlertPolicy().evaluate(st(SignalColor.RED), change, v(20f), 0, null, 15f)
         assertEquals(listOf(AlertType.RED_URGENT), slowButClose.map { it.type })
     }
+
+    @Test
+    fun `yellow dilemma zone - no stop cue when a comfortable stop is impossible`() {
+        val change = StateChange(st(SignalColor.GREEN), st(SignalColor.YELLOW))
+        fun at(speed: Float, d: Float?) = SignalAlertPolicy().evaluate(st(SignalColor.YELLOW), change, v(speed), 0, null, d).single().type
+        // 50km/h, 신호등 70m: 반응 1초(13.9m) 후 44m 안에 2.2 m/s² 로 정지 가능 -> 정지 준비
+        assertEquals(AlertType.YELLOW_CAUTION, at(50f, 70f))
+        // 50km/h, 신호등 35m: 반응 후 9m 밖에 없음 (10.7 m/s² 필요) -> 급정거 유도하지 않음
+        assertEquals(AlertType.YELLOW_DILEMMA, at(50f, 35f))
+        // 거리를 모르면 기존 안내
+        assertEquals(AlertType.YELLOW_CAUTION, at(50f, null))
+    }
+
+    @Test
+    fun `no red alarm once past the stop line`() {
+        val change = StateChange(st(SignalColor.YELLOW), st(SignalColor.RED))
+        // 신호등 8m 앞 = 정지선(12m)을 이미 지나 교차로 안
+        val a = SignalAlertPolicy().evaluate(st(SignalColor.RED), change, v(45f), 0, null, 8f)
+        assertTrue(a.isEmpty(), "$a")
+    }
 }

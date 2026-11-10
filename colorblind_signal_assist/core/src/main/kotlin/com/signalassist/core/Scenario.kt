@@ -104,6 +104,22 @@ data class Scenario(
             startDistanceM = 120f,
         )
 
+        /** 정지선 직전에 황색: 급정거하면 뒤차 추돌 위험 -> '정지' 대신 '주의해서 진행' */
+        val YELLOW_DILEMMA = Scenario(
+            name = "yellow_dilemma",
+            titleKo = "색각이상 · 황색 딜레마 구간",
+            description = "50km/h 로 신호등 45m 앞에서 황색 전환 → 급정거 대신 주의 진행 안내 → 교차로 통과 후 적색 (경고 없음)",
+            targetNeeds = CV,
+            durationMs = 9_000,
+            phases = listOf(
+                SignalPhase(0, s(SignalColor.GREEN)),
+                SignalPhase(1_800, s(SignalColor.YELLOW)),
+                SignalPhase(4_800, s(SignalColor.RED)),
+            ),
+            speeds = listOf(SpeedKey(0, 50f), SpeedKey(9_000, 50f)),
+            startDistanceM = 70f,
+        )
+
         /** 야간, 적색 + 좌회전 화살표 동시 신호. 내비 경로는 좌회전 */
         val NIGHT_LEFT_TURN = Scenario(
             name = "night_left_turn",
@@ -166,7 +182,7 @@ data class Scenario(
             gears = listOf(GearKey(0, Gear.DRIVE), GearKey(15_000, Gear.PARK)),
         )
 
-        val ALL = listOf(STOP_AND_GO, RED_LIGHT_RISK, NIGHT_LEFT_TURN, HEARING_DRIVE, NIGHT_ARRIVAL)
+        val ALL = listOf(STOP_AND_GO, RED_LIGHT_RISK, YELLOW_DILEMMA, NIGHT_LEFT_TURN, HEARING_DRIVE, NIGHT_ARRIVAL)
     }
 }
 
@@ -203,15 +219,18 @@ class ScenarioPlayer(
 
     private val traveled = FloatArray(frameCount)
     private val distances = FloatArray(frameCount)
+    /** 신호등 바로 아래(8m 이내)를 지나면 카메라 화각에서 벗어남 */
+    private val passed = BooleanArray(frameCount)
 
     init {
         var dist = scenario.startDistanceM
         var trav = 0f
         for (i in 0 until frameCount) {
-            distances[i] = dist
+            distances[i] = max(6f, dist)
+            passed[i] = dist < 8f
             traveled[i] = trav
             val step = scenario.speedAt(i * frameIntervalMs) / 3.6f * frameIntervalMs / 1000f
-            dist = max(6f, dist - step)
+            dist -= step
             trav += step
         }
     }
@@ -229,7 +248,7 @@ class ScenarioPlayer(
             width = width,
             height = height,
             signal = truth ?: SignalState.UNKNOWN,
-            trafficLightVisible = truth != null,
+            trafficLightVisible = truth != null && !passed[i],
             lightCenterX = width / 2f + focalPx * lightLateralM / distance,
             lightCenterY = (horizon - focalPx * lightHeightAboveCamM / distance + shake).coerceAtLeast(20f),
             lampRadius = focalPx * lampRadiusM / distance,
@@ -241,7 +260,7 @@ class ScenarioPlayer(
         )
         return ScenarioSample(
             timestampMs = t,
-            groundTruth = truth,
+            groundTruth = truth.takeUnless { passed[i] },
             vehicle = VehicleState(speedKmh = speed, gear = scenario.gearAt(t)),
             cabin = scenario.cabinAt(t),
             navigation = scenario.navigationAt(traveled[i]),

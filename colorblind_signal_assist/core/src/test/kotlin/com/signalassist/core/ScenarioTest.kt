@@ -70,4 +70,13 @@ class ScenarioTest {
         assertTrue(rear.timestampMs in 15_000..15_500, "rear at ${rear.timestampMs}")
         assertTrue(alerts.any { it.message.endsWith("앞 목적지") }, alerts.map { it.message }.toString())
     }
+
+    @Test
+    fun `yellow dilemma - no stop cue and no red alarm after entering the intersection`() {
+        val alerts = run(Scenario.YELLOW_DILEMMA)
+        val types = alerts.types()
+        assertTrue(AlertType.YELLOW_DILEMMA in types, "$types")
+        assertTrue(AlertType.YELLOW_CAUTION !in types, "$types")
+        assertTrue(alerts.none { it.type == AlertType.RED_STOP || it.type == AlertType.RED_URGENT }, "$types")
+    }
 }

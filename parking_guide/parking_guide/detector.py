@@ -89,9 +89,23 @@ class SlotEstimate:
     left: LineEstimate
     right: LineEstimate
     end: EndLine | None = None
+    target_bias_cm: float = 0.0  # 목표 중심선을 주차칸 중심에서 옮긴 양 (+ = 오른쪽, 하차 모드)
 
     def center_x_at(self, y: float | np.ndarray) -> float | np.ndarray:
+        """주차칸의 기하학적 중심선."""
         return 0.5 * (self.left.x_at(y) + self.right.x_at(y))
+
+    def target_x_at(self, y: float | np.ndarray) -> float | np.ndarray:
+        """차 중심이 맞춰야 할 목표선 (하차 모드에 따라 옆으로 옮겨질 수 있다)."""
+        return self.center_x_at(y) + self.target_bias_cm / np.cos(np.arctan(self.slope))
+
+    @property
+    def half_inner_width_cm(self) -> float:
+        """선 안쪽 폭의 절반."""
+        return 0.5 * (self.width_cm - 0.5 * (self.left.width_cm + self.right.width_cm))
+
+    def with_target_bias(self, bias_cm: float) -> "SlotEstimate":
+        return SlotEstimate(self.left, self.right, self.end, float(bias_cm))
 
     @property
     def slope(self) -> float:
@@ -122,7 +136,7 @@ class SlotEstimate:
         if self.end is not None:
             e = self.end
             end = EndLine(e.c - ds_cm, e.d, e.width_cm, e.x_min, e.x_max)
-        return SlotEstimate(mv(self.left), mv(self.right), end)
+        return SlotEstimate(mv(self.left), mv(self.right), end, self.target_bias_cm)
 
     @property
     def far_end_y(self) -> float:
@@ -146,6 +160,7 @@ class Alignment:
     clear_right_front_cm: float
     status: str  # "good" | "adjust" | "danger"
     end_dist_cm: float | None = None
+    target_bias_cm: float = 0.0  # 하차 모드로 옮긴 목표 (offset은 이 목표 기준)
 
     @property
     def clear_left_cm(self) -> float:
@@ -164,7 +179,8 @@ class Alignment:
             msgs.append("좌우 균형 양호")
         if abs(self.offset_cm) >= AlignmentThresholds.good_offset_cm:
             side = "오른쪽" if self.offset_cm > 0 else "왼쪽"
-            msgs.append(f"{side}으로 {abs(self.offset_cm):.0f}cm 치우침")
+            ref = "목표보다 " if self.target_bias_cm else ""
+            msgs.append(f"{ref}{side}으로 {abs(self.offset_cm):.0f}cm 치우침")
         if abs(self.yaw_deg) >= AlignmentThresholds.good_yaw_deg:
             msgs.append(f"각도 {abs(self.yaw_deg):.1f}° 틀어짐")
         return msgs
@@ -182,6 +198,25 @@ class Alignment:
         if abs(self.yaw_deg) >= AlignmentThresholds.good_yaw_deg:
             msgs.append(f"Angle off {abs(self.yaw_deg):.1f} deg")
         return msgs
+
+
+DOOR_MODES = ("center", "driver", "passenger")
+
+
+def door_bias_cm(mode: str, slot: SlotEstimate, vehicle: VehicleSpec,
+                 max_bias_cm: float = 15.0, keep_cm: float = 8.0) -> float:
+    """하차 모드별 목표 이동량. 국내 차량은 운전석이 왼쪽이므로
+    운전석 여유 = 차를 오른쪽(+)으로, 동승석·뒷좌석 여유 = 왼쪽(-)으로 옮긴다.
+    반대쪽에도 keep_cm 이상은 남긴다."""
+    if mode == "center":
+        return 0.0
+    margin = slot.half_inner_width_cm - vehicle.width_cm / 2  # 가운데 세웠을 때 한쪽 여유
+    b = float(np.clip(margin - keep_cm, 0.0, max_bias_cm))
+    if mode == "driver":
+        return b
+    if mode == "passenger":
+        return -b
+    raise ValueError(f"하차 모드는 {DOOR_MODES} 중 하나: {mode}")
 
 
 @dataclass
@@ -216,10 +251,10 @@ def compute_alignment(
 
     lr, rr = clearances(0.0)
     lf, rf = clearances(-vehicle.length_cm)
-    offset = -float(slot.center_x_at(0.0)) * cos_t
+    offset = -float(slot.target_x_at(0.0)) * cos_t  # 목표선 기준
     yaw = slot.yaw_deg
     status = classify(offset, yaw, [lr, rr, lf, rf], thr)
-    return Alignment(offset, yaw, lr, rr, lf, rf, status, slot.end_dist_cm)
+    return Alignment(offset, yaw, lr, rr, lf, rf, status, slot.end_dist_cm, slot.target_bias_cm)
 
 
 def _row_centers(primary: np.ndarray, secondary: np.ndarray):
@@ -247,6 +282,7 @@ class SlotDetector:
         self.proj = Projector(camera or CameraModel(), bev or BevConfig(), self.cfg.ignore_bottom_ratio)
         self.vehicle = vehicle or DEFAULT_VEHICLE
         self.thr = thresholds or AlignmentThresholds()
+        self.door_mode = "center"
 
     @property
     def bev(self) -> BevConfig:
@@ -440,6 +476,7 @@ class SlotDetector:
             end = self.detect_end_line(end_mask, slot)
             if end is not None:
                 slot = self._make_parallel(SlotEstimate(slot.left, slot.right), end)
+            slot = slot.with_target_bias(door_bias_cm(self.door_mode, slot, self.vehicle))
         align = compute_alignment(slot, self.vehicle, self.thr) if slot else None
         return DetectionResult(bev_img, mask, lines, slot, align, end_mask)
 
@@ -456,6 +493,7 @@ class AlignmentSmoother:
         self.thr = thresholds or AlignmentThresholds()
         self.state: dict[str, float] | None = None
         self.end: float | None = None
+        self.bias = 0.0
         self.missed = 0
         self.missed_end = 0
 
@@ -475,6 +513,7 @@ class AlignmentSmoother:
                 self.state, self.end = None, None
             return self._emit()
         self.missed = 0
+        self.bias = a.target_bias_cm
         new = {f: getattr(a, f) for f in self.FIELDS}
         if self.state is None:
             self.state = new
@@ -498,4 +537,4 @@ class AlignmentSmoother:
             return None
         s = self.state
         status = classify(s["offset_cm"], s["yaw_deg"], [s[f] for f in self.FIELDS[2:]], self.thr)
-        return Alignment(status=status, end_dist_cm=self.end, **s)
+        return Alignment(status=status, end_dist_cm=self.end, target_bias_cm=self.bias, **s)

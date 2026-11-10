@@ -72,9 +72,15 @@ class FinalPrediction:
 
     @property
     def cost(self) -> float:
-        """뒤·앞 중심이 주차칸 중심에서 벗어난 정도 (작을수록 반듯하게 가운데)."""
+        """목표에서 벗어난 정도 (작을수록 좋음).
+
+        마지막 1~2m에서는 차를 옆으로 옮길 수 없어서, 위치 오차를 줄이려고 차를 비틀면 오히려 나쁘다.
+        그래서 '비뚤어짐'(앞뒤 치우침 차이)에 위치 오차보다 큰 가중치를 준다.
+        """
+        center = 0.5 * (self.offset_cm + self.front_offset_cm)
+        skew = self.front_offset_cm - self.offset_cm
         pen = max(0.0, -self.clear_left_cm) + max(0.0, -self.clear_right_cm)
-        return self.offset_cm ** 2 + self.front_offset_cm ** 2 + 20.0 * pen ** 2
+        return center ** 2 + 4.0 * skew ** 2 + 20.0 * pen ** 2
 
     @property
     def status(self) -> str:
@@ -105,8 +111,8 @@ def predict_final(slot: SlotEstimate, v: VehicleSpec, steer_deg: float,
 
     cl = min(side_clear(corners[0])[0], side_clear(corners[3])[0])
     cr = min(side_clear(corners[1])[1], side_clear(corners[2])[1])
-    offset = float((rear_c[0] - slot.center_x_at(rear_c[1])) * cos_t)
-    front_off = float((front_c[0] - slot.center_x_at(front_c[1])) * cos_t)
+    offset = float((rear_c[0] - slot.target_x_at(rear_c[1])) * cos_t)
+    front_off = float((front_c[0] - slot.target_x_at(front_c[1])) * cos_t)
     axis = rear_c - front_c  # 차의 후진 방향
     car_ang = np.degrees(np.arctan2(axis[0], axis[1]))
     yaw = float(slot.yaw_deg - car_ang)
@@ -134,7 +140,7 @@ def desired_steering(slot: SlotEstimate, v: VehicleSpec, lookahead_cm: float = 2
     """뒷바퀴 축이 주차칸 중심선 위의 목표점(lookahead 앞)을 향하게 하는 핸들 각도 (pure pursuit)."""
     ya = -v.rear_overhang_cm
     yt = ya + lookahead_cm
-    xt = float(slot.center_x_at(yt))
+    xt = float(slot.target_x_at(yt))
     ly = yt - ya
     kappa = 2.0 * xt / (xt * xt + ly * ly)
     return curvature_to_wheel(kappa, v)
@@ -245,6 +251,14 @@ def build_guidance(
             g = Guidance("warn", f"hint{arrow}", f"차 뒤를 {side_ko}으로 보내세요",
                          f"Move the rear {side_en}", arrow)
 
+    if final_zone and steer_deg is not None and g.level == "ok":
+        landing = predict_final(slot, v, steer_deg, end)
+        if landing.status != "good" and abs(landing.offset_cm) >= 5:
+            # 마지막 구간에선 더 고칠 수 없더라도 결과를 솔직하게 알려 준다
+            side_ko, side_en = ("오른쪽", "right") if landing.offset_cm > 0 else ("왼쪽", "left")
+            ref = "목표보다 " if slot.target_bias_cm else ""
+            sub_ko += f" · {ref}{side_ko} {abs(landing.offset_cm):.0f}cm"
+            sub_en += f" · {abs(landing.offset_cm):.0f}cm {side_en}"
     g.sub_ko, g.sub_en = sub_ko, sub_en
     g.desired_steer_deg, g.current_steer_deg = desired, steer_deg
     return g

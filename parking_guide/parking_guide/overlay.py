@@ -58,7 +58,8 @@ def display_status(a: Alignment, thr: AlignmentThresholds) -> str:
     dl, dr = display_clearances(a)
     if min(dl, dr) < 0:
         return "danger"
-    if abs(a.offset_cm) < thr.good_offset_cm and abs(a.yaw_deg) < thr.good_yaw_deg and abs(dl - dr) < 2 * thr.good_offset_cm:
+    dev = (dl - dr) / 2 - a.target_bias_cm  # 목표 위치에서 벗어난 정도
+    if abs(a.offset_cm) < thr.good_offset_cm and abs(a.yaw_deg) < thr.good_yaw_deg and abs(dev) < thr.good_offset_cm:
         return "good"
     return "adjust"
 
@@ -280,7 +281,7 @@ class GuideRenderer:
             self._ground_line(layer, xl, yl, xr, yr, ec, tk)
         # 주차칸 중심선
         ye = slot.far_end_y
-        self._ground_dashed(layer, slot.center_x_at(y0), y0, slot.center_x_at(ye), ye, AMBER,
+        self._ground_dashed(layer, slot.target_x_at(y0), y0, slot.target_x_at(ye), ye, AMBER,
                             max(2, int(3 * self.k)))
         # 가상 벽 수직선: 끝선과 평행한 벽 위에 세운다
         b = slot.slope
@@ -291,7 +292,7 @@ class GuideRenderer:
             return
         for (x, y), color in ((ends["l"], cl), (ends["r"], cr)):
             self._vertical_bar(layer, x, y, h, color, 14.0, nx, ny)
-        xc, yc = 0.5 * (ends["l"][0] + ends["r"][0]), 0.5 * (ends["l"][1] + ends["r"][1])
+        xc, yc = float(slot.target_x_at(slot.far_end_y)), 0.5 * (ends["l"][1] + ends["r"][1])
         self._vertical_bar(layer, xc, yc, h * 0.7, AMBER, 6.0, nx, ny)
         p = self._poly(np.array([[ends["l"][0], ends["l"][1], h], [ends["r"][0], ends["r"][1], h]]))
         if p is not None and len(p) == 2:
@@ -361,9 +362,10 @@ class GuideRenderer:
         cl, cr = clearance_color(dl, self.thr), clearance_color(dr, self.thr)
         lab, num = int(17 * k), int(34 * k)
         pad = int(24 * k)
-        texts.append((self._t("왼쪽 여유", "Left"), (x0 + pad, y0 + int(14 * k)), lab, SOFT))
+        # 후방카메라 화면은 거울처럼 보이므로 화면 왼쪽 = 운전석 쪽 (국내 차량 기준)
+        texts.append((self._t("운전석 쪽", "Driver side"), (x0 + pad, y0 + int(14 * k)), lab, SOFT))
         texts.append((f"{dl:.0f}cm", (x0 + pad, y0 + int(40 * k)), num, cl))
-        rl, rv = self._t("오른쪽 여유", "Right"), f"{dr:.0f}cm"
+        rl, rv = self._t("동승석 쪽", "Passenger side"), f"{dr:.0f}cm"
         texts.append((rl, (x0 + pw - pad - text_width(rl, lab), y0 + int(14 * k)), lab, SOFT))
         texts.append((rv, (x0 + pw - pad - text_width(rv, num), y0 + int(40 * k)), num, cr))
 
@@ -387,6 +389,19 @@ class GuideRenderer:
             cv2.rectangle(out, (xs - lw // 2, ty - int(9 * k)), (xs + lw // 2, ty + th + int(9 * k)), c, -1)
         cv2.line(out, (int(mid), ty - int(12 * k)), (int(mid), ty + th + int(12 * k)), WHITE,
                  max(1, int(2 * k)), cv2.LINE_AA)
+        if a.target_bias_cm:
+            # 하차 모드 목표: 노란 삼각형
+            tx = X(a.target_bias_cm)
+            tri = np.array([[tx, ty - int(4 * k)], [tx - int(9 * k), ty - int(18 * k)], [tx + int(9 * k), ty - int(18 * k)]])
+            cv2.fillPoly(out, [tri.astype(np.int32)], AMBER, cv2.LINE_AA)
+            side = self._t("운전석", "driver") if a.target_bias_cm > 0 else self._t("동승석", "passenger")
+            chip = self._t(f"문콕 방지 · {side} 쪽 여유 +{abs(a.target_bias_cm):.0f}cm",
+                           f"Door space · {side} side +{abs(a.target_bias_cm):.0f}cm")
+            cs = int(16 * k)
+            cwid = text_width(chip, cs)
+            rounded_rect(out, mid - cwid / 2 - int(12 * k), y0 - int(34 * k), mid + cwid / 2 + int(12 * k),
+                         y0 - int(6 * k), int(14 * k), AMBER, 0.9)
+            texts.append((chip, (int(mid - cwid / 2), y0 - int(31 * k)), cs, DARK))
         # 차 (각도는 보기 쉽게 3배 과장)
         cx = (X(car_c - half) + X(car_c + half)) / 2
         cw = X(car_c + half) - X(car_c - half)
@@ -417,12 +432,12 @@ class GuideRenderer:
             parts.append(self._t(f"각도 {abs(a.yaw_deg):.1f}°", f"angle {abs(a.yaw_deg):.1f}°"))
         if final is not None:
             fl_, fr_ = final.clear_left_cm, final.clear_right_cm
-            info = self._t(f"이대로 가면  왼쪽 {fl_:.0f}cm · 오른쪽 {fr_:.0f}cm",
-                           f"If you keep this:  L {fl_:.0f}cm · R {fr_:.0f}cm")
+            info = self._t(f"이대로 가면  운전석 쪽 {fl_:.0f}cm · 동승석 쪽 {fr_:.0f}cm",
+                           f"If you keep this:  driver {fl_:.0f}cm · passenger {fr_:.0f}cm")
         elif parts:
             info = "  ·  ".join(parts)
         elif status == "good":
-            info = self._t("가운데 정렬됨", "Centered")
+            info = self._t("목표 위치에 맞음", "On target") if a.target_bias_cm else self._t("가운데 정렬됨", "Centered")
         else:
             info = self._t("앞부분 여유를 확인하세요", "Check front clearance")
         isz = int(17 * k)

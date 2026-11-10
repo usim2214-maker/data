@@ -64,6 +64,7 @@ def run_scenes(args) -> None:
     cam = make_camera(args.lens)
     vehicle = get_vehicle(args.vehicle)
     det = SlotDetector(cam, vehicle=vehicle)
+    det.door_mode = args.door
     ren = GuideRenderer(cam, vehicle)
     print(f"{'scene':22s} {'GT off':>7s} {'est':>6s} {'GT yaw':>7s} {'est':>6s} {'GT end':>7s} {'est':>6s}  안내")
     for name, (pose, layout, photo, steer) in SCENES.items():
@@ -130,6 +131,7 @@ def run_video(args) -> None:
     cam = make_camera(args.lens)
     vehicle = get_vehicle(args.vehicle)
     det = SlotDetector(cam, vehicle=vehicle)
+    det.door_mode = args.door
     ren = GuideRenderer(cam, vehicle)
     # 끝선이 범퍼 밑으로 사라져도 이동 거리로 안내를 이어가도록 놓친 프레임을 넉넉히 허용
     smooth, stab = AlignmentSmoother(max_missed=60), GuidanceStabilizer()
@@ -181,6 +183,7 @@ def run_image(args) -> None:
                       pitch_deg=args.pitch, fisheye=args.fisheye)
     vehicle = get_vehicle(args.vehicle)
     det = SlotDetector(cam, vehicle=vehicle)
+    det.door_mode = args.door
     res = det.analyze(img)
     g = build_guidance(res.alignment, res.slot, vehicle, args.steer)
     vis = GuideRenderer(cam, vehicle).render(img, res.slot, res.alignment, g, args.steer)
@@ -198,6 +201,8 @@ def main() -> None:
     ap.add_argument("--vehicle", default="sonata", help="프리셋 이름 또는 '폭x길이'(cm)")
     ap.add_argument("--lens", choices=["wide", "pinhole"], default="wide", help="합성 카메라 렌즈")
     ap.add_argument("--debug", action="store_true", help="조감도/마스크 패널을 옆에 붙임")
+    ap.add_argument("--door", choices=["center", "driver", "passenger"], default="center",
+                    help="하차 모드: 가운데 / 운전석 여유 / 동승석·뒷좌석 여유 (문콕 방지)")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("scenes")
     v = sub.add_parser("video")

@@ -56,6 +56,12 @@ class GroundTruth:
     line_width_cm: float
     entry_dist_cm: float
     wall_dist_cm: float  # 주차칸 축을 따라 뒷범퍼에서 벽까지 거리
+    end_line_dist_cm: float | None = None  # 뒷범퍼에서 끝선 안쪽 가장자리까지
+
+    @property
+    def perp_offset_cm(self) -> float:
+        """뒷범퍼 중앙에서 주차칸 중심선까지의 수직 거리 (검출기 offset과 같은 정의)."""
+        return self.lateral_offset_cm * float(np.cos(np.radians(self.yaw_deg)))
 
 
 class ParkingLotWorld:
@@ -145,21 +151,20 @@ class ParkingLotWorld:
         y = -np.asarray(sx) * s + along * c
         return x, y
 
-    def _canvas_to_car_h(self, pose: CarPose) -> np.ndarray:
-        s = self.PX_PER_CM
-        canvas_to_slot = np.array([[1 / s, 0, self.sx_min], [0, 1 / s, self.sy_min], [0, 0, 1]])
-        psi = np.radians(pose.yaw_deg)
-        c, sn = np.cos(psi), np.sin(psi)
-        slot_to_car = np.array(
-            [
-                [c, sn, -pose.lateral_offset_cm + pose.entry_dist_cm * sn],
-                [-sn, c, pose.entry_dist_cm * c],
-                [0, 0, 1],
-            ]
-        )
-        return slot_to_car @ canvas_to_slot
-
     # ------------------------------------------------------------------ 렌더링
+    def _rays(self, camera: CameraModel):
+        key = (camera.width, camera.height, camera.focal_px, camera.mount_height_cm,
+               camera.pitch_deg, camera.fisheye, tuple(camera.dist))
+        if getattr(self, "_ray_key", None) != key:
+            dirs, valid = camera.pixel_rays_world()
+            h = camera.mount_height_cm
+            dz = dirs[..., 2]
+            hit = valid & (dz < -1e-6)
+            t = np.where(hit, h / np.where(hit, -dz, 1.0), np.inf)
+            self._ray_key = key
+            self._ray_cache = (dirs, valid, hit, t, dirs[..., 0] * np.where(hit, t, 0), dirs[..., 1] * np.where(hit, t, 0))
+        return self._ray_cache
+
     def render(
         self,
         pose: CarPose,
@@ -172,22 +177,39 @@ class ParkingLotWorld:
         rng = rng or self.rng
         lay = self.layout
         W, H = camera.width, camera.height
+        dirs, valid, hit, t_g, gx, gy = self._rays(camera)
 
-        h_canvas_to_img = camera.ground_to_image_h() @ self._canvas_to_car_h(pose)
-        img = cv2.warpPerspective(
-            self.canvas, h_canvas_to_img, (W, H), flags=cv2.INTER_LINEAR,
-            borderMode=cv2.BORDER_CONSTANT, borderValue=(74, 76, 78),
-        ).astype(np.float32)
-
-        # 지평선 위쪽은 어두운 천장/배경
-        v_h = int(np.ceil(camera.horizon_v)) + 2
-        if v_h > 0:
-            img[: min(v_h, H)] = (55, 58, 60)
+        # 지면: 차량 좌표 → 주차칸 좌표 → 캔버스 픽셀
+        psi = np.radians(pose.yaw_deg)
+        c, sn = np.cos(psi), np.sin(psi)
+        x = gx + pose.lateral_offset_cm
+        y = gy
+        sx = c * x - sn * y
+        sy = sn * x + c * y - pose.entry_dist_cm
+        s = self.PX_PER_CM
+        map_x = ((sx - self.sx_min) * s).astype(np.float32)
+        map_y = ((sy - self.sy_min) * s).astype(np.float32)
+        img = cv2.remap(self.canvas, map_x, map_y, cv2.INTER_LINEAR,
+                        borderMode=cv2.BORDER_CONSTANT, borderValue=(74, 76, 78)).astype(np.float32)
+        img[~hit] = (55, 58, 60)  # 지평선 위: 어두운 배경
 
         wall_sy = lay.slot_length_cm + lay.wall_gap_cm
         if lay.wall:
-            self._draw_wall(img, pose, camera, wall_sy)
+            # 벽 평면: 주차칸 축 방향 n = (sinψ, cosψ, 0), n·P = (entry + wall_sy) - offset·sinψ
+            n = np.array([sn, c, 0.0])
+            d = (pose.entry_dist_cm + wall_sy) - pose.lateral_offset_cm * sn
+            nd = dirs @ n
+            t_w = np.where(np.abs(nd) > 1e-9, d / np.where(np.abs(nd) > 1e-9, nd, 1.0), np.inf)
+            z = camera.mount_height_cm + t_w * dirs[..., 2]
+            on_wall = valid & (t_w > 0) & (z >= 0) & (z <= 400) & (t_w < t_g)
+            vv = np.arange(H, dtype=np.float32)[:, None] * np.ones((1, W), np.float32)
+            shade = (1.0 - 0.15 * vv / H)[..., None]
+            wall = np.array([150, 152, 150], np.float32) * shade
+            band = z < 25
+            wall = np.where(band[..., None], np.array([92, 96, 104], np.float32), wall)
+            img = np.where(on_wall[..., None], wall, img)
 
+        img[~valid] = 0
         self._draw_bumper(img, camera)
 
         # 조명/센서 효과
@@ -209,31 +231,9 @@ class ParkingLotWorld:
             line_width_cm=lay.line_width_cm,
             entry_dist_cm=pose.entry_dist_cm,
             wall_dist_cm=pose.entry_dist_cm + wall_sy,
+            end_line_dist_cm=pose.entry_dist_cm + lay.slot_length_cm - lay.line_width_cm if lay.end_line else None,
         )
         return img, gt
-
-    def _draw_wall(self, img: np.ndarray, pose: CarPose, camera: CameraModel, wall_sy: float) -> None:
-        sx = np.array([self.sx_min * 2, self.sx_max * 2, self.sx_max * 2, self.sx_min * 2])
-        sy = np.full(4, wall_sy)
-        x, y = self.slot_to_car(sx, sy, pose)
-        z = np.array([0.0, 0.0, 400.0, 400.0])
-        uv, valid = camera.project(np.column_stack([x, y, z]))
-        if not valid.all():
-            return
-        H, W = img.shape[:2]
-        mask = np.zeros((H, W), np.uint8)
-        cv2.fillPoly(mask, [np.round(uv).astype(np.int32)], 255)
-        # 콘크리트 벽: 아래로 갈수록 살짝 어두워지고 바닥 쪽에 띠(걸레받이)
-        yy = np.arange(H, dtype=np.float32)[:, None]
-        wall = np.zeros_like(img)
-        wall[:] = (150, 152, 150)
-        wall *= (1.0 - 0.15 * (yy / H))[..., None]
-        base_uv, _ = camera.project(np.column_stack([x[:2], y[:2], np.array([25.0, 25.0])]))
-        band = np.zeros((H, W), np.uint8)
-        cv2.fillPoly(band, [np.round(np.vstack([uv[:2], base_uv[::-1]])).astype(np.int32)], 255)
-        wall[band > 0] = (92, 96, 104)
-        sel = mask > 0
-        img[sel] = wall[sel]
 
     @staticmethod
     def _draw_bumper(img: np.ndarray, camera: CameraModel) -> None:
@@ -241,6 +241,16 @@ class ParkingLotWorld:
         mask = np.zeros((H, W), np.uint8)
         cv2.ellipse(mask, (W // 2, H + int(H * 0.9)), (int(W * 0.75), int(H * 0.97)), 0, 180, 360, 255, -1)
         img[mask > 0] = (30, 30, 34)
+
+
+def pose_from_bumper(bx: float, by: float, heading_deg: float) -> CarPose:
+    """주차칸 좌표계에서 뒷범퍼 중앙 위치 (bx, by)와 차의 후진 방향 각도로 CarPose를 만든다.
+
+    heading_deg: 후진 방향이 주차칸 축(+s_y)에서 +s_x 쪽으로 돌아간 각도.
+    """
+    psi = -np.radians(heading_deg)
+    return CarPose(lateral_offset_cm=float(bx / np.cos(psi)), yaw_deg=float(np.degrees(psi)),
+                   entry_dist_cm=float(bx * np.tan(psi) - by))
 
 
 def render_scene(

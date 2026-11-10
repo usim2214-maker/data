@@ -11,7 +11,7 @@
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import cv2
 import numpy as np
@@ -120,13 +120,16 @@ class ParkingLotWorld:
             cv2.fillPoly(lines, [np.round(poly).astype(np.int32)], 1.0, lineType=cv2.LINE_AA)
 
         if lay.line_wear > 0:
-            wear = np.ones((h, w), np.float32)
-            n = int(lay.line_wear * 400)
-            for _ in range(n):
-                cv2.circle(wear, (int(rng.uniform(0, w)), int(rng.uniform(0, h))),
-                           int(rng.uniform(4, 22) * s), 0.0, -1)
-            wear = cv2.GaussianBlur(wear, (0, 0), 2 * s)
-            lines *= np.clip(wear * 1.2, 0, 1)
+            # 저주파 노이즈를 문턱값으로 잘라 '군데군데 지워진' 구간을 만든다 (line_wear ≈ 지워진 비율)
+            cell = int(18 * s)  # 약 18cm 단위로 끊김
+            noise = rng.random((h // cell + 2, w // cell + 2)).astype(np.float32)
+            noise = cv2.resize(noise, (w, h), interpolation=cv2.INTER_LINEAR)
+            thr = float(np.quantile(noise, lay.line_wear))
+            keep = np.clip((noise - thr) / 0.08, 0.0, 1.0)  # 경계는 부드럽게
+            # 남은 부분도 닳아서 흐려진다
+            fade = 1.0 - 0.5 * lay.line_wear * cv2.resize(
+                rng.random((h // (cell * 3) + 2, w // (cell * 3) + 2)).astype(np.float32), (w, h))
+            lines *= keep * fade
 
         paint = 205.0 + rng.normal(0, 6, (h, w)).astype(np.float32)
         gray = gray * (1 - lines) + paint * lines

@@ -11,7 +11,7 @@
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import cv2
 import numpy as np
@@ -29,7 +29,7 @@ class DetectorConfig:
     min_end_line_length_cm: float = 60.0
     tophat_kernel_cm: float = 60.0
     min_contrast: float = 25.0
-    open_kernel_cm: float = 30.0
+    open_kernel_cm: float = 22.0  # 끝선 굵기(15cm)보다 커야 하고, 닳아 짧아진 선 조각보다는 작아야 한다
     ignore_bottom_ratio: float = 0.06  # 범퍼가 보이는 영상 하단 비율
     merge_dx_cm: float = 15.0
     y_ref_cm: float = 150.0  # 선을 정렬/비교할 기준 거리
@@ -53,6 +53,7 @@ class LineEstimate:
     y_max: float
     support: int
     pts: np.ndarray = field(repr=False, default_factory=lambda: np.zeros((0, 2)))
+    coverage: float = 1.0  # 선 길이 중 페인트가 보이는 비율 (닳을수록 낮음)
 
     def x_at(self, y: float | np.ndarray) -> float | np.ndarray:
         return self.a + self.b * np.asarray(y)
@@ -90,6 +91,7 @@ class SlotEstimate:
     right: LineEstimate
     end: EndLine | None = None
     target_bias_cm: float = 0.0  # 목표 중심선을 주차칸 중심에서 옮긴 양 (+ = 오른쪽, 하차 모드)
+    confidence: float = 1.0  # 인식 신뢰도 0~1
 
     def center_x_at(self, y: float | np.ndarray) -> float | np.ndarray:
         """주차칸의 기하학적 중심선."""
@@ -105,7 +107,7 @@ class SlotEstimate:
         return 0.5 * (self.width_cm - 0.5 * (self.left.width_cm + self.right.width_cm))
 
     def with_target_bias(self, bias_cm: float) -> "SlotEstimate":
-        return SlotEstimate(self.left, self.right, self.end, float(bias_cm))
+        return replace(self, target_bias_cm=float(bias_cm))
 
     @property
     def slope(self) -> float:
@@ -128,15 +130,41 @@ class SlotEstimate:
         # X = a + bY, Y = c + dX 의 교점
         return float((self.end.c + self.end.d * line.a) / (1 - self.end.d * line.b))
 
-    def shifted(self, ds_cm: float) -> "SlotEstimate":
-        """차가 ds_cm 만큼 곧게 후진한 뒤의 주차칸 (선이 안 보일 때 화면 갱신용 근사)."""
+    def moved(self, ds_cm: float, kappa: float = 0.0, axle_y: float = 0.0) -> "SlotEstimate":
+        """차가 뒷바퀴 축 기준 ds_cm 만큼 곡률 kappa로 후진한 뒤, 새 차량 좌표계에서 본 주차칸.
+
+        선이 가려지거나 범퍼 밑으로 사라졌을 때 이동 거리(속도)와 핸들 각도로 위치를 이어 가는 데 쓴다.
+        지면에 고정된 점은 차와 반대로 움직이므로 같은 원호를 -ds만큼 되돌린 것과 같다.
+        """
+        def tf(pts: np.ndarray) -> np.ndarray:
+            pts = np.asarray(pts, np.float64)
+            if abs(kappa) < 1e-9:
+                return pts - np.array([0.0, ds_cm])
+            R, phi = 1.0 / kappa, -ds_cm * kappa
+            vx, vy = pts[:, 0] - R, pts[:, 1] - axle_y
+            return np.column_stack([R + vx * np.cos(phi) + vy * np.sin(phi),
+                                    axle_y - vx * np.sin(phi) + vy * np.cos(phi)])
+
         def mv(l: LineEstimate) -> LineEstimate:
-            return LineEstimate(l.a + l.b * ds_cm, l.b, l.width_cm, l.y_min - ds_cm, l.y_max - ds_cm, l.support, l.pts)
+            ys = np.array([l.y_min, l.y_max])
+            p = tf(np.column_stack([l.x_at(ys), ys]))
+            b = (p[1, 0] - p[0, 0]) / (p[1, 1] - p[0, 1])
+            return replace(l, a=float(p[0, 0] - b * p[0, 1]), b=float(b),
+                           y_min=float(p[:, 1].min()), y_max=float(p[:, 1].max()))
+
         end = None
         if self.end is not None:
             e = self.end
-            end = EndLine(e.c - ds_cm, e.d, e.width_cm, e.x_min, e.x_max)
-        return SlotEstimate(mv(self.left), mv(self.right), end, self.target_bias_cm)
+            xs = np.array([e.x_min, e.x_max])
+            p = tf(np.column_stack([xs, e.y_at(xs)]))
+            d = (p[1, 1] - p[0, 1]) / (p[1, 0] - p[0, 0])
+            end = EndLine(float(p[0, 1] - d * p[0, 0]), float(d), e.width_cm,
+                          float(p[:, 0].min()), float(p[:, 0].max()))
+        return replace(self, left=mv(self.left), right=mv(self.right), end=end)
+
+    def shifted(self, ds_cm: float) -> "SlotEstimate":
+        """차가 ds_cm 만큼 곧게 후진한 뒤의 주차칸."""
+        return self.moved(ds_cm)
 
     @property
     def far_end_y(self) -> float:
@@ -198,6 +226,88 @@ class Alignment:
         if abs(self.yaw_deg) >= AlignmentThresholds.good_yaw_deg:
             msgs.append(f"Angle off {abs(self.yaw_deg):.1f} deg")
         return msgs
+
+
+def slot_confidence(slot: SlotEstimate) -> float:
+    """인식 신뢰도 0~1. 평행하게 맞추기 전의 좌우 선으로 계산한다.
+
+    - 보이는 길이: 짧게 보일수록 각도 추정이 불안하다
+    - 칠해진 비율: 닳거나 물웅덩이·사람에 가려 끊긴 정도
+    - 좌우 선 폭 일치, 평행도, 주차칸 폭이 흔한 범위(2.2~3.0m)인지
+    """
+    l, r = slot.left, slot.right
+    length = float(np.clip(min(l.length_cm, r.length_cm) / 150.0, 0.0, 1.0))
+    cover = float(np.clip((min(l.coverage, r.coverage) - 0.3) / 0.5, 0.0, 1.0))
+    width_match = 1.0 - 0.5 * float(np.clip(abs(l.width_cm - r.width_cm) / 10.0, 0.0, 1.0))
+    parallel = 1.0 - float(np.clip(abs(l.angle_deg - r.angle_deg) / 6.0, 0.0, 1.0))
+    slot_w = 1.0 if 220.0 <= slot.width_cm <= 300.0 else 0.6
+    score = np.sqrt(length) * np.sqrt(cover) * width_match * (0.5 + 0.5 * parallel) * slot_w
+    return float(np.clip(score, 0.0, 1.0))
+
+
+class SlotTracker:
+    """한 번 고른 주차칸을 고정하고 매 프레임 예측 → 검증 → 융합한다.
+
+    - 예측: 이동 거리와 핸들 각도로 지난 주차칸을 옮긴다 (선이 가려져도 이어 감)
+    - 검증: 예측과 너무 다른 검출(그림자, 옆 칸, 지나가는 사람)은 무시한다
+    - 같은 '다른 칸'이 몇 프레임 계속 보이면 그때 새 칸으로 바꾼다
+    - 검출이 없으면 신뢰도를 조금씩 낮추고, 오래 없으면 놓는다
+    """
+
+    def __init__(self, gate_cm: float = 30.0, gate_deg: float = 6.0, alpha: float = 0.5,
+                 coast_decay: float = 0.97, max_coast: int = 60, switch_after: int = 3) -> None:
+        self.gate_cm, self.gate_deg, self.alpha = gate_cm, gate_deg, alpha
+        self.coast_decay, self.max_coast, self.switch_after = coast_decay, max_coast, switch_after
+        self.slot: SlotEstimate | None = None
+        self.coast = 0
+        self.outliers = 0
+        self.last_rejected = False
+
+    def reset(self) -> None:
+        self.slot, self.coast, self.outliers = None, 0, 0
+
+    def update(self, det: SlotEstimate | None, ds_cm: float = 0.0, kappa: float = 0.0,
+               axle_y: float = 0.0) -> SlotEstimate | None:
+        self.last_rejected = False
+        if self.slot is not None and ds_cm:
+            self.slot = self.slot.moved(ds_cm, kappa, axle_y)
+        if det is None:
+            return self._coast()
+        if self.slot is None:
+            self.slot, self.coast, self.outliers = det, 0, 0
+            return self.slot
+        p = self.slot
+        y_ref = 150.0
+        dc = abs(float(det.center_x_at(y_ref) - p.center_x_at(y_ref)))
+        dyaw = abs(det.yaw_deg - p.yaw_deg)
+        if dc > self.gate_cm or dyaw > self.gate_deg:
+            self.outliers += 1
+            self.last_rejected = True
+            if self.outliers >= self.switch_after:  # 정말로 다른 칸이 계속 보이면 갈아탄다
+                self.slot, self.coast, self.outliers = det, 0, 0
+                return self.slot
+            return self._coast()
+        self.outliers, self.coast = 0, 0
+        a = self.alpha
+
+        def mix(pl: LineEstimate, dl: LineEstimate) -> LineEstimate:
+            return replace(dl, a=(1 - a) * pl.x_at(0.0) + a * dl.a, b=(1 - a) * pl.b + a * dl.b)
+
+        end = det.end if det.end is not None else p.end
+        conf = (1 - a) * p.confidence + a * det.confidence
+        self.slot = replace(det, left=mix(p.left, det.left), right=mix(p.right, det.right), end=end,
+                            confidence=float(conf))
+        return self.slot
+
+    def _coast(self) -> SlotEstimate | None:
+        if self.slot is None:
+            return None
+        self.coast += 1
+        if self.coast > self.max_coast:
+            self.slot = None
+            return None
+        self.slot = replace(self.slot, confidence=self.slot.confidence * self.coast_decay)
+        return self.slot
 
 
 DOOR_MODES = ("center", "driver", "passenger")
@@ -269,6 +379,20 @@ def _row_centers(primary: np.ndarray, secondary: np.ndarray):
     return uniq, centers, counts, full
 
 
+def _hough(mask: np.ndarray, votes: int, min_theta: float = 0.0, max_theta: float = np.pi):
+    """허프 변환을 절반 크기 마스크에서 돌려 4배 빠르게 한다 (조각을 묶는 용도라 정밀도는 충분).
+    결과의 rho는 원래 크기 기준으로 되돌린다."""
+    small = cv2.resize(mask, (mask.shape[1] // 2, mask.shape[0] // 2), interpolation=cv2.INTER_AREA)
+    small = (small > 60).astype(np.uint8) * 255
+    hl = cv2.HoughLines(small, 1, np.radians(0.5), max(10, votes // 2),
+                        min_theta=min_theta, max_theta=max_theta)
+    if hl is None:
+        return None
+    hl = hl.copy()
+    hl[:, 0, 0] = hl[:, 0, 0] * 2 + 0.5
+    return hl
+
+
 class SlotDetector:
     def __init__(
         self,
@@ -337,8 +461,10 @@ class SlotDetector:
         near_counts = counts[full][-max(8, int(full.sum()) // 3):]
         width = float(np.median(near_counts) / self.bev.px_per_cm * np.cos(np.arctan(b)))
         _, all_y = self.bev.pixels_to_ground(cols, rows)
+        span_rows = (all_y.max() - all_y.min()) * self.bev.px_per_cm + 1
+        coverage = float(np.clip(len(uniq) / span_rows, 0.0, 1.0))
         return LineEstimate(float(a), float(b), width, float(all_y.min()), float(all_y.max()),
-                            int(full.sum()), pts)
+                            int(full.sum()), pts, coverage)
 
     @staticmethod
     def _same_line(long: LineEstimate, short: LineEstimate, tol_cm: float) -> bool:
@@ -357,30 +483,77 @@ class SlotDetector:
             yield np.column_stack([cols + x, rows + y]).astype(np.float64)
 
     def detect_lines(self, mask: np.ndarray) -> list[LineEstimate]:
-        cfg, s = self.cfg, self.bev.px_per_cm
-        min_area = (cfg.min_line_length_cm * 0.4) * cfg.line_width_range_cm[0] * s * s
-        cands: list[LineEstimate] = []
-        for pts in self._components(mask, min_area):
-            line = self._fit(pts)
-            if line is not None and abs(line.angle_deg) <= cfg.max_line_angle_deg:
-                cands.append(line)
+        """좌우 주차선 후보.
 
-        # 끊긴 선 조각 병합: 긴 선부터 기준으로 삼고, 짧은 조각이 그 연장선 위에 있으면 합친다
-        cands.sort(key=lambda l: -l.length_cm)
-        merged: list[LineEstimate] = []
-        for line in cands:
-            for k, base in enumerate(merged):
+        1) 연결 요소(페인트 조각)를 구한다.
+        2) 허프 변환으로 '한 직선 위에 놓인 조각들'을 묶는다. 닳아서 점선처럼 끊긴 선도 한 선이 된다.
+           (허프 직선 주변 띠의 화소만 쓰면 번진 먼 쪽이 잘려 각도가 틀어지므로, 묶인 조각의 화소 전체로 맞춘다)
+        3) 묶이지 않은 조각은 따로 맞추고, 같은 선 위에 있는 후보끼리 합친다.
+        """
+        cfg, s = self.cfg, self.bev.px_per_cm
+        n, labels, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=8)
+        min_area = 10 * cfg.line_width_range_cm[0] * s * s  # 10cm 길이 조각까지
+        areas = stats[:, cv2.CC_STAT_AREA]
+        valid = {i for i in range(1, n) if areas[i] >= min_area}
+        cache: dict[int, np.ndarray] = {}
+
+        def comp_pts(i: int) -> np.ndarray:
+            if i not in cache:
+                x, y, w, h = (stats[i, k] for k in (cv2.CC_STAT_LEFT, cv2.CC_STAT_TOP,
+                                                     cv2.CC_STAT_WIDTH, cv2.CC_STAT_HEIGHT))
+                rr, cc = np.nonzero(labels[y:y + h, x:x + w] == i)
+                cache[i] = np.column_stack([cc + x, rr + y]).astype(np.float64)
+            return cache[i]
+
+        def fit_group(group: frozenset) -> LineEstimate | None:
+            line = self._fit(np.vstack([comp_pts(i) for i in group]))
+            if line is None or abs(line.angle_deg) > cfg.max_line_angle_deg:
+                return None
+            return line
+
+        groups: list[tuple[frozenset, LineEstimate]] = []
+        claimed: set[int] = set()
+        hl = _hough(mask, int(60 * s))
+        if hl is not None:
+            rows, cols = np.nonzero(mask)
+            labs_px = labels[rows, cols]
+            max_t = np.radians(cfg.max_line_angle_deg)
+            for rho, theta in hl[:40, 0]:
+                if not (theta < max_t or theta > np.pi - max_t):  # 세로에 가까운 선만
+                    continue
+                band = np.abs(cols * np.cos(theta) + rows * np.sin(theta) - rho) < 12 * s
+                ids, cnt = np.unique(labs_px[band], return_counts=True)
+                # 조각의 절반 이상이 띠 안에 있으면 이 직선 위의 조각으로 본다
+                group = frozenset(int(i) for i, c in zip(ids, cnt)
+                                  if i in valid and i not in claimed and c >= 0.5 * areas[i])
+                if not group:
+                    continue
+                line = fit_group(group)
+                if line is None or line.length_cm < cfg.min_line_length_cm:
+                    continue
+                groups.append((group, line))
+                claimed |= group
+        for i in sorted(valid - claimed, key=lambda i: -areas[i]):
+            line = fit_group(frozenset([i]))
+            if line is not None:
+                groups.append((frozenset([i]), line))
+
+        # 같은 선 위에 있는 후보 합치기 (긴 것부터 기준)
+        groups.sort(key=lambda g: -g[1].length_cm)
+        merged: list[tuple[frozenset, LineEstimate]] = []
+        for group, line in groups:
+            for k, (bg, base) in enumerate(merged):
                 if self._same_line(base, line, cfg.merge_dx_cm):
-                    refit = self._fit(np.vstack([base.pts, line.pts]))
+                    refit = fit_group(bg | group)
                     if refit is not None:
-                        merged[k] = refit
+                        merged[k] = (bg | group, refit)
                         break
             else:
-                merged.append(line)
+                merged.append((group, line))
 
         lo, hi = cfg.line_width_range_cm
         out = []
-        for l in merged:
+        for _, l in merged:
             if l.length_cm < cfg.min_line_length_cm or not (lo <= l.width_cm <= hi * 1.5):
                 continue
             l.width_cm = float(np.clip(l.width_cm, lo, hi))
@@ -402,12 +575,36 @@ class SlotDetector:
         width = float(np.median(counts[full]) / self.bev.px_per_cm * np.cos(np.arctan(d)))
         return EndLine(float(c), float(d), width, float(gx.min()), float(gx.max()))
 
+    def _hough_end_lines(self, mask: np.ndarray) -> list[EndLine]:
+        """닳아서 끊긴 끝선용: 가로에 가까운 직선을 허프 변환으로 찾아 띠 안의 화소로 다시 맞춘다."""
+        s = self.bev.px_per_cm
+        hl = _hough(mask, int(50 * s), np.pi / 2 - np.radians(self.cfg.max_line_angle_deg),
+                    np.pi / 2 + np.radians(self.cfg.max_line_angle_deg))
+        if hl is None:
+            return []
+        rows, cols = np.nonzero(mask)
+        pts_all = np.column_stack([cols, rows]).astype(np.float64)
+        max_t = np.radians(self.cfg.max_line_angle_deg)
+        out, used = [], []
+        for rho, theta in hl[:20, 0]:
+            if abs(theta - np.pi / 2) > max_t:
+                continue
+            if any(abs(rho - r) < 30 * s for r in used):
+                continue
+            used.append(float(rho))
+            dist = np.abs(pts_all[:, 0] * np.cos(theta) + pts_all[:, 1] * np.sin(theta) - rho)
+            end = self._fit_end(pts_all[dist < 22 * s])  # 번진 먼 쪽이 잘리지 않도록 넉넉한 띠
+            if end is not None:
+                out.append(end)
+        return out
+
     def detect_end_line(self, mask: np.ndarray, slot: SlotEstimate) -> EndLine | None:
         cfg, s = self.cfg, self.bev.px_per_cm
         min_area = cfg.min_end_line_length_cm * 0.5 * cfg.line_width_range_cm[0] * s * s
         best, best_err = None, np.inf
-        for pts in self._components(mask, min_area):
-            end = self._fit_end(pts)
+        cands = [self._fit_end(p) for p in self._components(mask, min_area)]
+        cands += self._hough_end_lines(mask)
+        for end in cands:
             if end is None or end.length_cm < cfg.min_end_line_length_cm:
                 continue
             if not (cfg.line_width_range_cm[0] <= end.width_cm <= cfg.line_width_range_cm[1] * 1.5):
@@ -432,16 +629,25 @@ class SlotDetector:
         lines = sorted(lines, key=lambda l: l.x_at(cfg.y_ref_cm))
         best, best_score = None, np.inf
         lo, hi = cfg.slot_width_range_cm
-        for left, right in zip(lines, lines[1:]):
-            if abs(left.angle_deg - right.angle_deg) > 8.0:
-                continue
-            slot = SlotEstimate(left, right)
-            if not (lo <= slot.width_cm <= hi):
-                continue
-            score = abs(slot.center_x_at(0.0)) - 0.05 * min(left.length_cm, right.length_cm)
-            if score < best_score:
-                best, best_score = slot, score
-        return self._make_parallel(best) if best else None
+        for i in range(len(lines)):
+            for j in range(i + 1, len(lines)):
+                left, right = lines[i], lines[j]
+                if abs(left.angle_deg - right.angle_deg) > 4.0:
+                    continue
+                slot = SlotEstimate(left, right)
+                if not (lo <= slot.width_cm <= hi):
+                    continue
+                # 사이에 평행한 긴 선이 있으면 두 칸에 걸친 쌍이다
+                if any(abs(m.angle_deg - left.angle_deg) < 3.0 and m.length_cm > 100 for m in lines[i + 1:j]):
+                    continue
+                score = (abs(slot.center_x_at(0.0)) - 0.05 * min(left.length_cm, right.length_cm)
+                         - 20.0 * min(left.coverage, right.coverage))
+                if score < best_score:
+                    best, best_score = slot, score
+        if best is None:
+            return None
+        best = replace(best, confidence=slot_confidence(best))
+        return self._make_parallel(best)
 
     @staticmethod
     def _make_parallel(slot: SlotEstimate, end: EndLine | None = None) -> SlotEstimate:
@@ -457,25 +663,27 @@ class SlotDetector:
 
         def rebased(line: LineEstimate) -> LineEstimate:
             yc = 0.5 * (line.y_min + line.y_max)
-            return LineEstimate(float(line.x_at(yc) - b * yc), float(b), line.width_cm,
-                                line.y_min, line.y_max, line.support, line.pts)
+            return replace(line, a=float(line.x_at(yc) - b * yc), b=float(b))
 
         if end is not None:
             xm = 0.5 * (end.x_min + end.x_max)
             end = EndLine(float(end.y_at(xm) + b * xm), float(-b), end.width_cm, end.x_min, end.x_max)
-        return SlotEstimate(rebased(l), rebased(r), end)
+        return replace(slot, left=rebased(l), right=rebased(r), end=end)
 
     def analyze(self, img: np.ndarray) -> DetectionResult:
         bev_img = self.to_bev(img)
-        mask = self.line_mask(bev_img)
+        gray = cv2.cvtColor(bev_img, cv2.COLOR_BGR2GRAY)
+        mask = self._directional_mask(gray, vertical=True)
+        end_mask = self._directional_mask(gray, vertical=False)
+        # 멀리 있는 끝선은 원근 때문에 세로로 두꺼워져 세로선 마스크에 남을 수 있으므로 직접 뺀다
+        mask[cv2.dilate(end_mask, np.ones((5, 5), np.uint8)) > 0] = 0
         lines = self.detect_lines(mask)
         slot = self.select_slot(lines)
-        end_mask = None
         if slot is not None:
-            end_mask = self.end_line_mask(bev_img)
             end = self.detect_end_line(end_mask, slot)
             if end is not None:
-                slot = self._make_parallel(SlotEstimate(slot.left, slot.right), end)
+                slot = self._make_parallel(replace(slot, end=None), end)
+                slot = replace(slot, confidence=min(1.0, slot.confidence + 0.1))  # 끝선까지 맞으면 더 믿을 만함
             slot = slot.with_target_bias(door_bias_cm(self.door_mode, slot, self.vehicle))
         align = compute_alignment(slot, self.vehicle, self.thr) if slot else None
         return DetectionResult(bev_img, mask, lines, slot, align, end_mask)

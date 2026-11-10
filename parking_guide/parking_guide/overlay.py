@@ -17,7 +17,7 @@ import numpy as np
 
 from .camera import CameraModel
 from .detector import Alignment, AlignmentThresholds, SlotEstimate
-from .guidance import FINAL_ZONE_CM, FinalPrediction, Guidance, predict_final, predict_path, turns_phrase_en, turns_phrase_ko
+from .guidance import FINAL_ZONE_CM, GHOST_CONFIDENCE, LOW_CONFIDENCE, FinalPrediction, Guidance, predict_final, predict_path, turns_phrase_en, turns_phrase_ko
 from .text import draw_texts, korean_available, text_width
 from .vehicles import VehicleSpec
 
@@ -201,6 +201,7 @@ class GuideRenderer:
         final = None
         # 고스트카는 마무리 구간에서만: 멀리서는 '핸들 고정' 가정이 맞지 않아 오해를 부른다
         if (slot is not None and align is not None and steer_deg is not None
+                and slot.confidence >= GHOST_CONFIDENCE
                 and align.end_dist_cm is not None and align.end_dist_cm <= FINAL_ZONE_CM):
             final = predict_final(slot, self.vehicle, steer_deg, align.end_dist_cm)
         # 1) 바닥 통로 (옅은 면)
@@ -220,11 +221,14 @@ class GuideRenderer:
         # 3) UI
         texts: list = []
         self._draw_badge(out, texts, guidance)
+        weak = slot is not None and slot.confidence < LOW_CONFIDENCE
         if align is not None:
-            self._draw_balance(out, texts, align, final)
+            self._draw_balance(out, texts, align, final, weak)
             if self.show_minimap:
-                self._draw_minimap(out, slot, align, path)
+                self._draw_minimap(out, slot, align, path, weak)
         self._draw_steering_dial(out, texts, guidance)
+        if slot is not None:
+            self._draw_confidence(out, texts, slot.confidence)
         self._draw_footer(texts)
         draw_texts(out, texts)
         return out
@@ -269,10 +273,16 @@ class GuideRenderer:
         cl, cr = clearance_color(dl, self.thr), clearance_color(dr, self.thr)
         tk = max(4, int(7 * self.k))
         ends = {}
+        weak = slot.confidence < LOW_CONFIDENCE
+        if weak:
+            cl = cr = SOFT  # 확실하지 않으면 색으로 판정을 주지 않는다
         for name, line, color in (("l", slot.left, cl), ("r", slot.right, cr)):
             ye = slot.end_y_for(line)
             ends[name] = (float(line.x_at(ye)), ye)
-            self._ground_line(layer, line.x_at(y0), y0, line.x_at(ye), ye, color, tk)
+            if weak:
+                self._ground_dashed(layer, line.x_at(y0), y0, line.x_at(ye), ye, color, tk, dash_cm=25.0)
+            else:
+                self._ground_line(layer, line.x_at(y0), y0, line.x_at(ye), ye, color, tk)
         # 끝선: 가까워질수록 노랑 → 빨강
         if slot.end is not None:
             d = align.end_dist_cm if align.end_dist_cm is not None else 999.0
@@ -350,7 +360,8 @@ class GuideRenderer:
         for a, b in ((rl, fl), (rr, fr)):
             self._ground_dashed(layer, a[0], a[1], b[0], b[1], c, max(2, int(3 * self.k)), dash_cm=20.0)
 
-    def _draw_balance(self, out, texts, a: Alignment, final: FinalPrediction | None = None) -> None:
+    def _draw_balance(self, out, texts, a: Alignment, final: FinalPrediction | None = None,
+                      weak: bool = False) -> None:
         """수평계 모양 균형 게이지: 주차칸 안쪽 폭 안에서 차가 어디 있는지."""
         H, W = out.shape[:2]
         k = self.k
@@ -360,6 +371,8 @@ class GuideRenderer:
 
         dl, dr = display_clearances(a)
         cl, cr = clearance_color(dl, self.thr), clearance_color(dr, self.thr)
+        if weak:  # 인식이 불확실하면 색으로 판정을 주지 않는다
+            cl = cr = SOFT
         lab, num = int(17 * k), int(34 * k)
         pad = int(24 * k)
         # 후방카메라 화면은 거울처럼 보이므로 화면 왼쪽 = 운전석 쪽 (국내 차량 기준)
@@ -408,7 +421,7 @@ class GuideRenderer:
         rect = ((cx, ty + th / 2), (cw, th + int(10 * k)), float(np.clip(a.yaw_deg * 2, -10, 10)))
         box = cv2.boxPoints(rect).astype(np.int32)
         status = display_status(a, self.thr)
-        sc = STATUS_COLOR[status]
+        sc = SOFT if weak else STATUS_COLOR[status]
         if final is not None:
             # 예상 최종 위치: 속이 빈 윤곽 (지금 위치는 채운 상자)
             fc = (final.clear_left_cm - final.clear_right_cm) / 2
@@ -430,7 +443,9 @@ class GuideRenderer:
                                  f"{abs(a.offset_cm):.0f}cm to the {side}"))
         if abs(a.yaw_deg) >= self.thr.good_yaw_deg or (status != "good" and abs(a.yaw_deg) >= 0.8):
             parts.append(self._t(f"각도 {abs(a.yaw_deg):.1f}°", f"angle {abs(a.yaw_deg):.1f}°"))
-        if final is not None:
+        if weak:
+            info = self._t("인식이 불확실해요 · 참고만 하세요", "Uncertain · for reference only")
+        elif final is not None:
             fl_, fr_ = final.clear_left_cm, final.clear_right_cm
             info = self._t(f"이대로 가면  운전석 쪽 {fl_:.0f}cm · 동승석 쪽 {fr_:.0f}cm",
                            f"If you keep this:  driver {fl_:.0f}cm · passenger {fr_:.0f}cm")
@@ -443,7 +458,7 @@ class GuideRenderer:
         isz = int(17 * k)
         texts.append((info, (int(mid - text_width(info, isz) / 2), ty + th + int(22 * k)), isz, SOFT))
 
-    def _draw_minimap(self, out, slot: SlotEstimate | None, a: Alignment, path) -> None:
+    def _draw_minimap(self, out, slot: SlotEstimate | None, a: Alignment, path, weak: bool = False) -> None:
         """위에서 내려다본 모습. 위쪽이 차 뒤쪽(벽 방향)."""
         W = out.shape[1]
         k = self.k
@@ -466,7 +481,8 @@ class GuideRenderer:
         if slot is not None:
             yb = -L - 40
             dl, dr = display_clearances(a)
-            for ln, c in ((slot.left, clearance_color(dl, self.thr)), (slot.right, clearance_color(dr, self.thr))):
+            cols = (SOFT, SOFT) if weak else (clearance_color(dl, self.thr), clearance_color(dr, self.thr))
+            for ln, c in zip((slot.left, slot.right), cols):
                 ye = min(slot.end_y_for(ln), back)
                 seg(P(ln.x_at(yb), yb), P(ln.x_at(ye), ye), c, t)
             if slot.end is not None and slot.far_end_y <= back:
@@ -478,7 +494,8 @@ class GuideRenderer:
                 cv2.polylines(view, [np.round(pts).astype(np.int32)], False, BLUE, max(1, int(2 * k)), cv2.LINE_AA)
         car = np.round([P(-Wv / 2, 0), P(Wv / 2, 0), P(Wv / 2, -L), P(-Wv / 2, -L)]).astype(np.int32)
         cv2.fillPoly(view, [car], (88, 88, 92), cv2.LINE_AA)
-        cv2.polylines(view, [car], True, STATUS_COLOR[display_status(a, self.thr)], max(2, int(2 * k)), cv2.LINE_AA)
+        car_c = SOFT if weak else STATUS_COLOR[display_status(a, self.thr)]
+        cv2.polylines(view, [car], True, car_c, max(2, int(2 * k)), cv2.LINE_AA)
         seg(P(-Wv / 2 + 18, -8), P(Wv / 2 - 18, -8), (60, 60, 225), max(2, int(4 * k)))  # 후미등
         seg(P(-Wv / 2 + 22, -L * 0.62), P(Wv / 2 - 22, -L * 0.62), (150, 150, 150), max(1, int(2 * k)))
 
@@ -488,7 +505,7 @@ class GuideRenderer:
         '오른쪽으로'만으로는 얼마나 돌릴지 알기 어려워서, 목표 위치를 눈으로 보여 준다.
         """
         if (g is None or g.current_steer_deg is None or g.desired_steer_deg is None
-                or g.level == "stop" or g.key == "retry"):
+                or g.level == "stop" or g.key in ("retry", "lowconf")):
             return
         H = out.shape[0]
         k = self.k
@@ -534,6 +551,23 @@ class GuideRenderer:
         a = np.radians(-90 + rot_deg)  # 12시 표시점: 몇 바퀴 돌았는지 보이게
         cv2.circle(out, (int(cx + r * np.cos(a)), int(cy + r * np.sin(a))), max(3, t), AMBER, -1, cv2.LINE_AA)
         cv2.circle(out, (cx, cy), max(3, r // 4), SOFT, -1, cv2.LINE_AA)
+
+    def _draw_confidence(self, out, texts, conf: float) -> None:
+        """오른쪽 아래: 인식 신뢰도 막대 4칸 (휴대폰 신호 표시처럼)."""
+        H, W = out.shape[:2]
+        k = self.k
+        n = int(np.clip(np.ceil(conf * 4 - 1e-6), 0, 4))
+        col = GREEN if n >= 3 else AMBER if n == 2 else RED
+        label = self._t("인식", "Lines")
+        ls = int(15 * k)
+        bx = W - int(16 * k) - int(4 * 11 * k)
+        by = H - int(16 * k)
+        for i in range(4):
+            h = int((6 + i * 4) * k)
+            x = bx + int(i * 11 * k)
+            c = col if i < n else (90, 90, 90)
+            cv2.rectangle(out, (x, by - h), (x + int(7 * k), by), c, -1)
+        texts.append((label, (bx - text_width(label, ls) - int(8 * k), by - int(18 * k)), ls, SOFT))
 
     def _draw_footer(self, texts) -> None:
         k, H = self.k, self.camera.height

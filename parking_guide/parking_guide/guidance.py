@@ -184,6 +184,8 @@ class Guidance:
     current_steer_deg: float | None = None
 
 
+LOW_CONFIDENCE = 0.45  # 이보다 낮으면 핸들 안내를 하지 않는다
+GHOST_CONFIDENCE = 0.5  # 고스트카(예측)는 이 이상일 때만
 FINAL_ZONE_CM = 250.0  # 끝선까지 이 거리 안쪽을 마무리 구간으로 본다
 
 
@@ -206,6 +208,11 @@ def build_guidance(
 
     if end is not None and end <= stop_cm:
         return Guidance("stop", "stop", "멈추세요", "STOP", 0, sub_ko, sub_en)
+
+    if slot.confidence < LOW_CONFIDENCE:
+        # 확실하지 않을 땐 확실하지 않다고 말한다: 핸들 안내 대신 직접 확인을 요청
+        return Guidance("info", "lowconf", "주차선이 희미해요", "Lines are faint", 0,
+                        "직접 확인하며 천천히 후진하세요", "Check around and reverse slowly")
 
     near = end is not None and end <= slow_cm
     final_zone = end is not None and end <= FINAL_ZONE_CM

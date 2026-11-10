@@ -16,8 +16,9 @@ import cv2
 import numpy as np
 
 from parking_guide.camera import CameraModel
-from parking_guide.detector import AlignmentSmoother, SlotDetector
-from parking_guide.guidance import GuidanceStabilizer, build_guidance, curvature_to_wheel, wheel_to_curvature
+from parking_guide.detector import SlotDetector
+from parking_guide.pipeline import ParkingAssistant
+from parking_guide.guidance import build_guidance, curvature_to_wheel, wheel_to_curvature
 from parking_guide.overlay import GuideRenderer
 from parking_guide.synth import CarPose, LotLayout, ParkingLotWorld, Photometric, pose_from_bumper
 from parking_guide.vehicles import VehicleSpec, get_vehicle
@@ -130,11 +131,9 @@ def run_video(args) -> None:
     out.mkdir(parents=True, exist_ok=True)
     cam = make_camera(args.lens)
     vehicle = get_vehicle(args.vehicle)
-    det = SlotDetector(cam, vehicle=vehicle)
-    det.door_mode = args.door
+    pa = ParkingAssistant(cam, vehicle, args.door)
+    det = pa.detector
     ren = GuideRenderer(cam, vehicle)
-    # 끝선이 범퍼 밑으로 사라져도 이동 거리로 안내를 이어가도록 놓친 프레임을 넉넉히 허용
-    smooth, stab = AlignmentSmoother(max_missed=60), GuidanceStabilizer()
     layout = LotLayout(line_wear=0.25)
     world = ParkingLotWorld(layout, seed=3)
     rng = np.random.default_rng(0)
@@ -144,31 +143,26 @@ def run_video(args) -> None:
     path = out / "reverse_parking.mp4"
     size = (cam.width * 2 if args.debug else cam.width, cam.height)
     writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"), args.fps, size)
-    n, hold = 0, 0
-    last_slot = None
+    n, hold, ds = 0, 0, 0.0
     while n < args.max_frames:
         img, _ = world.render(sim.pose(), cam, Photometric(), rng)
-        res = det.analyze(img)
-        a = smooth.update(res.alignment)
-        if res.alignment is None:
-            res.slot = last_slot  # 선이 안 보이는 마지막 구간은 마지막으로 본 주차칸을 이동 거리만큼 옮겨 쓴다
-        else:
-            last_slot = res.slot
-        g = stab.update(build_guidance(a, res.slot, vehicle, sim.steer_deg))
-        vis = ren.render(img, res.slot, a, g, sim.steer_deg)
-        frame = compose(vis, det, res) if args.debug else vis
+        fo = pa.step(img, sim.steer_deg, ds, t=n / args.fps)
+        if fo.speech:
+            print(f"[음성 {n / args.fps:5.1f}s] {fo.speech}")
+        g = fo.guidance
+        vis = ren.render(img, fo.slot, fo.alignment, g, sim.steer_deg)
+        frame = compose(vis, det, fo.detection) if args.debug else vis
         writer.write(cv2.resize(frame, size) if args.debug else frame)
         n += 1
         if sim.by >= stop_by:
+            ds = 0.0
             hold += 1
             if hold > args.fps * 1.5:  # 멈춘 화면 1.5초
                 break
         else:
             # 운전자는 노란 안내(핸들 방향)가 뜰 때만 안내를 따른다
             sim.step(args.speed, g.desired_steer_deg if g.level == "warn" else None)
-            smooth.advance(args.speed)  # 실제 차량: 속도 신호 × 시간
-            if last_slot is not None:
-                last_slot = last_slot.shifted(args.speed)
+            ds = args.speed  # 실제 차량: 속도 신호 × 시간
     writer.release()
     print(f"저장: {path} ({n} frames, 최종 치우침 {sim.bx:.1f}cm, 각도 {sim.heading_deg:.1f}°)")
 

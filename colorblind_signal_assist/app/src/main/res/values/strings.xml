@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">신호 도우미</string>
+    <string name="channel_name">신호 알림</string>
+    <string name="channel_desc">신호등 색 변화와 위험 상황을 알려줍니다</string>
+</resources>

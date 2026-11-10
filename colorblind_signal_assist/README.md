@@ -22,6 +22,10 @@ adb install apk/팀명_모두의운전석_release.apk
 ./gradlew :app:assembleRelease # APK (ANDROID_HOME 또는 local.properties 필요)
 ```
 
+### 시연 영상
+`docs/시연영상/모두의운전석_시연.mp4` (2분 38초). 챕터와 내레이션 대본은 `docs/시연영상/README.md`에 있습니다.
+다시 만들기: `./gradlew :demo:renderVideo`
+
 ### 시연 순서 (에뮬레이터)
 1. 화면 아래 **모드**에서 `시뮬레이션: …` 시나리오 7종 중 하나를 고릅니다. 시나리오에 맞는 운전자 특성이 자동으로 선택됩니다.
 2. **운전자 특성**(색각이상·청각장애·저시력·주의력·고령)을 바꿔, 같은 상황에서 알림 방식이 달라지는 것을 확인합니다.

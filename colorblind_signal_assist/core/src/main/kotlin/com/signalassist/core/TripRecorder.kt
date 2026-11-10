@@ -12,8 +12,8 @@ data class TripSummary(
 
     /** 가족·보호자와 공유할 수 있는 짧은 요약 */
     fun summaryKo(): String = buildString {
-        val minutes = (durationMs / 60_000).coerceAtLeast(1)
-        append("주행 ${minutes}분 · %.1fkm".format(distanceKm))
+        val time = if (durationMs < 60_000) "${durationMs / 1000}초" else "${durationMs / 60_000}분"
+        append("주행 $time · %.1fkm".format(distanceKm))
         if (signalCount > 0) append("\n신호 안내 ${signalCount}회")
         val vehicle = alertCounts.filterKeys { it.category == AlertCategory.VEHICLE || it.category == AlertCategory.ENVIRONMENT }
         if (vehicle.isNotEmpty()) {

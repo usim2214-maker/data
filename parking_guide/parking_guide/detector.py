@@ -255,7 +255,7 @@ class SlotTracker:
     """
 
     def __init__(self, gate_cm: float = 30.0, gate_deg: float = 6.0, alpha: float = 0.5,
-                 coast_decay: float = 0.97, max_coast: int = 60, switch_after: int = 3) -> None:
+                 coast_decay: float = 0.97, max_coast: int = 150, switch_after: int = 3) -> None:
         self.gate_cm, self.gate_deg, self.alpha = gate_cm, gate_deg, alpha
         self.coast_decay, self.max_coast, self.switch_after = coast_decay, max_coast, switch_after
         self.slot: SlotEstimate | None = None
@@ -272,7 +272,7 @@ class SlotTracker:
         if self.slot is not None and ds_cm:
             self.slot = self.slot.moved(ds_cm, kappa, axle_y)
         if det is None:
-            return self._coast()
+            return self._coast(ds_cm)
         if self.slot is None:
             self.slot, self.coast, self.outliers = det, 0, 0
             return self.slot
@@ -286,7 +286,7 @@ class SlotTracker:
             if self.outliers >= self.switch_after:  # 정말로 다른 칸이 계속 보이면 갈아탄다
                 self.slot, self.coast, self.outliers = det, 0, 0
                 return self.slot
-            return self._coast()
+            return self._coast(ds_cm)
         self.outliers, self.coast = 0, 0
         a = self.alpha
 
@@ -299,14 +299,20 @@ class SlotTracker:
                             confidence=float(conf))
         return self.slot
 
-    def _coast(self) -> SlotEstimate | None:
+    def _coast(self, ds_cm: float = 0.0) -> SlotEstimate | None:
+        """검출 없이 예측으로 이어 간다.
+
+        신뢰도는 '움직인 거리'만큼만 낮춘다 (5cm마다 coast_decay배). 끝선이 범퍼 밑으로 사라진 뒤
+        차가 멈춰 있으면 위치가 그대로이므로 믿음도 그대로다. 프레임 수 상한(max_coast)은 안전장치.
+        """
         if self.slot is None:
             return None
         self.coast += 1
         if self.coast > self.max_coast:
             self.slot = None
             return None
-        self.slot = replace(self.slot, confidence=self.slot.confidence * self.coast_decay)
+        decay = self.coast_decay ** (abs(ds_cm) / 5.0)
+        self.slot = replace(self.slot, confidence=self.slot.confidence * decay)
         return self.slot
 
 

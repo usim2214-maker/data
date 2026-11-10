@@ -14,7 +14,7 @@ class SlotTracker(
     private val gateDeg: Double = 6.0,
     private val alpha: Double = 0.5,
     private val coastDecay: Double = 0.97,
-    private val maxCoast: Int = 60,
+    private val maxCoast: Int = 150,
     private val switchAfter: Int = 3,
 ) {
     var slot: SlotEstimate? = null
@@ -31,7 +31,7 @@ class SlotTracker(
     fun update(det: SlotEstimate?, dsCm: Double = 0.0, kappa: Double = 0.0, axleY: Double = 0.0): SlotEstimate? {
         lastRejected = false
         if (dsCm != 0.0) slot = slot?.moved(dsCm, kappa, axleY)
-        if (det == null) return coastStep()
+        if (det == null) return coastStep(dsCm)
         val p = slot ?: run {
             slot = det; coast = 0; outliers = 0
             return det
@@ -46,7 +46,7 @@ class SlotTracker(
                 slot = det; coast = 0; outliers = 0
                 return det
             }
-            return coastStep()
+            return coastStep(dsCm)
         }
         outliers = 0; coast = 0
         fun mix(pl: LineEstimate, dl: LineEstimate) =
@@ -60,13 +60,14 @@ class SlotTracker(
         return fused
     }
 
-    private fun coastStep(): SlotEstimate? {
+    /** 신뢰도는 움직인 거리만큼만 낮춘다 (5cm마다 coastDecay배). 멈춰 있으면 그대로. 프레임 상한은 안전장치. */
+    private fun coastStep(dsCm: Double): SlotEstimate? {
         val s = slot ?: return null
         coast++
         if (coast > maxCoast) {
             slot = null
             return null
         }
-        return s.copy(confidence = s.confidence * coastDecay).also { slot = it }
+        return s.copy(confidence = s.confidence * Math.pow(coastDecay, abs(dsCm) / 5.0)).also { slot = it }
     }
 }

@@ -20,4 +20,5 @@ dependencies {
 
 application {
     mainClass.set("com.signalassist.demo.DemoKt")
+    applicationDefaultJvmArgs = listOf("-Dfile.encoding=UTF-8", "-Dstdout.encoding=UTF-8")
 }

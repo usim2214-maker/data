@@ -1,8 +1,14 @@
 package com.signalassist.app
 
 import android.Manifest
+import android.animation.ObjectAnimator
+import android.car.Car
+import android.car.drivingstate.CarUxRestrictions
+import android.car.drivingstate.CarUxRestrictionsManager
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.graphics.Typeface
+import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
@@ -10,148 +16,321 @@ import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.CheckBox
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.SeekBar
 import android.widget.Spinner
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
-import com.signalassist.app.alert.AlertNotifier
-import com.signalassist.app.camera.AssetImageFrameSource
-import com.signalassist.app.camera.FrameSource
-import com.signalassist.app.camera.ScenarioFrameSource
-import com.signalassist.app.camera.ScenarioSession
-import com.signalassist.app.camera.SyntheticCycleFrameSource
-import com.signalassist.app.camera.toBitmap
+import androidx.lifecycle.repeatOnLifecycle
+import com.signalassist.app.ui.SafePalette
 import com.signalassist.app.ui.SignalPanelView
-import com.signalassist.app.vehicle.PleosVehicleDataSource
-import com.signalassist.app.vehicle.ScenarioVehicleDataSource
-import com.signalassist.app.vehicle.VehicleDataSource
-import com.signalassist.core.EngineOutput
-import com.signalassist.core.Frame
+import com.signalassist.core.Alert
+import com.signalassist.core.AlertLevel
+import com.signalassist.core.CabinState
+import com.signalassist.core.DriverNeed
+import com.signalassist.core.DriverProfile
+import com.signalassist.core.OutputPlan
 import com.signalassist.core.Scenario
+import com.signalassist.core.TurnSignal
+import kotlinx.coroutines.launch
 
+/**
+ * 화면: 설정(주차 중) + 큰 상태 표시(주행 중).
+ * 알림 자체는 [AssistService] 가 내므로 이 화면이 없어도 동작한다.
+ */
 class MainActivity : AppCompatActivity() {
 
-    /** 입력 모드: 카메라가 없으므로 합성 영상 / 테스트 이미지로 대체 */
-    private sealed class Mode(val label: String) {
-        class Simulated(val scenario: Scenario) : Mode("시뮬레이션: ${scenario.description}")
-        data object LiveVehicleSyntheticSignal : Mode("실차 데이터 + 가상 신호 주기")
-        data object LiveVehicleTestImages : Mode("실차 데이터 + 테스트 이미지(assets)")
-    }
+    private data class ModeItem(val mode: AssistMode, val label: String)
 
-    private val modes: List<Mode> =
-        Scenario.ALL.map { Mode.Simulated(it) } + Mode.LiveVehicleSyntheticSignal + Mode.LiveVehicleTestImages
+    private val modeItems: List<ModeItem> =
+        Scenario.ALL.map { ModeItem(AssistMode.Simulated(it.name), "시뮬레이션: ${it.titleKo}") } + listOf(
+            ModeItem(AssistMode.LiveNoCamera, "실차: 차량 경고·내비 (카메라 없이)"),
+            ModeItem(AssistMode.LiveSyntheticSignal, "실차 + 가상 신호 주기"),
+            ModeItem(AssistMode.LiveTestImages, "실차 + 테스트 이미지(assets)"),
+        )
 
+    private lateinit var settings: Settings
     private lateinit var panel: SignalPanelView
     private lateinit var preview: ImageView
+    private lateinit var navCard: TextView
+    private lateinit var cabinView: TextView
+    private lateinit var banner: TextView
     private lateinit var status: TextView
-    private lateinit var lastAlert: TextView
-    private lateinit var notifier: AlertNotifier
-    private lateinit var controller: AssistController
-    private var selected: Mode = modes.first()
-    private var showPreview = true
-    private var clearFlashAt = 0L
+    private lateinit var controls: LinearLayout
+    private lateinit var flash: TextView
+    private lateinit var speedRow: LinearLayout
+    private var restartToken = 0
+    private var drivingRestricted = false
+    private var car: Car? = null
+    private var uxManager: CarUxRestrictionsManager? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        notifier = AlertNotifier(this)
-        controller = AssistController(lifecycleScope, ::render)
+        settings = Settings(this)
         setContentView(buildUi())
+        publishConfig()
+        AssistService.start(this)
         requestPermissionsIfNeeded()
-    }
+        connectUxRestrictions()
 
-    override fun onStart() {
-        super.onStart()
-        startSelected()
-    }
-
-    override fun onStop() {
-        controller.stop()
-        super.onStop()
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch { AssistBus.snapshot.collect { it?.let(::render) } }
+                launch { AssistBus.alerts.collect { (alert, plan) -> showAlert(alert, plan) } }
+            }
+        }
     }
 
     override fun onDestroy() {
-        notifier.shutdown()
+        runCatching { uxManager?.unregisterListener() }
+        car?.disconnect()
         super.onDestroy()
     }
 
-    private fun startSelected() {
-        val (frames: FrameSource, vehicle: VehicleDataSource) = when (val m = selected) {
-            is Mode.Simulated -> ScenarioSession(m.scenario).let { ScenarioFrameSource(it) to ScenarioVehicleDataSource(it) }
-            Mode.LiveVehicleSyntheticSignal -> SyntheticCycleFrameSource() to PleosVehicleDataSource(this)
-            Mode.LiveVehicleTestImages -> {
-                val images = AssetImageFrameSource(this)
-                if (images.isEmpty) {
-                    status.text = "assets/test_frames 에 이미지가 없습니다. README.txt 참고"
-                    return
-                }
-                images to PleosVehicleDataSource(this)
+    private fun publishConfig() {
+        AssistBus.config.value = AssistConfig(settings.mode, settings.profile, restartToken)
+        applyProfileToUi(settings.profile)
+    }
+
+    // ---- 주행 중 UX 제약 ----
+
+    private fun connectUxRestrictions() {
+        val onReady: (Car) -> Unit = { c ->
+            val mgr = c.getCarManager(Car.CAR_UX_RESTRICTION_SERVICE) as? CarUxRestrictionsManager
+            uxManager = mgr
+            mgr?.registerListener { r -> runOnUiThread { applyRestrictions(r) } }
+            mgr?.currentCarUxRestrictions?.let { r -> runOnUiThread { applyRestrictions(r) } }
+        }
+        car = runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                Car.createCar(this, null, Car.CAR_WAIT_TIMEOUT_DO_NOT_WAIT) { c, ready -> if (ready) onReady(c) }
+            } else {
+                Car.createCar(this)?.also(onReady)
             }
-        }
-        controller.start(frames, vehicle)
-        status.text = "영상: ${frames.name} · 차량: ${vehicle.name}"
+        }.getOrNull()
     }
 
-    private fun render(out: EngineOutput, frame: Frame) {
-        panel.state = out.state
-        if (showPreview) preview.setImageBitmap(frame.toBitmap())
-        val v = out.vehicle
-        status.text = "%.0f km/h · 기어 %s · 프레임 인식 %s%s".format(
-            v.speedKmh, v.gear, out.detection.color.labelKo, if (out.detection.leftTurnArrow) "+좌회전" else "",
+    /** 주행 중에는 설정·영상 미리보기를 숨기고 큰 상태 표시만 남긴다 */
+    private fun applyRestrictions(r: CarUxRestrictions) {
+        drivingRestricted = r.isRequiresDistractionOptimization
+        val vis = if (drivingRestricted) View.GONE else View.VISIBLE
+        controls.visibility = vis
+        preview.visibility = if (drivingRestricted || !settings.profile.signalAssist) View.GONE else View.VISIBLE
+    }
+
+    // ---- 표시 ----
+
+    private fun render(s: UiSnapshot) {
+        val out = s.output
+        panel.state = out.signalState
+        if (!drivingRestricted && s.preview != null) preview.setImageBitmap(s.preview)
+
+        val nav = out.input.navigation
+        navCard.text = if (nav?.guiding == true && nav.distanceToManeuverM != null && nav.nextManeuver != null) {
+            val m = nav.nextManeuver!!
+            "${m.symbol}  ${Math.round(nav.distanceToManeuverM!! / 10f) * 10}m  ${m.labelKo}" + (nav.roadName?.let { "\n$it" } ?: "")
+        } else {
+            "경로 안내 없음"
+        }
+        cabinView.text = describeCabin(out.input.cabin)
+        val v = out.input.vehicle
+        status.text = "%.0f km/h · 기어 %s · %s".format(v.speedKmh, gearKo(v.gear), s.sourceDescription)
+        speedRow.visibility = if (!s.hasRealSpeed && !drivingRestricted) View.VISIBLE else View.GONE
+    }
+
+    private fun showAlert(alert: Alert, plan: OutputPlan) {
+        banner.text = "${alert.symbol}  ${alert.message}"
+        if (!plan.visualFlash) return
+        flash.text = "${alert.symbol}\n${alert.message}"
+        flash.setBackgroundColor(
+            when (alert.level) {
+                AlertLevel.URGENT -> SafePalette.VERMILION
+                AlertLevel.WARNING -> Color.rgb(170, 70, 0)
+                AlertLevel.CAUTION -> Color.rgb(120, 110, 20)
+                AlertLevel.INFO -> Color.rgb(0, 90, 140)
+            },
         )
-        for (alert in out.alerts) {
-            notifier.notify(alert)
-            lastAlert.text = alert.message
-            panel.flashLevel = alert.level
-            clearFlashAt = out.timestampMs + 1_500
+        flash.visibility = View.VISIBLE
+        // 두 번 깜빡인 뒤 사라짐 (소리를 못 듣는 운전자가 주변 시야로도 알아챌 수 있게)
+        ObjectAnimator.ofFloat(flash, View.ALPHA, 1f, 0.2f, 1f, 0.2f, 1f, 0f).apply {
+            duration = if (alert.level == AlertLevel.URGENT) 2_400 else 1_800
+            addListener(object : android.animation.AnimatorListenerAdapter() {
+                override fun onAnimationEnd(a: android.animation.Animator) { flash.visibility = View.GONE }
+            })
+            start()
         }
-        if (panel.flashLevel != null && out.timestampMs > clearFlashAt) panel.flashLevel = null
     }
 
-    // ---- UI (주행 중 조작 최소화: 큰 표시 + 설정은 최소한) ----
+    private fun describeCabin(c: CabinState): String {
+        fun line(label: String, value: Boolean?, okWhen: Boolean, ok: String, bad: String) =
+            if (value == null) null else "${if (value == okWhen) "○" else "⚠"} $label ${if (value == okWhen) ok else bad}"
+        return listOfNotNull(
+            line("벨트", c.driverSeatbeltBuckled, true, "착용", "미착용"),
+            line("문", c.doorOpen, false, "닫힘", "열림"),
+            line("타이어", c.lowTirePressure, false, "정상", "저압"),
+            c.turnSignal?.let {
+                when (it) {
+                    TurnSignal.NONE -> "○ 방향지시등 꺼짐"
+                    TurnSignal.LEFT -> "⇦ 방향지시등 왼쪽"
+                    TurnSignal.RIGHT -> "⇨ 방향지시등 오른쪽"
+                    TurnSignal.HAZARD -> "⚠ 비상등"
+                }
+            },
+            line("전조등", c.headlightsOn, true, "켜짐", "꺼짐"),
+            c.rearSeatOccupied?.let { if (it) "◉ 뒷좌석 탑승" else "○ 뒷좌석 비어 있음" },
+        ).joinToString("\n").ifEmpty { "차량 상태 정보 없음" }
+    }
+
+    private fun gearKo(g: com.signalassist.core.Gear) = when (g) {
+        com.signalassist.core.Gear.PARK -> "P"
+        com.signalassist.core.Gear.REVERSE -> "R"
+        com.signalassist.core.Gear.NEUTRAL -> "N"
+        com.signalassist.core.Gear.DRIVE -> "D"
+        com.signalassist.core.Gear.UNKNOWN -> "-"
+    }
+
+    private fun applyProfileToUi(p: DriverProfile) {
+        val scale = if (p.has(DriverNeed.LOW_VISION) || p.has(DriverNeed.ATTENTION)) 1.4f else 1f
+        banner.textSize = 30f * scale
+        navCard.textSize = (if (p.navigationCards) 40f else 26f) * scale
+        cabinView.textSize = 22f * scale
+        flash.textSize = 54f * scale
+        panel.visibility = if (p.signalAssist) View.VISIBLE else View.GONE
+        preview.visibility = if (p.signalAssist && !drivingRestricted) View.VISIBLE else View.GONE
+    }
+
+    // ---- UI 구성 ----
 
     private fun buildUi(): View {
-        val root = LinearLayout(this).apply {
+        val root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
+        val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.BLACK)
             setPadding(24, 16, 24, 16)
         }
         val body = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         panel = SignalPanelView(this)
+        val side = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(16, 0, 0, 0) }
         preview = ImageView(this).apply { adjustViewBounds = true; scaleType = ImageView.ScaleType.FIT_CENTER }
+        navCard = label(40f, Color.WHITE).apply { typeface = Typeface.DEFAULT_BOLD; setBackgroundColor(Color.rgb(20, 30, 45)); setPadding(20, 12, 20, 12) }
+        cabinView = label(22f, Color.LTGRAY)
+        side.addView(preview, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
+        side.addView(navCard)
+        side.addView(cabinView)
         body.addView(panel, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 3f))
-        body.addView(preview, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 2f))
-        root.addView(body, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
+        body.addView(side, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 2f))
+        content.addView(body, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
 
-        lastAlert = label(34f, Color.WHITE)
-        status = label(22f, Color.LTGRAY)
-        root.addView(lastAlert)
-        root.addView(status)
+        banner = label(30f, Color.WHITE).apply { typeface = Typeface.DEFAULT_BOLD }
+        status = label(18f, Color.GRAY)
+        content.addView(banner)
+        content.addView(status)
 
-        val controls = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        val spinner = Spinner(this).apply {
-            adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, modes.map { it.label })
+        controls = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        controls.addView(buildModeRow())
+        controls.addView(buildProfileRow())
+        speedRow = buildSpeedRow()
+        controls.addView(speedRow)
+        content.addView(controls)
+        root.addView(content)
+
+        flash = TextView(this).apply {
+            gravity = Gravity.CENTER
+            setTextColor(Color.WHITE)
+            typeface = Typeface.DEFAULT_BOLD
+            visibility = View.GONE
+        }
+        root.addView(flash, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+        return root
+    }
+
+    private fun buildModeRow() = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        val spinner = Spinner(this@MainActivity).apply {
+            adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, modeItems.map { it.label })
+            setSelection(modeItems.indexOfFirst { it.mode.key == settings.mode.key }.coerceAtLeast(0))
             onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
                 override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
-                    if (selected != modes[pos]) { selected = modes[pos]; startSelected() }
+                    val m = modeItems[pos].mode
+                    if (m.key != settings.mode.key) {
+                        settings.mode = m
+                        // 시나리오를 고르면 그 시나리오가 보여주는 프로필로 맞춰 줌 (시연 편의)
+                        if (m is AssistMode.Simulated) {
+                            Scenario.ALL.firstOrNull { it.name == m.scenarioName }?.let { settings.profile = DriverProfile(it.targetNeeds) }
+                            syncProfileChecks()
+                        }
+                        publishConfig()
+                    }
                 }
                 override fun onNothingSelected(p: AdapterView<*>?) = Unit
             }
         }
-        controls.addView(spinner, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        controls.addView(Button(this).apply { text = "다시 시작"; setOnClickListener { startSelected() } })
-        controls.addView(CheckBox(this).apply {
-            text = "음성"; setTextColor(Color.WHITE); isChecked = true
-            setOnCheckedChangeListener { _, c -> notifier.voiceEnabled = c }
+        addView(spinner, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        addView(Button(this@MainActivity).apply {
+            text = "다시 시작"
+            setOnClickListener { restartToken++; publishConfig() }
         })
-        controls.addView(CheckBox(this).apply {
-            text = "영상"; setTextColor(Color.WHITE); isChecked = true
-            setOnCheckedChangeListener { _, c -> showPreview = c; preview.visibility = if (c) View.VISIBLE else View.GONE }
-        })
-        root.addView(controls)
-        return root
+    }
+
+    private val profileChecks = HashMap<DriverNeed, CheckBox>()
+
+    private fun buildProfileRow() = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        addView(label(18f, Color.LTGRAY).apply { text = "운전자 특성: " })
+        for (need in DriverNeed.entries) {
+            val cb = CheckBox(this@MainActivity).apply {
+                text = need.labelKo
+                setTextColor(Color.WHITE)
+                textSize = 18f
+                isChecked = settings.profile.has(need)
+                setOnCheckedChangeListener { _, _ ->
+                    val needs = profileChecks.filter { it.value.isChecked }.keys
+                    settings.profile = DriverProfile(needs)
+                    publishConfig()
+                }
+            }
+            profileChecks[need] = cb
+            addView(cb)
+        }
+    }
+
+    private fun syncProfileChecks() {
+        val p = settings.profile
+        for ((need, cb) in profileChecks) {
+            if (cb.isChecked != p.has(need)) {
+                cb.setOnCheckedChangeListener(null)
+                cb.isChecked = p.has(need)
+                cb.setOnCheckedChangeListener { _, _ ->
+                    settings.profile = DriverProfile(profileChecks.filter { it.value.isChecked }.keys)
+                    publishConfig()
+                }
+            }
+        }
+    }
+
+    /** Pleos 에뮬레이터에는 차속 시뮬레이션이 없어, 실차 모드 시연용 차속 조절 막대를 둔다 */
+    private fun buildSpeedRow() = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        visibility = View.GONE
+        val value = label(18f, Color.LTGRAY).apply { text = "시연용 차속: 0 km/h" }
+        addView(value)
+        addView(SeekBar(this@MainActivity).apply {
+            max = 80
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(s: SeekBar?, p: Int, fromUser: Boolean) {
+                    AssistBus.speedOverrideKmh = p.toFloat()
+                    value.text = "시연용 차속: $p km/h"
+                }
+                override fun onStartTrackingTouch(s: SeekBar?) = Unit
+                override fun onStopTrackingTouch(s: SeekBar?) = Unit
+            })
+        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
     }
 
     private fun label(sizeSp: Float, color: Int) = TextView(this).apply {
@@ -159,14 +338,17 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun requestPermissionsIfNeeded() {
-        val wanted = arrayOf("android.car.permission.CAR_SPEED", Manifest.permission.POST_NOTIFICATIONS)
-            .filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
+        val wanted = buildList {
+            add("android.car.permission.CAR_SPEED")
+            if (Build.VERSION.SDK_INT >= 33) add(Manifest.permission.POST_NOTIFICATIONS)
+        }.filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
         if (wanted.isNotEmpty()) requestPermissions(wanted.toTypedArray(), 1)
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         // 차속 권한을 받은 뒤 차량 데이터 구독을 다시 등록
-        if (controller.isRunning) startSelected()
+        restartToken++
+        publishConfig()
     }
 }

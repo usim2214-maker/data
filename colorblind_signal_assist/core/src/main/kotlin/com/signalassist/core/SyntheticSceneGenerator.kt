@@ -27,6 +27,8 @@ data class SceneSpec(
     /** 앞차 브레이크등, 가로등, 가로수 같은 방해 요소 */
     val distractors: Boolean = true,
     val leadCarBrakeLights: Boolean = true,
+    /** false 면 신호등 없는 도로 (교차로 사이 구간) */
+    val trafficLightVisible: Boolean = true,
     val seed: Int = 0,
 )
 
@@ -76,7 +78,7 @@ object SyntheticSceneGenerator {
         val rnd = Random(spec.seed)
         if (spec.distractors) drawDistractors(px, w, h, horizon, spec, rnd)
 
-        drawTrafficLight(px, w, h, spec)
+        if (spec.trafficLightVisible) drawTrafficLight(px, w, h, spec)
 
         // 노출 + 센서 노이즈
         val sigma = spec.noiseSigma

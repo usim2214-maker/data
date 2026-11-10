@@ -1,11 +1,12 @@
 package com.signalassist.demo
 
+import com.signalassist.core.DriverProfile
+import com.signalassist.core.DrivingAssistEngine
 import com.signalassist.core.Frame
 import com.signalassist.core.Lighting
 import com.signalassist.core.SceneSpec
 import com.signalassist.core.ScenarioPlayer
 import com.signalassist.core.Scenario
-import com.signalassist.core.SignalAssistEngine
 import com.signalassist.core.SignalColor
 import com.signalassist.core.SignalState
 import com.signalassist.core.SyntheticSceneGenerator
@@ -29,35 +30,43 @@ fun main(args: Array<String>) {
 }
 
 private fun runScenario(scenario: Scenario, outDir: File) {
-    println("\n=== 시나리오: ${scenario.name} — ${scenario.description}")
+    val profile = DriverProfile(scenario.targetNeeds)
+    println("\n=== 시나리오: ${scenario.titleKo} — ${scenario.description}")
+    println("    프로필: ${profile.needs.joinToString { it.labelKo }}")
     val player = ScenarioPlayer(scenario)
-    val engine = SignalAssistEngine()
+    val engine = DrivingAssistEngine(profile)
     var correct = 0
     var known = 0
     for (sample in player.samples()) {
-        val out = engine.process(sample.frame, sample.vehicle, sample.timestampMs)
-        if (out.state.color != SignalColor.UNKNOWN) {
+        val out = engine.process(sample.toInput())
+        val signal = out.signal
+        val truth = sample.groundTruth
+        if (signal != null && truth != null && signal.state.color != SignalColor.UNKNOWN) {
             known++
-            if (out.state.color == sample.groundTruth.color) correct++
+            if (signal.state.color == truth.color) correct++
         }
-        if (out.change != null) {
+        signal?.change?.let { c ->
             println(
-                "%6.1fs  상태 %-5s → %-5s%s  (실제 %s, %.0fkm/h, %.0fm)".format(
-                    sample.timestampMs / 1000.0,
-                    out.change!!.from.color, out.change!!.to.color,
-                    if (out.state.leftTurnArrow) " +좌회전" else "",
-                    sample.groundTruth.color, sample.vehicle.speedKmh, sample.distanceM,
+                "%6.1fs  신호 %-7s → %-7s%s  (실제 %s, %.0fkm/h, %.0fm)".format(
+                    sample.timestampMs / 1000.0, c.from.color, c.to.color,
+                    if (c.to.leftTurnArrow) " +좌회전" else "",
+                    truth?.color ?: "-", sample.vehicle.speedKmh, sample.distanceM,
                 ),
             )
         }
         for (a in out.alerts) {
-            println("%6.1fs  🔔 [%s/%s] %s".format(a.timestampMs / 1000.0, a.level, a.tone, a.message))
+            val plan = profile.outputFor(a)
+            val channels = listOfNotNull(
+                "소리".takeIf { plan.tone }, "음성".takeIf { plan.voice },
+                "화면깜빡임".takeIf { plan.visualFlash }, "큰글씨".takeIf { plan.largeText },
+            ).joinToString("+")
+            println("%6.1fs  🔔 %s %s  [%s/%s → %s]".format(a.timestampMs / 1000.0, a.symbol, a.message, a.level, a.tone, channels))
         }
         if (sample.timestampMs % 2000 == 0L) {
             savePng(sample.frame, File(outDir, "${scenario.name}_%05d.png".format(sample.timestampMs)))
         }
     }
-    println("  안정화된 상태 정확도: $correct / $known (UNKNOWN 제외)")
+    if (known > 0) println("  안정화된 신호 상태 정확도: $correct / $known (UNKNOWN 제외)")
 }
 
 /** 무작위 장면(색·크기·위치·조명·노출)에 대한 단일 프레임 검출 정확도 */

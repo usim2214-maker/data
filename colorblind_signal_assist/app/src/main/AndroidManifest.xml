@@ -6,16 +6,32 @@
     <!-- 실제 카메라 연동 전까지는 합성 영상을 쓰므로 카메라는 필수 아님 -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
-    <!-- 차속 (런타임 권한) / 기어 -->
+    <!-- AAOS 표준: 차속 (런타임 권한) / 기어 / 주행 상태(UX 제약) -->
     <uses-permission android:name="android.car.permission.CAR_SPEED" />
     <uses-permission android:name="android.car.permission.CAR_POWERTRAIN" />
+    <uses-permission android:name="android.car.permission.CAR_EXTERIOR_ENVIRONMENT" />
+    <uses-permission android:name="android.car.permission.CAR_TIRES" />
+    <uses-permission android:name="android.car.permission.CAR_EXTERIOR_LIGHTS" />
+
+    <!-- Pleos Vehicle State 조회 권한 그룹 (pleos.car.permission.CAR_*) -->
+    <uses-permission android:name="pleos.car.permission.CAR_SAFETY" />
+    <uses-permission android:name="pleos.car.permission.CAR_SEATS" />
+    <uses-permission android:name="pleos.car.permission.CAR_DOORS" />
+    <uses-permission android:name="pleos.car.permission.CAR_LIGHTS" />
+    <uses-permission android:name="pleos.car.permission.CAR_DRIVE" />
+    <!-- TODO(Pleos): NaviHelper 권한(NAVI_ROUTE) 의 정확한 문자열을 SDK 문서에서 확인해 추가 -->
+
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <application
         android:allowBackup="false"
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.SignalAssist">
+
+        <uses-library android:name="android.car" android:required="false" />
 
         <activity
             android:name=".MainActivity"
@@ -26,8 +42,22 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- 주행 중에도 화면을 띄울 수 있도록 '주행 중 방해 최소화' 앱으로 선언 (UX 제약 준수 필요) -->
+            <!--
+              주행 중 화면: 주행 중에는 설정 UI 를 숨기고 큰 상태 표시만 남긴다 (CarUxRestrictions 준수).
+              주행 중 화면 사용이 허용되지 않는 카테고리로 분류되더라도, 알림은 아래 서비스가
+              소리·음성·헤드업 알림으로 계속 전달한다.
+            -->
             <meta-data android:name="distractionOptimized" android:value="true" />
         </activity>
+
+        <!-- 화면과 무관하게 계속 동작하는 알림 엔진 -->
+        <service
+            android:name=".AssistService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Driver accessibility alerts (traffic signal, vehicle warnings) for drivers with color vision, hearing or visual impairments" />
+        </service>
     </application>
 </manifest>

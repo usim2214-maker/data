@@ -5,7 +5,7 @@ import com.signalassist.core.ScenarioPlayer
 import com.signalassist.core.ScenarioSample
 
 /**
- * 시나리오 재생 시계. 영상(FrameSource)과 차량 데이터(VehicleDataSource)가 같은 샘플을 보도록 공유한다.
+ * 시나리오 재생 시계. 영상·차량·실내·내비 공급원이 같은 샘플을 보도록 공유한다.
  * 끝나면 처음부터 반복한다.
  */
 class ScenarioSession(val scenario: Scenario, fps: Int = 10) {
@@ -25,19 +25,9 @@ class ScenarioSession(val scenario: Scenario, fps: Int = 10) {
         }
         return cached!!
     }
-
-    /** 시나리오 안에서의 경과 시간 */
-    fun scenarioTimeMs(nowMs: Long): Long = sampleAt(nowMs).timestampMs
-
-    @Synchronized
-    fun restart() {
-        startMs = null
-        cachedIndex = -1
-        cached = null
-    }
 }
 
 class ScenarioFrameSource(private val session: ScenarioSession) : FrameSource {
-    override val name = "합성 영상: ${session.scenario.name}"
+    override val name = "합성 영상"
     override fun nextFrame(nowMs: Long) = session.sampleAt(nowMs).frame
 }

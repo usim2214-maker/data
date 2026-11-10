@@ -23,6 +23,7 @@ class TonePlayer {
         TonePattern.FALLING_TRIPLE to listOf(Note(880.0, 150), Note(660.0, 150), Note(440.0, 260)), // 내려감 = 정지
         TonePattern.RAPID_BEEPS to List(6) { Note(1000.0, 80, 50) },              // 빠른 반복 = 긴급
         TonePattern.SOFT_CHIME to listOf(Note(1047.0, 120)),
+        TonePattern.DOUBLE_MID to listOf(Note(740.0, 140, 120), Note(740.0, 140)),        // 같은 음 두 번 = 차량 경고
     )
 
     private val cache = HashMap<TonePattern, ShortArray>()

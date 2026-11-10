@@ -22,6 +22,14 @@ object SignalSymbols {
     const val LEFT_ARROW = "←"
 }
 
+/** 색각이상 친화 팔레트 (Okabe-Ito) */
+object SafePalette {
+    val VERMILION = Color.rgb(213, 94, 0)
+    val AMBER = Color.rgb(240, 228, 66)
+    val BLUISH_GREEN = Color.rgb(0, 158, 115)
+    val SKY_BLUE = Color.rgb(86, 180, 233)
+}
+
 /**
  * 적록색맹 운전자를 위한 신호 표시.
  * - 위치: 실제 국내 4구 신호등과 같은 순서(적·황·좌회전·녹)로 켜진 칸을 강조
@@ -38,9 +46,9 @@ class SignalPanelView @JvmOverloads constructor(context: Context, attrs: Attribu
     var flashLevel: AlertLevel? = null
         set(value) { field = value; invalidate() }
 
-    private val vermilion = Color.rgb(213, 94, 0)
-    private val amber = Color.rgb(240, 228, 66)
-    private val bluishGreen = Color.rgb(0, 158, 115)
+    private val vermilion = SafePalette.VERMILION
+    private val amber = SafePalette.AMBER
+    private val bluishGreen = SafePalette.BLUISH_GREEN
     private val off = Color.rgb(45, 45, 48)
 
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)

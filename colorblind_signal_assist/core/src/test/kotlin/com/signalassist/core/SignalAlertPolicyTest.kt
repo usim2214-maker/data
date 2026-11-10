@@ -4,13 +4,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class AlertPolicyTest {
+class SignalAlertPolicyTest {
     private fun st(c: SignalColor, arrow: Boolean = false) = SignalState(c, arrow)
     private fun v(speed: Float, gear: Gear = Gear.DRIVE) = VehicleState(speed, gear)
 
     @Test
     fun `green after red while stopped announces go, then reminds once`() {
-        val p = AlertPolicy()
+        val p = SignalAlertPolicy()
         p.evaluate(st(SignalColor.RED), null, v(0f), 0)
         val a = p.evaluate(st(SignalColor.GREEN), StateChange(st(SignalColor.RED), st(SignalColor.GREEN)), v(0f), 1_000)
         assertEquals(listOf(AlertType.GREEN_GO), a.map { it.type })
@@ -20,7 +20,7 @@ class AlertPolicyTest {
 
     @Test
     fun `no reminder when driver already pulled away`() {
-        val p = AlertPolicy()
+        val p = SignalAlertPolicy()
         p.evaluate(st(SignalColor.GREEN), StateChange(st(SignalColor.RED), st(SignalColor.GREEN)), v(0f), 0)
         val later = (1..50).flatMap { p.evaluate(st(SignalColor.GREEN), null, v(10f), it * 100L) }
         assertTrue(later.isEmpty())
@@ -28,7 +28,7 @@ class AlertPolicyTest {
 
     @Test
     fun `red at speed without braking repeats urgent warning`() {
-        val p = AlertPolicy()
+        val p = SignalAlertPolicy()
         val first = p.evaluate(st(SignalColor.RED), StateChange(st(SignalColor.YELLOW), st(SignalColor.RED)), v(45f), 0)
         assertEquals(listOf(AlertType.RED_URGENT), first.map { it.type })
         val repeats = (1..70).flatMap { p.evaluate(st(SignalColor.RED), null, v(45f), it * 100L) }
@@ -37,7 +37,7 @@ class AlertPolicyTest {
 
     @Test
     fun `urgent warning stops once driver brakes hard`() {
-        val p = AlertPolicy()
+        val p = SignalAlertPolicy()
         p.evaluate(st(SignalColor.RED), StateChange(st(SignalColor.YELLOW), st(SignalColor.RED)), v(45f), 0)
         // 1초에 15km/h 씩 감속
         val alerts = (1..30).flatMap { p.evaluate(st(SignalColor.RED), null, v((45f - it * 1.5f).coerceAtLeast(0f)), it * 100L) }
@@ -46,22 +46,40 @@ class AlertPolicyTest {
 
     @Test
     fun `stopped at red is silent`() {
-        val p = AlertPolicy()
+        val p = SignalAlertPolicy()
         val a = p.evaluate(st(SignalColor.RED), StateChange(st(SignalColor.GREEN), st(SignalColor.RED)), v(0f), 0)
         assertTrue(a.isEmpty())
     }
 
     @Test
     fun `parked suppresses everything`() {
-        val p = AlertPolicy()
+        val p = SignalAlertPolicy()
         val a = p.evaluate(st(SignalColor.RED), StateChange(st(SignalColor.GREEN), st(SignalColor.RED)), v(40f, Gear.PARK), 0)
         assertTrue(a.isEmpty())
     }
 
     @Test
     fun `left arrow announced while stopped`() {
-        val p = AlertPolicy()
+        val p = SignalAlertPolicy()
         val a = p.evaluate(st(SignalColor.RED, true), StateChange(st(SignalColor.RED), st(SignalColor.RED, true)), v(0f), 0)
         assertEquals(listOf(AlertType.LEFT_ARROW_ON), a.map { it.type })
+    }
+
+    @Test
+    fun `unknown gear (Pleos has no gear API) still warns by speed`() {
+        val p = SignalAlertPolicy()
+        val a = p.evaluate(st(SignalColor.RED), StateChange(st(SignalColor.YELLOW), st(SignalColor.RED)), v(45f, Gear.UNKNOWN), 0)
+        assertEquals(listOf(AlertType.RED_URGENT), a.map { it.type })
+    }
+
+    @Test
+    fun `left arrow is interpreted against the planned route`() {
+        val change = StateChange(st(SignalColor.RED), st(SignalColor.RED, true))
+        fun typeFor(nav: NavigationState?) =
+            SignalAlertPolicy().evaluate(st(SignalColor.RED, true), change, v(0f), 0, nav).single().type
+        assertEquals(AlertType.LEFT_ARROW_FOR_ROUTE, typeFor(NavigationState(true, Maneuver.LEFT, 40f)))
+        assertEquals(AlertType.LEFT_ARROW_NOT_FOR_ROUTE, typeFor(NavigationState(true, Maneuver.LEFT, 900f)))
+        assertEquals(AlertType.LEFT_ARROW_NOT_FOR_ROUTE, typeFor(NavigationState(true, Maneuver.RIGHT, 40f)))
+        assertEquals(AlertType.LEFT_ARROW_ON, typeFor(null))
     }
 }

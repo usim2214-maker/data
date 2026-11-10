@@ -57,9 +57,56 @@ data class StateChange(val from: SignalState, val to: SignalState)
 
 enum class Gear { PARK, REVERSE, NEUTRAL, DRIVE, UNKNOWN }
 
-/** 차량 신호 (Pleos Vehicle SDK / Android Car API / 시나리오에서 들어옴) */
+/**
+ * 주행 신호. 차속·기어는 Pleos Vehicle State 에 없어서 AAOS 표준 프로퍼티
+ * (PERF_VEHICLE_SPEED, GEAR_SELECTION)로 읽는다. 기어를 못 읽으면 UNKNOWN 이고, 이때는 차속만으로 판단한다.
+ */
 data class VehicleState(
     val speedKmh: Float,
-    val gear: Gear = Gear.DRIVE,
+    val gear: Gear = Gear.UNKNOWN,
+    /** Pleos Vehicle State `getCurrentBrakePedalStatus` */
     val brakePedal: Boolean? = null,
+)
+
+enum class TurnSignal { NONE, LEFT, RIGHT, HAZARD }
+
+/**
+ * 실내·차체 상태. 값을 못 읽는 항목은 null (해당 규칙은 꺼짐).
+ * 괄호 안은 대응하는 Pleos Vehicle State API.
+ */
+data class CabinState(
+    /** 운전석 안전벨트 체결 (`getCurrentSeatBeltBuckledState`) */
+    val driverSeatbeltBuckled: Boolean? = null,
+    /** 차량이 띄우는 벨트 미착용 경고 (`hasSeatBeltNotBuckledWarning`) */
+    val seatbeltWarning: Boolean? = null,
+    /** 문이 하나라도 열림 (`getCurrentDoorPosition`) */
+    val doorOpen: Boolean? = null,
+    /** 타이어 저압 경고 (`getLowTirePressure`) */
+    val lowTirePressure: Boolean? = null,
+    /** 방향지시등 (`getCurrentTurnSignalState`) */
+    val turnSignal: TurnSignal? = null,
+    /** 전조등 (`getCurrentLowBeamLightState`) */
+    val headlightsOn: Boolean? = null,
+    /** 주변이 어두움 (AAOS NIGHT_MODE 또는 시각 기반) */
+    val isDark: Boolean? = null,
+    /** 뒷좌석 탑승 감지 (`getCurrentSeatOccupancy`) */
+    val rearSeatOccupied: Boolean? = null,
+)
+
+enum class Maneuver(val labelKo: String, val symbol: String) {
+    LEFT("좌회전", "↰"),
+    RIGHT("우회전", "↱"),
+    STRAIGHT("직진", "↑"),
+    UTURN("유턴", "↶"),
+    EXIT("출구", "↗"),
+    DESTINATION("목적지", "◎"),
+    OTHER("안내", "•"),
+}
+
+/** 내비 안내 상태 (Pleos NaviHelper `getTBTInfo` / `getRouteStateInfo`) */
+data class NavigationState(
+    val guiding: Boolean,
+    val nextManeuver: Maneuver? = null,
+    val distanceToManeuverM: Float? = null,
+    val roadName: String? = null,
 )

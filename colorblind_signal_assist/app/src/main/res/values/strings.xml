@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">신호 도우미</string>
-    <string name="channel_name">신호 알림</string>
-    <string name="channel_desc">신호등 색 변화와 위험 상황을 알려줍니다</string>
+    <string name="app_name">모두의 운전석</string>
+    <string name="channel_name">운전 보조 알림</string>
+    <string name="channel_desc">신호등 색 변화, 차량 경고, 내비 안내를 운전자 특성에 맞게 알려줍니다</string>
+    <string name="service_channel_name">동작 상태</string>
+    <string name="service_running">운전 보조 알림이 동작 중입니다</string>
 </resources>

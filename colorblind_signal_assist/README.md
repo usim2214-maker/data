@@ -1,101 +1,126 @@
-# 신호 도우미 — 적록색맹 운전자를 위한 차량용 신호 알림 앱 (Pleos Connect / AAOS)
+# 모두의 운전석 — 운전자 특성에 맞춰 차량 정보를 '다른 감각'으로 전달하는 접근성 운전 보조 앱
 
-적록색맹 운전자는 신호등의 **적색과 녹색을 색만으로 구분하기 어렵습니다**.
-이 앱은 전방 영상에서 신호 색을 인식하고, **차속·기어**를 함께 보고 상황에 맞춰
-**소리 패턴 · 음성 · 모양 기호 · 헤드업 알림**으로 알려줍니다. 색에만 기대는 정보는 쓰지 않습니다.
+> **한 줄 소개**: 색(신호등), 소리(경고음·방향지시등·내비 음성), 작은 경고등처럼 **한 가지 감각에만 의존하는 차량 정보**를
+> 색각이상·청각장애·저시력·주의력 저하(고령) 운전자가 받아들일 수 있는 **소리 패턴·음성·화면 깜빡임·큰 글씨**로 바꿔 전달하는 Pleos Connect 앱
 
-> ⚠️ 보조 기능입니다. 안전장치가 아니며, 운전자는 언제나 직접 신호를 확인해야 합니다.
+⚠️ 보조 기능입니다. 안전장치가 아니며, 운전자는 언제나 직접 신호와 주변을 확인해야 합니다.
 
-## 구조
+---
 
+## 실행 방법
+
+### APK 설치 (바로 실행)
+```bash
+adb install apk/팀명_모두의운전석_release.apk
 ```
-colorblind_signal_assist/
-├── core/   순수 Kotlin (Android 의존성 없음) — PC에서 빌드·테스트 가능
-│   ├── TrafficLightDetector   프레임 → 켜진 등화 (HSV 색 분할 + 연결 요소 + 함체/위치 점수)
-│   ├── SignalStateTracker     프레임 다수결로 깜빡임·오검출 억제
-│   ├── AlertPolicy            신호 + 차속/기어 → 알릴지 판단
-│   ├── SignalAssistEngine     위 세 단계를 묶은 파이프라인
-│   ├── SyntheticSceneGenerator  카메라 대체용 합성 장면 (국내 가로형 4구 신호등)
-│   └── Scenario / ScenarioPlayer  교차로 접근 시나리오 (차속 적분 → 거리 → 신호등 크기·위치)
-├── demo/   PC 데모: 시나리오 실행 로그 + 검출 정확도 평가 + 합성 프레임 PNG 저장
-└── app/    Android Automotive 앱 (Pleos Connect 대상)
-    ├── vehicle/   CarPropertyVehicleDataSource (표준 Car API), PleosVehicleDataSource (Pleos SDK 자리), 시나리오
-    ├── camera/    FrameSource: 합성 시나리오 / 가상 신호 주기 / assets 테스트 이미지
-    ├── alert/     TonePlayer (신호별 고유 소리), AlertNotifier (TTS + 헤드업 알림)
-    └── ui/        SignalPanelView (위치 + 모양 + 문구 + 색각이상 친화 팔레트)
+앱 목록에서 **모두의 운전석**을 실행합니다. 처음 실행 시 차속·알림 권한을 허용합니다.
+
+### 소스 빌드
+```bash
+./gradlew :core:test           # 단위·시나리오 테스트 (34개, Android SDK 불필요)
+./gradlew :demo:run            # PC 데모: 시나리오별 알림 로그 + 신호 검출 정확도 + 합성 프레임 PNG
+./gradlew :app:assembleRelease # APK (ANDROID_HOME 또는 local.properties 필요)
 ```
 
-## 카메라가 없는 문제 → 합성 영상으로 대체
+### 시연 순서 (에뮬레이터)
+1. 화면 아래 **모드**에서 `시뮬레이션: …` 시나리오 5종 중 하나를 고릅니다. 시나리오에 맞는 운전자 특성이 자동으로 선택됩니다.
+2. **운전자 특성** 체크박스(색각이상·청각장애·저시력·주의력·고령)를 바꿔 같은 상황에서 알림 방식이 달라지는 것을 확인합니다.
+3. `실차: 차량 경고·내비 (카메라 없이)` 모드에서는 Pleos 에뮬레이터 Virtual Console로 도어·방향지시등·좌석·조명을 바꿔 봅니다.
+   에뮬레이터는 차속을 시뮬레이션하지 못하므로, 차속이 들어오지 않으면 **시연용 차속** 막대가 나타납니다.
 
-Pleos Playground 공개 API에는 카메라가 없으므로 영상 입력을 `FrameSource` 인터페이스로 분리했습니다.
+## 테스트 환경 · 필요 설정
 
-| 모드 (앱에서 선택) | 영상 | 차량 데이터 |
+| 항목 | 내용 |
+|---|---|
+| 대상 | Pleos Connect (AAOS 기반), Android Automotive 에뮬레이터 API 34 |
+| 빌드 | minSdk 28 / targetSdk 34, Gradle 8.14, AGP 8.7, Kotlin 2.0, JDK 17+ |
+| 권한 | `android.car.permission.CAR_SPEED`(런타임), `CAR_POWERTRAIN`, `pleos.car.permission.CAR_SAFETY·SEATS·DOORS·LIGHTS·DRIVE`, 알림 |
+| Pleos 에뮬레이터 | Virtual Console: `adb forward tcp:8088 tcp:8088` 후 `http://127.0.0.1:8088/` |
+| 카메라 | 불필요 (Pleos 공개 API에 카메라 없음 → 합성 영상으로 대체, 아래 참고) |
+
+## APK 위치
+`apk/팀명_모두의운전석_release.apk`
+
+---
+
+## 무엇을 해결하나
+
+| 운전자 | 차량이 주는 정보의 문제 | 이 앱이 바꿔 주는 방식 |
 |---|---|---|
-| 시뮬레이션 (3종) | 시나리오대로 합성 | 시나리오의 차속 (영상과 동기화) |
-| 실차 데이터 + 가상 신호 주기 | 적 10s → 녹 8s → 황 3s 반복 합성 | Car API / Pleos SDK |
-| 실차 데이터 + 테스트 이미지 | `app/src/main/assets/test_frames/*.png,jpg` 순환 | Car API / Pleos SDK |
+| **색각이상** | 신호등 적·녹·황을 색으로만 구분 | 신호 변화를 **음높이 패턴 + 음성 + 모양 기호(■▲●←)** 로. 좌회전 화살표가 **내 경로**에 해당하는지도 내비와 맞춰 알려줌 |
+| **청각장애** | 벨트 경고음, 방향지시등 똑딱 소리, 내비 음성 안내 | **화면 전체 깜빡임 + 큰 글씨 + 헤드업 알림**. "300m 앞 좌회전" 카드, 방향지시등 끄는 것을 잊으면 알림 |
+| **저시력** | 계기판 경고등·아이콘이 작음 | 타이어 저압·전조등 미점등·벨트 등을 **음성**으로 읽어주고 글씨 1.4배 |
+| **주의력·고령** | 깜빡한 방향지시등, 초록불 늦은 출발, 뒷좌석 아이 방치 | **한 번 더 상기**. 위험 상황(적색 고속 접근)만 강하게, 나머지는 조용히 |
 
-나중에 카메라 접근이 열리거나 외장 카메라를 쓰게 되면, CameraX `ImageAnalysis` 결과를 `Frame`으로 바꾸는
-`FrameSource` 구현만 추가하면 됩니다(`Bitmap.toFrame()` 유틸 있음). 나머지 코드는 바꿀 필요가 없습니다.
-
-합성 장면에는 오검출을 시험하기 위한 방해 요소(앞차 브레이크등, LED 가로등, 가로수, 야간 창문 불빛)와
-센서 노이즈, 노출 변화, 주행 중 흔들림이 들어 있습니다.
-
-## 알림 설계
+### 알림 규칙 (요약)
 
 | 상황 | 알림 | 소리 패턴 |
 |---|---|---|
 | 정차 중 적/황 → 녹 | "초록불로 바뀌었습니다." | 도→솔 (올라감) |
 | 녹색인데 3초 넘게 출발 안 함 | "초록불입니다. 주변을 확인하고 출발하세요." (1회) | 도→솔 |
-| 주행 중 황색 | "황색 신호입니다. 정지를 준비하세요." | 한 번 길게 |
-| 주행 중 적색 | "적색 신호입니다. 정지하세요." | 높음→낮음 3번 (내려감) |
-| 적색인데 25km/h 이상, 감속 안 함 | "적색 신호! 즉시 감속하세요." (3초마다 반복) | 빠른 연속음 |
-| 정차 중 좌회전 화살표 점등 | "좌회전 신호가 켜졌습니다." | 짧은 차임 |
+| 주행 중 황색 / 적색 | "황색 신호입니다…" / "적색 신호입니다. 정지하세요." | 한 번 길게 / 높음→낮음 3번 |
+| 적색인데 25km/h 이상, 감속 안 함 | "적색 신호! 즉시 감속하세요." (3초마다, 제동하면 멈춤) | 빠른 연속음 |
+| 좌회전 화살표 점등 | 내비 경로가 좌회전이면 "안내 경로도 좌회전입니다", 직진이면 "직진은 기다리세요" | 차임 |
+| 주행 중 벨트 미착용 / 문 열림 | "안전벨트를 매 주세요." / "문이 열려 있습니다!" | 같은 음 두 번 / 연속음 |
+| 방향지시등 20초 이상 켜짐 (30km/h↑, 안내 지점 근처 아님) | "방향지시등이 계속 켜져 있습니다." | 같은 음 두 번 |
+| 어두운데 전조등 꺼짐 / 타이어 저압 | 1회 안내 | 같은 음 두 번 |
+| 주차(P) 또는 문 열림 + 이번 주행에 뒷좌석 탑승 | "내리기 전에 뒷좌석을 확인하세요." | 한 번 길게 |
+| 내비 안내 지점 300m·100m 전 | "300m 앞 좌회전 (강남대로)" 큰 카드 | 차임 |
 | 정차 중 적색 / P·R 기어 | 알리지 않음 (화면 표시만) | — |
 
-- 감속도(km/h/s)를 계산해, 운전자가 이미 제동 중이면 반복 경고를 멈춥니다.
-- 같은 알림은 2.5초 안에 다시 나오지 않습니다.
-- 화면: 실제 신호등과 같은 순서로 켜진 칸을 강조하고, **정지=팔각형, 주의=삼각형, 진행=원, 좌회전=화살표** 모양과
-  "정지/주의/진행" 문구를 크게 표시합니다. 색은 Okabe-Ito 팔레트(주홍·노랑·청록)를 씁니다.
+**프로필별 출력**: 청각장애만 고르면 소리·음성 없이 화면 깜빡임 + 헤드업 알림, 저시력·주의력은 큰 글씨, 경고(WARNING) 이상은 모두에게 화면 깜빡임.
 
-## 실행
+## 구조
 
-```bash
-# 1) 코어 단위 테스트 + 시나리오 E2E 테스트 (Android SDK 불필요)
-./gradlew :core:test
-
-# 2) PC 데모: 시나리오별 알림 로그, 무작위 합성 장면 600장 검출 정확도, 프레임 PNG 저장
-./gradlew :demo:run
-./gradlew :demo:run --args="app/src/main/assets/test_frames"   # 앱의 테스트 이미지 모드용으로 저장
-
-# 3) 앱 빌드 (ANDROID_HOME 또는 local.properties 가 있으면 :app 모듈이 포함됨)
-./gradlew :app:assembleDebug
-adb install app/build/outputs/apk/debug/app-debug.apk
+```
+core/   순수 Kotlin — PC에서 빌드·테스트
+  TrafficLightDetector      프레임 → 켜진 등화 (HSV 색 분할 + 연결 요소 + 함체/위치 점수)
+  SignalStateTracker        프레임 다수결로 깜빡임·오검출 억제
+  SignalAlertPolicy         신호 + 차속 + 내비 경로 → 신호 알림
+  VehicleAlertPolicy        실내 상태(벨트·문·타이어·방향지시등·전조등·뒷좌석) → 차량 알림
+  NavigationAlertPolicy     내비 안내 지점 → 300m/100m 카드
+  DriverProfile             운전자 특성 → 켤 기능 + 감각별 출력(OutputPlan)
+  DrivingAssistEngine       위를 합친 엔진
+  SyntheticSceneGenerator   카메라 대체용 합성 장면 (국내 가로형 4구 신호등 + 방해 요소)
+  Scenario / ScenarioPlayer 시나리오 5종 (차속·실내·경로·신호를 시간축으로 재생)
+demo/   PC 데모
+app/    Pleos Connect 앱
+  AssistService             포그라운드 서비스 — 화면과 무관하게 알림 (주행 중 UX 제약 대응)
+  MainActivity              설정(주차 중) + 큰 상태 표시(주행 중, CarUxRestrictions 준수)
+  vehicle/                  차속·기어(AAOS 표준), 실내 상태(Pleos Vehicle State ↔ AAOS 대체), 시나리오
+  nav/                      Pleos NaviHelper 어댑터
+  camera/                   영상: 합성 시나리오 / 가상 신호 주기 / assets 테스트 이미지
+  alert/                    TonePlayer(패턴별 합성음), AlertNotifier(TTS + 헤드업 알림)
+tools/make_submission.sh    블라인드 심사용 익명 제출 저장소 생성
+docs/기획서_초안.md          공모전 기획서 초안
 ```
 
-AAOS 에뮬레이터(또는 Pleos Playground 에뮬레이터)에서 **Extended controls → Car data**로 차속·기어를 바꾸면
-"실차 데이터" 모드의 알림 정책을 직접 시험할 수 있습니다.
+## Pleos SDK 사용
 
-### 현재 결과 (합성 데이터 기준)
+| 기능 | Pleos API | 코드 위치 | 상태 |
+|---|---|---|---|
+| 벨트·문·타이어·방향지시등·전조등·뒷좌석 | Vehicle State: `getCurrentSeatBeltBuckledState`, `hasSeatBeltNotBuckledWarning`, `getCurrentDoorPosition`, `getLowTirePressure`, `getCurrentTurnSignalState`, `getCurrentLowBeamLightState`, `getCurrentSeatOccupancy` | `vehicle/PleosCabinDataSource.kt` | 매핑·규칙 구현 완료, SDK 호출 연결 예정 (지금은 AAOS 표준 프로퍼티로 대체) |
+| 브레이크 반응 판단 | Vehicle State: `getCurrentBrakePedalStatus` | `VehicleState.brakePedal` | 연결 예정 |
+| 내비 경로 / 안내 지점 | NaviHelper: `getRouteStateInfo`, `getTBTInfo`, `getCurrentLocationInfo` | `nav/NaviHelperNavigationSource.kt` | 규칙 구현 완료, SDK 호출 연결 예정 |
+| 차속·기어 | (Vehicle State에 없음) AAOS `PERF_VEHICLE_SPEED`, `GEAR_SELECTION` | `vehicle/CarPropertyVehicleDataSource.kt` | 구현 완료. 기어를 못 읽으면 차속만으로 판단 |
+| 음성 | (Pleos TTS SDK 준비 중) Android `TextToSpeech` | `alert/AlertNotifier.kt` | 구현 완료 |
+| 주행 중 화면 제약 | AAOS `CarUxRestrictionsManager` | `MainActivity.kt` | 구현 완료 |
 
-- 단위·E2E 테스트 18개 통과
-- 무작위 합성 장면 600장: 정확도 99.7%, **다른 색으로 잘못 인식 0건**(놓친 2건은 '인식 안 됨'), 좌회전 화살표 76/77
-- 시나리오 `stop_and_go`: 황색 주의 → 적색 정지 → 녹색 전환 0.2초 후 안내 → 3초 뒤 출발 리마인드
-- 시나리오 `red_light_risk`: 적색 전환 0.2초 후 긴급 경고, 제동 전까지 3초 간격 반복
+## 카메라가 없는 문제
 
-합성 데이터는 실제 도로보다 쉽습니다. 실제 영상에서는 정확도가 이보다 낮을 것으로 봐야 합니다.
+Pleos 공개 API에는 카메라가 없어서, 신호 인식은 영상 입력을 `FrameSource` 인터페이스로 분리하고 **합성 영상**으로 검증했습니다.
+카메라 접근이 열리면 CameraX 결과를 `Frame`으로 바꾸는 구현만 추가하면 되고(`Bitmap.toFrame()` 있음), 나머지는 그대로입니다.
+차량 경고·내비 카드 기능(청각·저시력·주의력)은 카메라 없이 **지금 SDK만으로 동작**합니다.
 
-## Pleos Playground 연동 메모
+합성 데이터 결과: 무작위 장면 600장에서 정확도 99.7%, **다른 색으로 오인 0건**, 좌회전 화살표 76/77.
+실제 도로 영상은 합성보다 어려우므로 이 수치는 상한으로 봐야 합니다.
 
-- Pleos Connect는 AAOS 기반이고 Vehicle SDK가 Android API 호환을 유지한다고 소개되어 있어,
-  차량 데이터는 표준 `CarPropertyManager`(`PERF_VEHICLE_SPEED`, `GEAR_SELECTION`)로 먼저 구현했습니다.
-- `app/.../vehicle/PleosVehicleDataSource.kt`는 Pleos Vehicle SDK를 연결할 자리입니다. 지금은 Car API에 위임합니다.
-  SDK 문서를 받으면 이 파일만 고치면 되고, 브레이크 페달 신호가 있으면 `VehicleState.brakePedal`에 넣어 주세요.
-- 클러스터/HUD 표시나 시트·스티어링 햅틱 API가 있으면 `alert/AlertNotifier.kt`에 출력 채널로 추가하면 좋습니다.
+## 오픈소스 라이선스
 
-## 다음 단계
+| 라이브러리 | 라이선스 |
+|---|---|
+| AndroidX (core-ktx, appcompat, lifecycle) | Apache License 2.0 |
+| Kotlin 표준 라이브러리, kotlinx.coroutines | Apache License 2.0 |
+| Android Car API (`android.car`, 플랫폼 제공) | Apache License 2.0 |
 
-1. **실제 영상 검증**: 블랙박스 영상에서 프레임을 뽑아 `test_frames`에 넣고, 역광·비·LED 깜빡임(플리커) 조건 확인
-2. **ML 검출기**: 색 기반 검출기를 경량 객체 검출 모델(TFLite 등)로 교체. `TrafficLightDetector.detect()` 입출력만 맞추면 됨
-3. **내 차로의 신호 선택**: 교차로에 신호등이 여러 개일 때 차로·지도 정보로 해당 신호만 고르기
-4. **사용자 연구**: 적록색맹 운전자 대상으로 알림 빈도와 소리 패턴이 실제로 구분되는지 검증
+색상 팔레트: Okabe & Ito, *Color Universal Design* (색각이상 친화 팔레트).

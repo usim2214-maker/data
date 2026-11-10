@@ -7,6 +7,8 @@ data class EngineOutput(
     val change: StateChange?,
     val vehicle: VehicleState,
     val alerts: List<Alert>,
+    /** 신호등까지 추정 거리(m). 모르면 null */
+    val distanceM: Float? = null,
 )
 
 /** 신호 인식 파이프라인: 검출 -> 상태 안정화 -> 신호 알림 정책 */
@@ -14,6 +16,7 @@ class SignalAssistEngine(
     private val detector: TrafficLightDetector = TrafficLightDetector(),
     private val tracker: SignalStateTracker = SignalStateTracker(),
     private val policy: SignalAlertPolicy = SignalAlertPolicy(),
+    private val distance: DistanceEstimator = DistanceEstimator(),
 ) {
     fun process(
         frame: Frame,
@@ -23,13 +26,15 @@ class SignalAssistEngine(
     ): EngineOutput {
         val detection = detector.detect(frame)
         val change = tracker.update(detection)
-        val alerts = policy.evaluate(tracker.state, change, vehicle, timestampMs, navigation)
-        return EngineOutput(timestampMs, detection, tracker.state, change, vehicle, alerts)
+        val d = distance.update(detection, frame.width, tracker.state.color)
+        val alerts = policy.evaluate(tracker.state, change, vehicle, timestampMs, navigation, d)
+        return EngineOutput(timestampMs, detection, tracker.state, change, vehicle, alerts, d)
     }
 
     fun reset() {
         tracker.reset()
         policy.reset()
+        distance.reset()
     }
 }
 

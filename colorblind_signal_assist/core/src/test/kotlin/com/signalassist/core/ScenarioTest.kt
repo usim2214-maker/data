@@ -26,11 +26,15 @@ class ScenarioTest {
     }
 
     @Test
-    fun `red light risk triggers urgent warning before braking`() {
+    fun `red light risk - stop warning first, urgent once braking becomes necessary`() {
         val alerts = run(Scenario.RED_LIGHT_RISK)
+        // 적색 전환 시점(74m 앞)에는 보통 제동으로 설 수 있으므로 일반 정지 안내
+        val stop = alerts.first { it.type == AlertType.RED_STOP }
+        assertTrue(stop.timestampMs in 3_500..4_200, "stop at ${stop.timestampMs}")
+        // 운전자가 반응하지 않고 계속 접근하면, 제동을 시작(7.5s)하기 전에 긴급 경고
         val urgent = alerts.filter { it.type == AlertType.RED_URGENT }
         assertTrue(urgent.isNotEmpty(), "${alerts.types()}")
-        assertTrue(urgent.first().timestampMs < 5_000, "first urgent at ${urgent.first().timestampMs}")
+        assertTrue(urgent.first().timestampMs in 5_000..7_000, "first urgent at ${urgent.first().timestampMs}")
         assertTrue(alerts.none { it.type == AlertType.GREEN_GO })
     }
 

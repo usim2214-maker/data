@@ -3,8 +3,15 @@ package com.signalassist.core
 data class AlertPolicyConfig(
     /** 이 속도 미만이면 정차로 본다 */
     val stoppedSpeedKmh: Float = 3f,
-    /** 적색인데 이 속도 이상이면 긴급 경고 */
+    /** 거리를 모를 때: 적색인데 이 속도 이상이면 긴급 경고 */
     val urgentSpeedKmh: Float = 25f,
+    /**
+     * 거리를 알 때: 정지선에 서려면 필요한 감속도(m/s²)가 이 값 이상이면 긴급 경고.
+     * 일반적인 편안한 제동이 약 2~3 m/s² 이므로, 이 이상이 필요하면 '지금 밟아야 하는' 상황이다.
+     */
+    val urgentDecelMps2: Float = 2.5f,
+    /** 국내 신호등은 대부분 교차로 건너편에 있어, 정지선은 신호등보다 이만큼 앞에 있다고 본다 */
+    val stopLineOffsetM: Float = 12f,
     /** 이 이상 감속 중이면(km/h/s) 운전자가 이미 반응한 것으로 보고 반복 경고를 멈춤 */
     val brakingDecelKmhPerS: Float = 6f,
     /** 초록불로 바뀐 뒤 이 시간 동안 출발하지 않으면 한 번 더 알려줌 */
@@ -41,6 +48,8 @@ class SignalAlertPolicy(private val config: AlertPolicyConfig = AlertPolicyConfi
         vehicle: VehicleState,
         nowMs: Long,
         navigation: NavigationState? = null,
+        /** 신호등까지 추정 거리 (등화 크기 기반). null 이면 차속만으로 판단 */
+        distanceToLightM: Float? = null,
     ): List<Alert> {
         updateDecel(vehicle, nowMs)
         // 기어를 읽을 수 있을 때만 P/R 에서 끈다. (Pleos Vehicle State 에는 기어가 없어 UNKNOWN 일 수 있음)
@@ -52,6 +61,13 @@ class SignalAlertPolicy(private val config: AlertPolicyConfig = AlertPolicyConfi
         val out = ArrayList<Alert>(2)
         val stopped = vehicle.speedKmh < config.stoppedSpeedKmh
         val braking = decelKmhPerS >= config.brakingDecelKmhPerS || vehicle.brakePedal == true
+        val required = requiredDecelMps2(vehicle.speedKmh, distanceToLightM)
+        // 적색에서 '지금 강하게 제동해야 하는가': 거리를 알면 필요한 감속도로, 모르면 차속으로
+        val redUrgent = !braking && !stopped && if (required != null) {
+            required >= config.urgentDecelMps2
+        } else {
+            vehicle.speedKmh >= config.urgentSpeedKmh
+        }
 
         if (change != null && change.from.color != change.to.color) {
             when (change.to.color) {
@@ -63,7 +79,7 @@ class SignalAlertPolicy(private val config: AlertPolicyConfig = AlertPolicyConfi
                 }
                 SignalColor.YELLOW -> if (!stopped) fire(AlertType.YELLOW_CAUTION, nowMs, out)
                 SignalColor.RED -> when {
-                    vehicle.speedKmh >= config.urgentSpeedKmh && !braking -> fire(AlertType.RED_URGENT, nowMs, out)
+                    redUrgent -> fire(AlertType.RED_URGENT, nowMs, out)
                     !stopped -> fire(AlertType.RED_STOP, nowMs, out)
                 }
                 SignalColor.UNKNOWN -> Unit
@@ -82,8 +98,8 @@ class SignalAlertPolicy(private val config: AlertPolicyConfig = AlertPolicyConfi
             fire(type, nowMs, out)
         }
 
-        // 적색인데 빠른 속도로 계속 접근 중 -> 반복 긴급 경고
-        if (state.color == SignalColor.RED && vehicle.speedKmh >= config.urgentSpeedKmh && !braking) {
+        // 적색인데 제동 없이 계속 접근 중 -> 반복 긴급 경고
+        if (state.color == SignalColor.RED && redUrgent) {
             fire(AlertType.RED_URGENT, nowMs, out)
         }
 
@@ -98,6 +114,14 @@ class SignalAlertPolicy(private val config: AlertPolicyConfig = AlertPolicyConfi
         if (!stopped) greenReminded = true
 
         return out
+    }
+
+    /** 정지선에 서기 위해 필요한 감속도 v²/(2d). 거리를 모르면 null */
+    private fun requiredDecelMps2(speedKmh: Float, distanceToLightM: Float?): Float? {
+        val d = distanceToLightM ?: return null
+        val stopDist = (d - config.stopLineOffsetM).coerceAtLeast(1f)
+        val v = speedKmh / 3.6f
+        return v * v / (2f * stopDist)
     }
 
     /** 다음 안내 지점이 가까우면 그 회전 방향, 아니면 직진으로 본다. 경로 안내 중이 아니면 null */

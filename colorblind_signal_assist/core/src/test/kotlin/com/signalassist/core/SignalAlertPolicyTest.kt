@@ -82,4 +82,18 @@ class SignalAlertPolicyTest {
         assertEquals(AlertType.LEFT_ARROW_NOT_FOR_ROUTE, typeFor(NavigationState(true, Maneuver.RIGHT, 40f)))
         assertEquals(AlertType.LEFT_ARROW_ON, typeFor(null))
     }
+
+    @Test
+    fun `distance-aware - far red at speed is a normal stop warning, close red is urgent`() {
+        val change = StateChange(st(SignalColor.YELLOW), st(SignalColor.RED))
+        // 45km/h, 신호등 90m (정지선 78m): 필요한 감속 1.0 m/s² -> 일반 정지 안내
+        val far = SignalAlertPolicy().evaluate(st(SignalColor.RED), change, v(45f), 0, null, 90f)
+        assertEquals(listOf(AlertType.RED_STOP), far.map { it.type })
+        // 45km/h, 신호등 40m (정지선 28m): 필요한 감속 2.8 m/s² -> 긴급
+        val near = SignalAlertPolicy().evaluate(st(SignalColor.RED), change, v(45f), 0, null, 40f)
+        assertEquals(listOf(AlertType.RED_URGENT), near.map { it.type })
+        // 20km/h 인데 15m 앞 (정지선 3m): 저속이어도 필요한 감속 5.1 m/s² -> 긴급
+        val slowButClose = SignalAlertPolicy().evaluate(st(SignalColor.RED), change, v(20f), 0, null, 15f)
+        assertEquals(listOf(AlertType.RED_URGENT), slowButClose.map { it.type })
+    }
 }

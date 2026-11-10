@@ -17,13 +17,17 @@ data class AlertPolicyConfig(
     /** 국내 신호등은 대부분 교차로 건너편에 있어, 정지선은 신호등보다 이만큼 앞에 있다고 본다 */
     val stopLineOffsetM: Float = 12f,
     /** 이 이상 감속 중이면(km/h/s) 운전자가 이미 반응한 것으로 보고 반복 경고를 멈춤 */
-    val brakingDecelKmhPerS: Float = 6f,
+    val brakingDecelKmhPerS: Float = 4f,
     /** 초록불로 바뀐 뒤 이 시간 동안 출발하지 않으면 한 번 더 알려줌 */
     val greenReminderDelayMs: Long = 3_000,
     /** 긴급 경고 반복 간격 */
     val urgentRepeatMs: Long = 3_000,
     /** 같은 종류 알림 최소 간격 (신호 깜빡임에 의한 중복 방지) */
     val sameAlertCooldownMs: Long = 2_500,
+    /** 정차 중 신호를 이 시간 이상 못 보면 '직접 확인' 안내 */
+    val signalLostAfterMs: Long = 2_000,
+    /** 최근 이 시간 안에 신호를 봤을 때만 (교차로 접근 중이었을 때만) 안내 */
+    val signalRecentlySeenMs: Long = 20_000,
     /** 내비 다음 안내 지점이 이 거리 안이면 '이번 교차로의 경로'로 본다 */
     val routeLookaheadM: Float = 250f,
 )
@@ -40,10 +44,14 @@ class SignalAlertPolicy(private val config: AlertPolicyConfig = AlertPolicyConfi
     private var prevSpeed: Float? = null
     private var prevTimeMs: Long? = null
     private var decelKmhPerS = 0f
+    private var lastKnownMs: Long? = null
+    private var unknownSinceMs: Long? = null
+    private var lostAnnounced = false
 
     fun reset() {
         cooldowns.clear(); greenSinceMs = null; greenReminded = false
         prevSpeed = null; prevTimeMs = null; decelKmhPerS = 0f
+        lastKnownMs = null; unknownSinceMs = null; lostAnnounced = false
     }
 
     fun evaluate(
@@ -111,6 +119,20 @@ class SignalAlertPolicy(private val config: AlertPolicyConfig = AlertPolicyConfi
         if (state.color == SignalColor.RED && redUrgent) {
             fire(AlertType.RED_URGENT, nowMs, out)
         }
+
+        // 정차했는데 접근할 때 보이던 신호등이 사라짐 (정지선 바로 앞이라 화각을 벗어남 등) -> 직접 확인 안내
+        if (state.color != SignalColor.UNKNOWN) {
+            lastKnownMs = nowMs; unknownSinceMs = null
+        } else if (unknownSinceMs == null) {
+            unknownSinceMs = nowMs
+        }
+        val lostFor = unknownSinceMs?.let { nowMs - it } ?: 0L
+        val seenRecently = lastKnownMs?.let { nowMs - it <= config.signalRecentlySeenMs } ?: false
+        if (stopped && !lostAnnounced && seenRecently && lostFor >= config.signalLostAfterMs) {
+            lostAnnounced = true
+            fire(AlertType.SIGNAL_LOST, nowMs, out)
+        }
+        if (vehicle.speedKmh >= 10f) lostAnnounced = false
 
         // 초록불인데 출발하지 않음 -> 한 번만 리마인드
         val since = greenSinceMs

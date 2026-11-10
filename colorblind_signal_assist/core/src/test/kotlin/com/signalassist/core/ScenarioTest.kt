@@ -79,4 +79,22 @@ class ScenarioTest {
         assertTrue(AlertType.YELLOW_CAUTION !in types, "$types")
         assertTrue(alerts.none { it.type == AlertType.RED_STOP || it.type == AlertType.RED_URGENT }, "$types")
     }
+
+    @Test
+    fun `signal leaving the camera view is announced instead of silence`() {
+        val alerts = run(Scenario.SIGNAL_OUT_OF_VIEW)
+        val lost = alerts.filter { it.type == AlertType.SIGNAL_LOST }
+        assertEquals(1, lost.size, "${alerts.types()}")
+        assertTrue(lost.single().timestampMs in 7_000..11_000, "lost at ${lost.single().timestampMs}")
+        assertTrue(alerts.none { it.type == AlertType.GREEN_GO }, "초록불을 보지 못했으므로 진행 안내가 없어야 함")
+        // 운전자가 이미 꾸준히 감속 중이었으므로 긴급 경고는 없어야 함 (거짓 경보는 경고를 무시하게 만든다)
+        assertTrue(alerts.none { it.type == AlertType.RED_URGENT }, "${alerts.types()}")
+    }
+
+    @Test
+    fun `normal stops do not trigger signal-lost`() {
+        for (s in listOf(Scenario.STOP_AND_GO, Scenario.NIGHT_LEFT_TURN)) {
+            assertTrue(run(s).none { it.type == AlertType.SIGNAL_LOST }, s.name)
+        }
+    }
 }

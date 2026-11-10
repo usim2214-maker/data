@@ -41,6 +41,8 @@ enum class AlertType(
     /** 정지선이 너무 가까워 편안하게 설 수 없을 때: 급정거(추돌 위험)를 유도하지 않는다 */
     YELLOW_DILEMMA(AlertCategory.SIGNAL, AlertLevel.CAUTION, TonePattern.SINGLE_LONG, "황색 신호입니다. 급정거하지 말고 주의해서 진행하세요.", "▲"),
     RED_STOP(AlertCategory.SIGNAL, AlertLevel.WARNING, TonePattern.FALLING_TRIPLE, "적색 신호입니다. 정지하세요.", "■"),
+    /** 인식 실패를 숨기지 않는다: 침묵을 '여전히 빨간불'로 오해하지 않게 */
+    SIGNAL_LOST(AlertCategory.SIGNAL, AlertLevel.CAUTION, TonePattern.SOFT_CHIME, "신호등이 보이지 않습니다. 신호를 직접 확인하세요.", "?"),
     RED_URGENT(AlertCategory.SIGNAL, AlertLevel.URGENT, TonePattern.RAPID_BEEPS, "적색 신호! 즉시 감속하세요.", "■"),
 
     // ---- 차량 상태 (청각: 경고음을 화면으로 / 저시력: 경고등을 음성으로 / 주의력) ----

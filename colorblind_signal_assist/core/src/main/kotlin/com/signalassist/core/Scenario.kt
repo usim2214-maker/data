@@ -120,6 +120,18 @@ data class Scenario(
             startDistanceM = 70f,
         )
 
+        /** 정지선 바로 앞에 서서 신호등이 카메라 화각을 벗어남 -> 침묵하지 않고 '직접 확인' 안내 */
+        val SIGNAL_OUT_OF_VIEW = Scenario(
+            name = "signal_out_of_view",
+            titleKo = "색각이상 · 신호등이 화면 밖으로",
+            description = "적색에 정지선 바로 앞까지 붙어 정차 → 신호등이 화각을 벗어남 → '직접 확인하세요' 안내",
+            targetNeeds = CV,
+            durationMs = 16_000,
+            phases = listOf(SignalPhase(0, s(SignalColor.RED)), SignalPhase(12_000, s(SignalColor.GREEN))),
+            speeds = listOf(SpeedKey(0, 30f), SpeedKey(2_000, 30f), SpeedKey(7_000, 0f), SpeedKey(16_000, 0f)),
+            startDistanceM = 45f,
+        )
+
         /** 야간, 적색 + 좌회전 화살표 동시 신호. 내비 경로는 좌회전 */
         val NIGHT_LEFT_TURN = Scenario(
             name = "night_left_turn",
@@ -182,7 +194,7 @@ data class Scenario(
             gears = listOf(GearKey(0, Gear.DRIVE), GearKey(15_000, Gear.PARK)),
         )
 
-        val ALL = listOf(STOP_AND_GO, RED_LIGHT_RISK, YELLOW_DILEMMA, NIGHT_LEFT_TURN, HEARING_DRIVE, NIGHT_ARRIVAL)
+        val ALL = listOf(STOP_AND_GO, RED_LIGHT_RISK, YELLOW_DILEMMA, SIGNAL_OUT_OF_VIEW, NIGHT_LEFT_TURN, HEARING_DRIVE, NIGHT_ARRIVAL)
     }
 }
 

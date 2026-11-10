@@ -116,4 +116,15 @@ class SignalAlertPolicyTest {
         val a = SignalAlertPolicy().evaluate(st(SignalColor.RED), change, v(45f), 0, null, 8f)
         assertTrue(a.isEmpty(), "$a")
     }
+
+    @Test
+    fun `signal lost only after a recently seen signal, once per stop`() {
+        val p = SignalAlertPolicy()
+        p.evaluate(st(SignalColor.RED), null, v(10f), 0)
+        val a = (1..40).flatMap { p.evaluate(SignalState.UNKNOWN, null, v(0f), it * 100L) }
+        assertEquals(listOf(AlertType.SIGNAL_LOST), a.map { it.type })
+        // 신호를 본 적 없는 정차 (정체 등)에는 안내하지 않음
+        val q = SignalAlertPolicy()
+        assertTrue((0..40).flatMap { q.evaluate(SignalState.UNKNOWN, null, v(0f), it * 100L) }.isEmpty())
+    }
 }

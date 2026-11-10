@@ -31,6 +31,7 @@ import com.signalassist.core.Alert
 import com.signalassist.core.AlertGuide
 import com.signalassist.core.AlertHistory
 import com.signalassist.core.Scenario
+import com.signalassist.core.TripRecorder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -52,11 +53,14 @@ class AssistService : Service() {
     private var activeToken = -1
     private var micWanted = false
     private val history = AlertHistory()
+    private val trips = TripRecorder()
+    private lateinit var settings: Settings
     private var sourceDescription = ""
 
     override fun onCreate() {
         super.onCreate()
         notifier = AlertNotifier(this)
+        settings = Settings(this)
         controller = AssistController(scope, ::onOutput)
         startAsForeground()
         scope.launch {
@@ -133,6 +137,11 @@ class AssistService : Service() {
         scope.launch {
             // 중재(AlertArbiter)를 거친 전달 목록: 같은 순간엔 가장 중요한 알림만 소리·음성·깜빡임
             history.record(out.deliveries)
+            trips.update(out)?.let { summary ->
+                val text = summary.summaryKo()
+                settings.addTrip(text)
+                AssistBus.tripSummary.value = text
+            }
             for ((alert, plan) in out.deliveries) {
                 notifier.notify(alert, plan)
                 AssistBus.alerts.tryEmit(alert to plan)

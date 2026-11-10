@@ -67,6 +67,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var flash: TextView
     private lateinit var speedRow: LinearLayout
     private lateinit var lessonRow: LinearLayout
+    private lateinit var tripView: TextView
+    private lateinit var tripRow: LinearLayout
     private var restartToken = 0
     private var drivingRestricted = false
     private var car: Car? = null
@@ -86,6 +88,7 @@ class MainActivity : AppCompatActivity() {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { AssistBus.snapshot.collect { it?.let(::render) } }
                 launch { AssistBus.alerts.collect { (alert, plan) -> showAlert(alert, plan) } }
+                launch { AssistBus.tripSummary.collect { it?.let(::showTrip) } }
             }
         }
     }
@@ -170,6 +173,21 @@ class MainActivity : AppCompatActivity() {
             })
             start()
         }
+    }
+
+    /** 주행이 끝나면(주차) 요약 표시 + 가족에게 공유 */
+    private fun showTrip(text: String) {
+        tripView.text = "지난 주행\n$text"
+        tripRow.visibility = if (drivingRestricted) View.GONE else View.VISIBLE
+    }
+
+    private fun shareTrip() {
+        val text = settings.trips.firstOrNull() ?: return
+        val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(android.content.Intent.EXTRA_TEXT, "[모두의 운전석] 주행 요약\n$text")
+        }
+        runCatching { startActivity(android.content.Intent.createChooser(send, "주행 요약 공유")) }
     }
 
     private fun describeCabin(c: CabinState): String {
@@ -267,6 +285,20 @@ class MainActivity : AppCompatActivity() {
         controls.addView(buildProfileRow())
         speedRow = buildSpeedRow()
         controls.addView(speedRow)
+        tripView = label(20f, Color.WHITE)
+        tripRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            visibility = View.GONE
+            addView(tripView, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            addView(Button(this@MainActivity).apply {
+                text = "가족에게 공유"
+                contentDescription = "지난 주행 요약을 가족에게 공유"
+                setOnClickListener { shareTrip() }
+            })
+        }
+        controls.addView(tripRow)
+        settings.trips.firstOrNull()?.let { tripView.text = "지난 주행\n$it"; tripRow.visibility = View.VISIBLE }
         lessonRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         controls.addView(HorizontalScrollView(this).apply { addView(lessonRow) })
         content.addView(controls)

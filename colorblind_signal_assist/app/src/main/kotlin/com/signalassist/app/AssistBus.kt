@@ -54,6 +54,8 @@ object AssistBus {
     val snapshot = MutableStateFlow<UiSnapshot?>(null)
     val alerts = MutableSharedFlow<Pair<Alert, OutputPlan>>(extraBufferCapacity = 16)
     val requests = MutableSharedFlow<UserRequest>(extraBufferCapacity = 8)
+    /** 방금 끝난 주행 요약 */
+    val tripSummary = MutableStateFlow<String?>(null)
 
     /** Pleos 에뮬레이터는 차속을 시뮬레이션하지 못하므로 시연용 차속 (null 이면 실제 값) */
     @Volatile var speedOverrideKmh: Float? = null

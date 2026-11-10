@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Android Automotive 전용 앱 -->
+    <uses-feature android:name="android.hardware.type.automotive" android:required="true" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+    <!-- Pleos Vehicle SDK: SteeringWheel 조향각 (protection level: normal) -->
+    <uses-permission android:name="pleos.car.permission.CAR_DRIVE" />
+    <!-- Pleos TextToSpeech: 음성 안내 (SDK의 @RequiresPermission, Lint로 확인) -->
+    <uses-permission android:name="pleos.car.permission.TTS_SERVICE" />
+    <!-- Pleos FusedLocation: 지자체 공유용 대략적 위치 -->
+    <uses-permission android:name="pleos.car.permission.FUSED_LOCATION" />
+    <!-- AAOS Car API: 기어(R단), 차속(이동 거리 계산) -->
+    <uses-permission android:name="android.car.permission.CAR_POWERTRAIN" />
+    <uses-permission android:name="android.car.permission.CAR_SPEED" />
+    <!-- 시험용 외부 카메라 (Pleos 카메라 API가 열리기 전까지) -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <application
+        android:allowBackup="false"
+        android:icon="@drawable/ic_launcher"
+        android:label="@string/app_name"
+        android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|keyboardHidden">
+            <!-- 후진 중(저속)에도 보여야 하는 운전 보조 화면. 글자 입력 없이 한눈에 읽히도록 설계함 -->
+            <meta-data android:name="distractionOptimized" android:value="true" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

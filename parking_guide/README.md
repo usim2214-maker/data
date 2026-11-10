@@ -121,15 +121,15 @@ docs/          화면 예시, 회차별 개선 기록 (IMPROVEMENTS.md)
 
 | 필요한 값 | Pleos에서 얻는 방법 (2026-11 공개 문서 기준) |
 |---|---|
-| 핸들 각도 | `SteeringWheel.getCurrentSteeringWheelAngle` / `registerSteeringWheelAngle` |
+| 핸들 각도 | `SteeringWheel.registerSteeringWheelAngle`: **앞바퀴 조향각**(도, 왼쪽 −)을 주므로 조향비를 곱해 핸들 각도로 바꾼다 |
 | 음성 안내 | Pleos Connect SDK `TextToSpeech` |
 | 위치 (지자체 공유, 약 100m 단위로 반올림) | Pleos Connect SDK `FusedLocation` |
 | 차폭·휠베이스 | `CarInfo`는 VIN만 제공 → VIN으로 차종을 조회하거나 사용자 설정 |
-| 이동 거리 (추적·추측 항법) | 속도·주행거리 관련 API 확인 필요 (`DrivingMode`, `Odometer` 등) |
-| 후진(R단) 상태 | 공개 문서에서 확인되지 않음, 확인 필요 |
+| 이동 거리 (추적·추측 항법) | AAOS `PERF_VEHICLE_SPEED` × 시간 (Pleos `Odometer`는 km 단위라 거칠다) |
+| 후진(R단) 상태 | AAOS `GEAR_SELECTION` (Pleos `Gear` API는 숨김·deprecated, AAOS 속성을 쓰라고 안내) |
 | 후방카메라 영상 | **공개된 카메라 API 없음**. 하드웨어 직접 접근 금지 정책이 있어 Pleos 측 문의 필요 |
 
-`pipeline.ParkingAssistant`가 앱의 한 프레임 처리 흐름이다. Kotlin으로 옮길 때 이 구조를 그대로 따르면 된다.
+`pipeline.ParkingAssistant`가 앱의 한 프레임 처리 흐름이다. **Kotlin으로 옮긴 Android Automotive 앱은 [`android/`](android/README.md)에 있다.** 빌드, Lint, JVM 테스트를 통과했고, Kotlin 인식기는 같은 합성 영상에서 Python 인식기와 같은 결과를 낸다.
 
 ## 한계와 다음 단계
 

@@ -39,8 +39,25 @@ object SafePalette {
  */
 class SignalPanelView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) : View(context, attrs) {
 
+    init {
+        contentDescription = "현재 신호: 인식 중"
+        importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
+    }
+
     var state: SignalState = SignalState.UNKNOWN
-        set(value) { field = value; invalidate() }
+        set(value) {
+            if (field != value) {
+                // 화면 낭독기(TalkBack) 사용자용 설명. 알림 음성과 겹치지 않도록 자동 낭독은 하지 않는다
+                contentDescription = "현재 신호: " + when (value.color) {
+                    SignalColor.RED -> "정지"
+                    SignalColor.YELLOW -> "주의"
+                    SignalColor.GREEN -> "진행"
+                    SignalColor.UNKNOWN -> "인식 중"
+                } + if (value.leftTurnArrow) ", 좌회전 신호" else ""
+            }
+            field = value
+            invalidate()
+        }
 
     /** 긴급 경고 시 테두리 점멸 */
     var flashLevel: AlertLevel? = null

@@ -309,6 +309,8 @@ class MainActivity : AppCompatActivity() {
             setTextColor(Color.WHITE)
             typeface = Typeface.DEFAULT_BOLD
             visibility = View.GONE
+            // 같은 내용을 음성 알림이 이미 전달하므로 화면 낭독기가 중복으로 읽지 않게
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
         root.addView(flash, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         return root
@@ -338,6 +340,7 @@ class MainActivity : AppCompatActivity() {
         }
         addView(spinner, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         addView(Button(this@MainActivity).apply {
+            minimumHeight = dp(76)
             text = "다시 시작"
             setOnClickListener { restartToken++; publishConfig() }
         })
@@ -352,7 +355,9 @@ class MainActivity : AppCompatActivity() {
             val cb = CheckBox(this@MainActivity).apply {
                 text = need.labelKo
                 setTextColor(Color.WHITE)
-                textSize = 18f
+                textSize = 20f
+                minimumHeight = dp(76) // 차량 화면 권장 터치 영역
+                contentDescription = "${need.labelKo}: ${need.descriptionKo}"
                 isChecked = settings.profile.has(need)
                 setOnCheckedChangeListener { _, _ ->
                     val needs = profileChecks.filter { it.value.isChecked }.keys

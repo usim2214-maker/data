@@ -23,8 +23,9 @@ adb install apk/팀명_모두의운전석_release.apk
 ```
 
 ### 시연 영상
-`docs/시연영상/모두의운전석_시연.mp4` (2분 38초). 챕터와 내레이션 대본은 `docs/시연영상/README.md`에 있습니다.
-다시 만들기: `./gradlew :demo:renderVideo`
+- `docs/시연영상/모두의운전석_시연.mp4` (2분 38초, 가로): `./gradlew :demo:renderVideo`
+- `docs/시연영상/모두의운전석_숏폼.mp4` (37초, 세로 숏폼): `./gradlew :demo:renderShorts`
+- 챕터, 내레이션 대본, 숏폼 게시글 예시는 `docs/시연영상/README.md`에 있습니다.
 
 ### 시연 순서 (에뮬레이터)
 1. 화면 아래 **모드**에서 `시뮬레이션: …` 시나리오 7종 중 하나를 고릅니다. 시나리오에 맞는 운전자 특성이 자동으로 선택됩니다.

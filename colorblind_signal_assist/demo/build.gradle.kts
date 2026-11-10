@@ -33,3 +33,14 @@ tasks.register<JavaExec>("renderVideo") {
     environment("LC_ALL", "C.UTF-8") // 한글 파일 이름
     workingDir = projectDir
 }
+
+// 숏폼 세로 영상 (1080x1920)
+tasks.register<JavaExec>("renderShorts") {
+    group = "application"
+    description = "숏폼 세로 영상(mp4) 렌더링"
+    mainClass.set("com.signalassist.demo.ShortsKt")
+    classpath = sourceSets["main"].runtimeClasspath
+    jvmArgs("-Dfile.encoding=UTF-8", "-Dstdout.encoding=UTF-8", "-Djava.awt.headless=true")
+    environment("LC_ALL", "C.UTF-8")
+    workingDir = projectDir
+}

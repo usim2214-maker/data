@@ -47,39 +47,42 @@ import kotlin.math.sin
  */
 private const val W = 1280
 private const val H = 720
-private const val FPS = 30
-private const val SR = 44_100
+internal const val FPS = 30
+internal const val SR = 44_100
 
 fun main(args: Array<String>) {
     val out = File(args.firstOrNull() ?: "build/video/모두의운전석_시연.mp4").absoluteFile
-    out.parentFile.mkdirs()
-    val silent = File(out.parentFile, "video_noaudio.mp4")
-    val wav = File(out.parentFile, "audio.wav")
-
     val r = VideoRenderer()
+    encodeVideo(out, W, H, r.audio, { emit -> r.render(emit); r.totalMs })
+}
+
+/** 프레임을 ffmpeg 로 인코딩하고 알림음 트랙을 합친다. [render] 는 프레임을 내보내고 총 길이(ms)를 돌려준다 */
+internal fun encodeVideo(out: File, w: Int, h: Int, audio: AudioTimeline, render: ((BufferedImage) -> Unit) -> Long) {
+    out.parentFile.mkdirs()
+    val silent = File(out.parentFile, out.nameWithoutExtension + "_noaudio.mp4")
+    val wav = File(out.parentFile, out.nameWithoutExtension + "_audio.wav")
     val ffmpeg = ProcessBuilder(
-        "ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", "${W}x$H", "-r", "$FPS",
+        "ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", "${w}x$h", "-r", "$FPS",
         "-i", "-", "-c:v", "libx264", "-preset", "medium", "-crf", "21", "-pix_fmt", "yuv420p", silent.path,
     ).redirectErrorStream(true).start()
     val sink = ffmpeg.outputStream.buffered(1 shl 20)
-    r.render { frame -> sink.write((frame.raster.dataBuffer as DataBufferByte).data) }
+    val totalMs = render { frame -> sink.write((frame.raster.dataBuffer as DataBufferByte).data) }
     sink.close()
     check(ffmpeg.waitFor() == 0) { "ffmpeg video encode failed: " + ffmpeg.inputStream.bufferedReader().readText() }
-
-    r.audio.writeWav(wav, r.totalMs)
+    audio.writeWav(wav, totalMs)
     val mux = ProcessBuilder(
         "ffmpeg", "-y", "-loglevel", "error", "-i", silent.path, "-i", wav.path,
         "-c:v", "copy", "-c:a", "aac", "-b:a", "160k", "-shortest", "-movflags", "+faststart", out.path,
     ).redirectErrorStream(true).start()
     check(mux.waitFor() == 0) { "ffmpeg mux failed: " + mux.inputStream.bufferedReader().readText() }
     silent.delete(); wav.delete()
-    println("시연 영상: ${out.path} (%.0f초)".format(r.totalMs / 1000.0))
+    println("영상: ${out.path} (%.0f초, ${w}x$h)".format(totalMs / 1000.0))
 }
 
 // ---------------------------------------------------------------- 오디오
 
 /** 앱 TonePlayer 와 같은 알림음을 타임라인에 섞는다 */
-private class AudioTimeline {
+internal class AudioTimeline {
     private data class Note(val f: Double, val ms: Int, val gap: Int = 60)
     private val patterns = mapOf(
         TonePattern.RISING_DOUBLE to listOf(Note(523.0, 150), Note(784.0, 220)),
@@ -121,7 +124,7 @@ private class AudioTimeline {
 
 // ---------------------------------------------------------------- 그리기 도구
 
-private object Pal {
+internal object Pal {
     val bg = Color(14, 15, 18)
     val panel = Color(24, 26, 31)
     val line = Color(48, 52, 60)
@@ -134,7 +137,7 @@ private object Pal {
     val off = Color(45, 45, 48)
 }
 
-private object Fonts {
+internal object Fonts {
     private const val DIR = "/usr/share/fonts/truetype/nanum/"
     private fun load(file: String, fallback: String) =
         File(DIR + file).takeIf { it.exists() }?.let { Font.createFont(Font.TRUETYPE_FONT, it) } ?: Font(fallback, Font.PLAIN, 12)
@@ -194,12 +197,12 @@ private object Fonts {
     }
 }
 
-private fun Graphics2D.round(x: Number, y: Number, w: Number, h: Number, r: Float, c: Color) {
+internal fun Graphics2D.round(x: Number, y: Number, w: Number, h: Number, r: Float, c: Color) {
     color = c
     fill(RoundRectangle2D.Float(x.toFloat(), y.toFloat(), w.toFloat(), h.toFloat(), r, r))
 }
 
-private fun Graphics2D.chip(x: Float, y: Float, text: String, bg: Color, fg: Color = Pal.text, size: Float = 17f): Float {
+internal fun Graphics2D.chip(x: Float, y: Float, text: String, bg: Color, fg: Color = Pal.text, size: Float = 17f): Float {
     val f = Fonts.r(size)
     val w = Fonts.width(this, text, f) + 22
     round(x, y, w, size + 16, 12f, bg)
@@ -572,59 +575,6 @@ private class VideoRenderer {
         }
     }
 
-    // ---- 보조 ----
-
-    private fun toImage(s: ScenarioSample): BufferedImage {
-        val f = s.frame
-        val img = BufferedImage(f.width, f.height, BufferedImage.TYPE_INT_RGB)
-        img.setRGB(0, 0, f.width, f.height, f.argb, 0, f.width)
-        return img
-    }
-
-    private fun shape(i: Int, cx: Float, cy: Float, r: Float): Path2D.Float = Path2D.Float().apply {
-        when (i) {
-            0 -> { for (k in 0 until 8) { val a = Math.toRadians(22.5 + 45.0 * k); val px = cx + r * cos(a).toFloat(); val py = cy + r * sin(a).toFloat(); if (k == 0) moveTo(px, py) else lineTo(px, py) }; closePath() }
-            1 -> { moveTo(cx, cy - r); lineTo(cx + r * 0.95f, cy + r * 0.75f); lineTo(cx - r * 0.95f, cy + r * 0.75f); closePath() }
-            2 -> { moveTo(cx - r, cy); lineTo(cx - r * 0.1f, cy - r * 0.7f); lineTo(cx - r * 0.1f, cy - r * 0.28f); lineTo(cx + r, cy - r * 0.28f)
-                lineTo(cx + r, cy + r * 0.28f); lineTo(cx - r * 0.1f, cy + r * 0.28f); lineTo(cx - r * 0.1f, cy + r * 0.7f); closePath() }
-            else -> append(java.awt.geom.Ellipse2D.Float(cx - r, cy - r, 2 * r, 2 * r), false)
-        }
-    }
-
-    private fun cabinLines(c: CabinState): List<String> = listOfNotNull(
-        c.driverSeatbeltBuckled?.let { if (it) "○ 벨트 착용" else "⚠ 벨트 미착용" },
-        c.turnSignal?.let { when (it) { TurnSignal.NONE -> "○ 방향지시등 꺼짐"; TurnSignal.LEFT -> "⚠ 방향지시등 왼쪽"; TurnSignal.RIGHT -> "⚠ 방향지시등 오른쪽"; TurnSignal.HAZARD -> "⚠ 비상등" } },
-        c.lowTirePressure?.let { if (it) "⚠ 타이어 저압" else "○ 타이어 정상" },
-        c.headlightsOn?.let { if (it) "○ 전조등 켜짐" else "⚠ 전조등 꺼짐" },
-        c.doorOpen?.let { if (it) "⚠ 문 열림" else "○ 문 닫힘" },
-        c.rearSeatOccupied?.let { if (it) "◉ 뒷좌석 탑승" else "○ 뒷좌석 비어 있음" },
-    )
-
-    private fun levelColor(l: AlertLevel) = when (l) {
-        AlertLevel.URGENT -> Pal.vermilion; AlertLevel.WARNING -> Color(220, 120, 30)
-        AlertLevel.CAUTION -> Pal.amber; AlertLevel.INFO -> Pal.sky
-    }
-
-    private fun toneName(t: TonePattern) = when (t) {
-        TonePattern.RISING_DOUBLE -> "도→솔 (올라감)"
-        TonePattern.SINGLE_LONG -> "한 음 길게"
-        TonePattern.FALLING_TRIPLE -> "세 음 내려감"
-        TonePattern.RAPID_BEEPS -> "빠른 연속음"
-        TonePattern.SOFT_CHIME -> "짧은 차임"
-        TonePattern.DOUBLE_MID -> "같은 음 두 번"
-    }
-
-    /** 화면 깜빡임의 큰 제목: 신호는 모양 + 낱말로 (기호만 크게 그리면 빈 상자처럼 보임) */
-    private fun flashHeadline(a: Alert): String = when (a.type) {
-        AlertType.RED_STOP, AlertType.RED_URGENT -> "■ 정지"
-        AlertType.YELLOW_CAUTION, AlertType.YELLOW_DILEMMA -> "▲ 주의"
-        AlertType.GREEN_GO, AlertType.GREEN_REMINDER -> "● 진행"
-        AlertType.SIGNAL_LOST -> "? 직접 확인"
-        AlertType.LEFT_ARROW_ON, AlertType.LEFT_ARROW_FOR_ROUTE, AlertType.LEFT_ARROW_NOT_FOR_ROUTE -> "← 좌회전"
-        AlertType.SIREN_NEARBY -> "⚠ 사이렌"
-        else -> a.symbol
-    }
-
     /** 알림이 왜 나왔는지 한 줄 설명 (심사위원용) */
     private fun why(a: Alert): String = when (a.type) {
         AlertType.GREEN_GO -> "초록불은 5프레임 중 4프레임이 일치해야 확정 (빨간불보다 엄격) → 정차 중이라 바로 안내"
@@ -644,4 +594,57 @@ private class VideoRenderer {
         AlertType.SIREN_NEARBY -> "실내 마이크에서 오르내리는 사이렌음 감지 → 화면 깜빡임 (기기 안에서만 분석)"
         AlertType.NAV_MANEUVER_SOON -> "내비 음성 대신 300m·100m 앞 큰 카드 (Pleos NaviHelper)"
     }
+}
+
+// ---- 공용 그리기 도구 ----
+
+internal fun toImage(s: ScenarioSample): BufferedImage {
+    val f = s.frame
+    val img = BufferedImage(f.width, f.height, BufferedImage.TYPE_INT_RGB)
+    img.setRGB(0, 0, f.width, f.height, f.argb, 0, f.width)
+    return img
+}
+
+internal fun shape(i: Int, cx: Float, cy: Float, r: Float): Path2D.Float = Path2D.Float().apply {
+    when (i) {
+        0 -> { for (k in 0 until 8) { val a = Math.toRadians(22.5 + 45.0 * k); val px = cx + r * cos(a).toFloat(); val py = cy + r * sin(a).toFloat(); if (k == 0) moveTo(px, py) else lineTo(px, py) }; closePath() }
+        1 -> { moveTo(cx, cy - r); lineTo(cx + r * 0.95f, cy + r * 0.75f); lineTo(cx - r * 0.95f, cy + r * 0.75f); closePath() }
+        2 -> { moveTo(cx - r, cy); lineTo(cx - r * 0.1f, cy - r * 0.7f); lineTo(cx - r * 0.1f, cy - r * 0.28f); lineTo(cx + r, cy - r * 0.28f)
+            lineTo(cx + r, cy + r * 0.28f); lineTo(cx - r * 0.1f, cy + r * 0.28f); lineTo(cx - r * 0.1f, cy + r * 0.7f); closePath() }
+        else -> append(java.awt.geom.Ellipse2D.Float(cx - r, cy - r, 2 * r, 2 * r), false)
+    }
+}
+
+internal fun cabinLines(c: CabinState): List<String> = listOfNotNull(
+    c.driverSeatbeltBuckled?.let { if (it) "○ 벨트 착용" else "⚠ 벨트 미착용" },
+    c.turnSignal?.let { when (it) { TurnSignal.NONE -> "○ 방향지시등 꺼짐"; TurnSignal.LEFT -> "⚠ 방향지시등 왼쪽"; TurnSignal.RIGHT -> "⚠ 방향지시등 오른쪽"; TurnSignal.HAZARD -> "⚠ 비상등" } },
+    c.lowTirePressure?.let { if (it) "⚠ 타이어 저압" else "○ 타이어 정상" },
+    c.headlightsOn?.let { if (it) "○ 전조등 켜짐" else "⚠ 전조등 꺼짐" },
+    c.doorOpen?.let { if (it) "⚠ 문 열림" else "○ 문 닫힘" },
+    c.rearSeatOccupied?.let { if (it) "◉ 뒷좌석 탑승" else "○ 뒷좌석 비어 있음" },
+)
+
+internal fun levelColor(l: AlertLevel) = when (l) {
+    AlertLevel.URGENT -> Pal.vermilion; AlertLevel.WARNING -> Color(220, 120, 30)
+    AlertLevel.CAUTION -> Pal.amber; AlertLevel.INFO -> Pal.sky
+}
+
+internal fun toneName(t: TonePattern) = when (t) {
+    TonePattern.RISING_DOUBLE -> "도→솔 (올라감)"
+    TonePattern.SINGLE_LONG -> "한 음 길게"
+    TonePattern.FALLING_TRIPLE -> "세 음 내려감"
+    TonePattern.RAPID_BEEPS -> "빠른 연속음"
+    TonePattern.SOFT_CHIME -> "짧은 차임"
+    TonePattern.DOUBLE_MID -> "같은 음 두 번"
+}
+
+/** 화면 깜빡임의 큰 제목: 신호는 모양 + 낱말로 (기호만 크게 그리면 빈 상자처럼 보임) */
+internal fun flashHeadline(a: Alert): String = when (a.type) {
+    AlertType.RED_STOP, AlertType.RED_URGENT -> "■ 정지"
+    AlertType.YELLOW_CAUTION, AlertType.YELLOW_DILEMMA -> "▲ 주의"
+    AlertType.GREEN_GO, AlertType.GREEN_REMINDER -> "● 진행"
+    AlertType.SIGNAL_LOST -> "? 직접 확인"
+    AlertType.LEFT_ARROW_ON, AlertType.LEFT_ARROW_FOR_ROUTE, AlertType.LEFT_ARROW_NOT_FOR_ROUTE -> "← 좌회전"
+    AlertType.SIREN_NEARBY -> "⚠ 사이렌"
+    else -> a.symbol
 }

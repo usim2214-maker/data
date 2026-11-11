@@ -26,6 +26,17 @@ object AlertGuide {
         Lesson(AlertType.NAV_MANEUVER_SOON, "내비 안내", "내비 음성 대신 300m·100m 앞에서 큰 카드로 보여드립니다."),
     )
 
+    /** 운전 중에 음성 끝에 덧붙일 '소리의 뜻' (알림음으로 의미를 구분하는 알림만) */
+    fun hintFor(type: AlertType): String? = when (type) {
+        AlertType.GREEN_GO, AlertType.GREEN_REMINDER -> "두 음이 올라가면 초록불입니다."
+        AlertType.YELLOW_CAUTION, AlertType.YELLOW_DILEMMA -> "한 음이 길게 울리면 노란불입니다."
+        AlertType.RED_STOP -> "세 음이 내려가면 빨간불입니다."
+        AlertType.RED_URGENT -> "빠른 반복음은 긴급 감속입니다."
+        AlertType.SEATBELT_UNBUCKLED, AlertType.LOW_TIRE_PRESSURE, AlertType.TURN_SIGNAL_LEFT_ON,
+        AlertType.HEADLIGHTS_OFF_DARK -> "같은 음 두 번은 차량 경고입니다."
+        else -> null
+    }
+
     fun lessonsFor(profile: DriverProfile): List<Lesson> = buildList {
         if (profile.has(DriverNeed.COLOR_VISION)) addAll(signal)
         else if (profile.has(DriverNeed.ATTENTION)) addAll(signal.filter { it.type == AlertType.RED_URGENT })

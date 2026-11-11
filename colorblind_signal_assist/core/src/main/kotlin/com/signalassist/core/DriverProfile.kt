@@ -73,6 +73,9 @@ data class DriverProfile(
 
     /** 이 프로필에서 낼 알림인지 (색 구분에 문제 없는 주의력 프로필은 위험·리마인드만) */
     fun accepts(alert: Alert): Boolean {
+        val t = alert.type
+        if (t.mutable && t in prefs.muted) return false
+        if (prefs.verbosity == Verbosity.MINIMAL && t.mutable) return false
         if (alert.category != AlertCategory.SIGNAL) return true
         if (has(DriverNeed.COLOR_VISION)) return true
         return alert.type == AlertType.GREEN_REMINDER || alert.type == AlertType.RED_URGENT

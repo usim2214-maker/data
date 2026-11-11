@@ -72,6 +72,8 @@ data class Alert(
     val customMessage: String? = null,
     val customSymbol: String? = null,
     val customHeadline: String? = null,
+    /** 음성 끝에 덧붙이는 설명 (예: "두 음이 올라가면 초록불입니다.") */
+    val speechSuffix: String? = null,
 ) {
     val level get() = type.level
     val tone get() = type.tone
@@ -79,7 +81,7 @@ data class Alert(
     val message get() = customMessage ?: type.messageKo
     val symbol get() = customSymbol ?: type.symbol
     /** 음성으로 읽을 문장 (짧고 핵심어 먼저) */
-    val speech get() = customMessage ?: type.speechKo
+    val speech get() = (customMessage ?: type.speechKo) + (speechSuffix?.let { " $it" } ?: "")
     /** 깜빡임에 크게 띄울 한두 단어 */
     val headline get() = customHeadline ?: type.headlineKo
 }
@@ -111,3 +113,10 @@ val AlertType.ongoingLabelKo: String
         AlertType.SIGNAL_LOST -> "신호 직접 확인"
         else -> headlineKo
     }
+
+/**
+ * 사용자가 끌 수 있는 알림인지. 경고 이상, 그리고 노란불·신호 놓침처럼 안전 판단에 꼭 필요한 알림은 끌 수 없다.
+ */
+val AlertType.mutable: Boolean
+    get() = level < AlertLevel.WARNING &&
+        this !in setOf(AlertType.YELLOW_CAUTION, AlertType.YELLOW_DILEMMA, AlertType.SIGNAL_LOST)

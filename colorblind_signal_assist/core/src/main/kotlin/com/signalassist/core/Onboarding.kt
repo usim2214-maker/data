@@ -10,7 +10,18 @@ data class AlertPreferences(
     val volumeBoost: Float = 1f,
     /** 청각장애지만 큰 알림음은 들림: 화면 깜빡임과 함께 알림음도 낸다 */
     val soundForHearing: Boolean = false,
+    /** 알림 양 */
+    val verbosity: Verbosity = Verbosity.NORMAL,
+    /** 사용자가 끈 알림 (안전에 중요한 알림은 끌 수 없음, [AlertType.mutable]) */
+    val muted: Set<AlertType> = emptySet(),
 )
+
+/** 알림 양. 익숙한 사용자는 줄이고, 처음 쓰는 사용자는 자세히 */
+enum class Verbosity(val labelKo: String, val descriptionKo: String) {
+    MINIMAL("위험할 때만", "빨간불·노란불·차량 경고처럼 안전에 중요한 알림만 알려 줍니다"),
+    NORMAL("보통", "처음 세 번은 소리의 뜻을 덧붙이고, 익숙해지면 짧게 알려 줍니다"),
+    DETAILED("자세히", "알림마다 소리의 뜻을 함께 말해 줍니다"),
+}
 
 /** 처음 실행 때 묻는 질문 (예/아니요). 장애 이름 대신 '겪는 상황'으로 묻는다 */
 enum class OnboardingQuestion(val textKo: String, val need: DriverNeed) {

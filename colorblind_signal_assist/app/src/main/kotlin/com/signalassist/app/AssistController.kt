@@ -51,6 +51,9 @@ class AssistController(
         get() = engine.profile
         set(value) { engine.profile = value }
 
+    /** 운전하며 익히기 횟수 (서비스가 저장·복원) */
+    val hintCounts: MutableMap<com.signalassist.core.AlertType, Int> get() = engine.hints.counts
+
     fun start(newSources: Sources) {
         stop()
         sources = newSources.also { it.start() }

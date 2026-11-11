@@ -62,6 +62,7 @@ class AssistService : Service() {
         notifier = AlertNotifier(this)
         settings = Settings(this)
         controller = AssistController(scope, ::onOutput)
+        controller.hintCounts.putAll(settings.hintCounts)
         startAsForeground()
         scope.launch {
             AssistBus.requests.collect { req ->
@@ -137,6 +138,7 @@ class AssistService : Service() {
         scope.launch {
             // 중재(AlertArbiter)를 거친 전달 목록: 같은 순간엔 가장 중요한 알림만 소리·음성·깜빡임
             history.record(out.deliveries)
+            if (out.deliveries.any { it.alert.speechSuffix != null || it.plan.voice }) settings.hintCounts = controller.hintCounts.toMap()
             trips.update(out)?.let { summary ->
                 val text = summary.summaryKo()
                 settings.addTrip(text)

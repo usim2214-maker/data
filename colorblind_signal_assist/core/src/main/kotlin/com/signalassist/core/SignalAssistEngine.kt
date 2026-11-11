@@ -81,6 +81,8 @@ class DrivingAssistEngine(
     private val arbiter: AlertArbiter = AlertArbiter(),
     private val sirenCooldownMs: Long = 20_000,
     val frameScheduler: FrameScheduler = FrameScheduler(),
+    /** 운전하며 익히기 횟수 (앱이 저장·복원) */
+    val hints: HintTracker = HintTracker(),
 ) {
     private var lastSignal: EngineOutput? = null
 
@@ -113,8 +115,10 @@ class DrivingAssistEngine(
             }
         }
         sirenWasOn = siren
+        // 사용자 설정(알림 양, 끈 알림)과 프로필에 맞지 않는 알림은 뺀다
+        alerts.retainAll { p.accepts(it) }
         alerts.sortByDescending { it.level }
-        val deliveries = arbiter.arbitrate(alerts, p, input.timestampMs, input.cabin.isDark)
+        val deliveries = hints.decorate(arbiter.arbitrate(alerts, p, input.timestampMs, input.cabin.isDark), p.prefs)
         return DrivingOutput(input, signal, alerts, deliveries, activeHazards(input, p))
     }
 

@@ -40,6 +40,7 @@ import com.signalassist.core.OutputPlan
 import com.signalassist.core.Scenario
 import com.signalassist.core.TurnSignal
 import com.signalassist.core.ongoingLabelKo
+import com.signalassist.core.mutable
 import kotlinx.coroutines.launch
 
 /**
@@ -68,6 +69,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var flash: TextView
     private lateinit var edgeFlash: View
     private lateinit var hazardBar: TextView
+    private lateinit var muteButton: Button
+    private lateinit var verbosityRow: LinearLayout
+    private var lastAlertType: com.signalassist.core.AlertType? = null
     private lateinit var speedRow: LinearLayout
     private lateinit var lessonRow: LinearLayout
     private lateinit var tripView: TextView
@@ -172,6 +176,8 @@ class MainActivity : AppCompatActivity() {
      */
     private fun showAlert(alert: Alert, plan: OutputPlan) {
         banner.text = "${alert.symbol}  ${alert.message}"
+        lastAlertType = alert.type
+        muteButton.visibility = if (alert.type.mutable && !drivingRestricted) View.VISIBLE else View.GONE
         if (!plan.visualFlash) return
         val pattern = plan.flashPattern
         val target: View = if (pattern.fullScreen) flash else edgeFlash
@@ -277,6 +283,37 @@ class MainActivity : AppCompatActivity() {
         panel.visibility = if (p.signalAssist) View.VISIBLE else View.GONE
         preview.visibility = if (p.signalAssist && !drivingRestricted) View.VISIBLE else View.GONE
         rebuildLessons(p)
+        rebuildVerbosity(p)
+    }
+
+    /** 알림 양 (위험할 때만 / 보통 / 자세히) + 끈 알림 다시 켜기 */
+    private fun rebuildVerbosity(p: DriverProfile) {
+        if (!::verbosityRow.isInitialized) return
+        verbosityRow.removeAllViews()
+        verbosityRow.addView(label(18f, Color.LTGRAY).apply { text = "알림 양: " })
+        for (v in com.signalassist.core.Verbosity.entries) {
+            val selected = p.prefs.verbosity == v
+            verbosityRow.addView(Button(this).apply {
+                text = (if (selected) "✓ " else "") + v.labelKo
+                minimumHeight = dp(76)
+                contentDescription = "알림 양 ${v.labelKo}: ${v.descriptionKo}" + if (selected) ", 선택됨" else ""
+                setOnClickListener {
+                    settings.profile = settings.profile.copy(prefs = settings.profile.prefs.copy(verbosity = v))
+                    publishConfig()
+                }
+            })
+        }
+        verbosityRow.addView(label(16f, Color.GRAY).apply { text = "  " + p.prefs.verbosity.descriptionKo })
+        if (p.prefs.muted.isNotEmpty()) {
+            verbosityRow.addView(Button(this).apply {
+                text = "끈 알림 다시 켜기 (${p.prefs.muted.size})"
+                contentDescription = "끈 알림: " + p.prefs.muted.joinToString { it.headlineKo }
+                setOnClickListener {
+                    settings.profile = settings.profile.copy(prefs = settings.profile.prefs.copy(muted = emptySet()))
+                    publishConfig()
+                }
+            })
+        }
     }
 
     /** 알림 배우기 버튼 (주차 중에만 보이는 설정 영역 안) */
@@ -327,6 +364,21 @@ class MainActivity : AppCompatActivity() {
         // 마지막 알림 + 큰 '다시 듣기' 버튼 (주행 중에도 한 번 누르기로 사용 가능, 터치 영역 76dp 이상)
         val bannerRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         bannerRow.addView(banner, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        // 주차 중에만: 방금 알림이 필요 없으면 끄기 (안전에 중요한 알림은 버튼이 나오지 않음)
+        muteButton = Button(this).apply {
+            text = "이 알림 끄기"
+            visibility = View.GONE
+            minimumHeight = dp(76)
+            setOnClickListener {
+                val t = lastAlertType ?: return@setOnClickListener
+                val p = settings.profile
+                settings.profile = p.copy(prefs = p.prefs.copy(muted = p.prefs.muted + t))
+                publishConfig()
+                visibility = View.GONE
+                android.widget.Toast.makeText(this@MainActivity, "'${t.headlineKo}' 알림을 껐습니다. 설정에서 다시 켤 수 있습니다.", android.widget.Toast.LENGTH_LONG).show()
+            }
+        }
+        bannerRow.addView(muteButton)
         bannerRow.addView(Button(this).apply {
             text = "↻ 다시 듣기"
             textSize = 24f
@@ -341,6 +393,8 @@ class MainActivity : AppCompatActivity() {
         controls = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         controls.addView(buildModeRow())
         controls.addView(buildProfileRow())
+        verbosityRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        controls.addView(verbosityRow)
         speedRow = buildSpeedRow()
         controls.addView(speedRow)
         tripView = label(20f, Color.WHITE)

@@ -19,6 +19,12 @@ import com.signalassist.core.SignalState
 import com.signalassist.core.TonePattern
 import com.signalassist.core.TripRecorder
 import com.signalassist.core.TurnSignal
+import com.signalassist.core.HearingProbe
+import com.signalassist.core.Onboarding
+import com.signalassist.core.OnboardingQuestion
+import com.signalassist.core.OutputPlan
+import com.signalassist.core.SignalQuery
+import com.signalassist.core.ToneLibrary
 import com.signalassist.core.ongoingLabelKo
 import java.awt.AlphaComposite
 import java.awt.BasicStroke
@@ -205,8 +211,10 @@ internal fun Graphics2D.chip(x: Float, y: Float, text: String, bg: Color, fg: Co
 // ---------------------------------------------------------------- 영상 구성
 
 private sealed class Segment {
-    class Card(val ms: Long, val draw: (Graphics2D, Long) -> Unit) : Segment()
-    class Run(val index: Int, val scenario: Scenario, val trimMs: Long, val tripSummaryHoldMs: Long = 0) : Segment()
+    /** [onStart] 은 카드가 시작하는 전체 시각(ms)을 받아 알림음 등을 예약한다 */
+    class Card(val ms: Long, val onStart: ((Long) -> Unit)? = null, val draw: (Graphics2D, Long) -> Unit) : Segment()
+    /** [queries]: 운전자가 '? 지금 신호' 버튼을 누르는 시나리오 시각들 */
+    class Run(val index: Int, val scenario: Scenario, val trimMs: Long, val tripSummaryHoldMs: Long = 0, val queries: List<Long> = emptyList()) : Segment()
 }
 
 private class VideoRenderer {
@@ -220,10 +228,10 @@ private class VideoRenderer {
     )
 
     private val intros = mapOf(
-        "stop_and_go" to listOf("신호등의 빨강·초록을 색으로 구분하기 어려운 운전자", "신호 변화를 '음높이 방향'과 모양 기호로 전달합니다"),
+        "stop_and_go" to listOf("신호등의 빨강·초록을 색으로 구분하기 어려운 운전자", "신호 변화를 '음높이 방향'과 모양 기호로 · 헷갈리면 '지금 신호?'"),
         "red_light_risk" to listOf("빨간불을 알아채지 못하고 그대로 접근하는 상황", "신호등까지 거리를 재서, 정말 제동이 필요할 때만 긴급 경고"),
         "yellow_dilemma" to listOf("정지선 바로 앞에서 황색으로 바뀌는 상황", "급정거로 인한 뒤차 추돌을 막기 위해 '정지' 대신 '주의 진행'"),
-        "signal_out_of_view" to listOf("정지선 바로 앞에 서서 신호등이 카메라 화면을 벗어나는 상황", "인식 실패를 숨기지 않고 '직접 확인하세요'라고 알립니다"),
+        "signal_out_of_view" to listOf("정지선 바로 앞에 서서 신호등이 카메라 화면을 벗어나는 상황", "인식 실패를 숨기지 않고, 물어봐도 모르면 모른다고 답합니다"),
         "hearing_drive" to listOf("경고음·방향지시등 소리·내비 음성·사이렌을 듣기 어려운 운전자", "모든 소리 정보를 화면 깜빡임과 큰 글씨로 바꿉니다 (소리 없음)"),
         "night_arrival" to listOf("작은 경고등을 놓치기 쉽고, 깜빡하기 쉬운 운전자", "경고등은 음성으로, 겹치는 알림은 중재, 내릴 때 뒷좌석 확인"),
     )
@@ -231,10 +239,12 @@ private class VideoRenderer {
     private val segments: List<Segment> = buildList {
         add(Segment.Card(6_000) { g, t -> opening(g, t) })
         add(Segment.Card(6_000) { g, t -> profiles(g, t) })
+        add(Segment.Card(15_000, onStart = ::scheduleOnboardingTones) { g, t -> onboarding(g, t) })
         scenarios.forEachIndexed { i, s ->
             add(Segment.Card(3_500) { g, t -> scenarioIntro(g, t, i, s) })
-            val trim = when (s.name) { "signal_out_of_view" -> 12_000L; "night_arrival" -> 17_000L; else -> s.durationMs }
-            add(Segment.Run(i, s, trim, if (s.name == "night_arrival") 5_000 else 0))
+            val trim = when (s.name) { "signal_out_of_view" -> 14_000L; "night_arrival" -> 17_000L; else -> s.durationMs }
+            val queries = when (s.name) { "stop_and_go" -> listOf(9_000L); "signal_out_of_view" -> listOf(11_000L); else -> emptyList() }
+            add(Segment.Run(i, s, trim, if (s.name == "night_arrival") 5_000 else 0, queries))
         }
         add(Segment.Card(9_000) { g, t -> closing(g, t) })
     }
@@ -249,6 +259,7 @@ private class VideoRenderer {
         for (seg in segments) {
             when (seg) {
                 is Segment.Card -> {
+                    seg.onStart?.invoke(totalMs)
                     val frames = (seg.ms / frameMs).roundToInt()
                     repeat(frames) { f ->
                         val t = (f * frameMs).toLong()
@@ -326,6 +337,57 @@ private class VideoRenderer {
         Fonts.center(g, "여러 개를 함께 고를 수 있습니다", W / 2f, 660f, Fonts.r(20f), Pal.dim)
     }
 
+    // ---- 첫 설정 (질문 + 소리 테스트) ----
+
+    private val obAnswers = OnboardingQuestion.entries.associateWith { it == OnboardingQuestion.COLOR || it == OnboardingQuestion.HEARING }
+    private val obHeard = mapOf(HearingProbe.NORMAL to false, HearingProbe.LOW to true, HearingProbe.QUIET to false)
+    private val obResult = Onboarding.build(obAnswers, obHeard)
+
+    /** 소리 테스트 장면에서 실제 알림음(보통·낮은)을 들려준다 */
+    private fun scheduleOnboardingTones(startMs: Long) {
+        audio.add(startMs + 7_400, TonePattern.DOUBLE_MID, OutputPlan(true, false, false, false, toneGain = ToneLibrary.gainFor(AlertLevel.WARNING)))
+        audio.add(startMs + 9_600, TonePattern.DOUBLE_MID,
+            OutputPlan(true, false, false, false, toneGain = ToneLibrary.gainFor(AlertLevel.WARNING), lowPitchTones = true))
+    }
+
+    private fun dialog(g: Graphics2D, step: String, text: String, buttons: List<String>, pressed: Int?) {
+        g.round(240, 190, 800, 330, 26f, Pal.panel)
+        Fonts.draw(g, step, 290f, 250f, Fonts.r(22f), Pal.dim)
+        Fonts.wrap(g, text, Fonts.b(32f), 700f).forEachIndexed { k, l -> Fonts.draw(g, l, 290f, 310f + k * 46, Fonts.b(32f), Pal.text) }
+        var x = 290f
+        buttons.forEachIndexed { i, b ->
+            x += g.chip(x, 430f, b, if (pressed == i) Pal.amber else Pal.line, if (pressed == i) Color.BLACK else Pal.text, size = 26f) + 18
+        }
+    }
+
+    private fun onboarding(g: Graphics2D, t: Long) {
+        Fonts.center(g, "처음 설정 — 장애 이름 대신 '겪는 상황'으로 묻고, 차 스피커로 소리를 들려줍니다", W / 2f, 120f, Fonts.b(28f), Pal.text)
+        when {
+            t < 3_500 -> dialog(g, "처음 설정 1 / 5", OnboardingQuestion.COLOR.textKo, listOf("예", "아니요"), if (t > 2_200) 0 else null)
+            t < 7_000 -> dialog(g, "처음 설정 2 / 5", OnboardingQuestion.HEARING.textKo, listOf("예", "아니요"), if (t > 5_700) 0 else null)
+            t < 9_400 -> {
+                dialog(g, "소리 테스트 1 / 3  ♪ 보통 높이의 알림음", "방금 보통 높이의 알림음이 들리셨나요?", listOf("들렸어요", "안 들렸어요", "다시 듣기"), if (t > 8_600) 1 else null)
+            }
+            t < 11_600 -> {
+                dialog(g, "소리 테스트 2 / 3  ♪ 낮은 알림음", "방금 낮은 알림음이 들리셨나요?", listOf("들렸어요", "안 들렸어요", "다시 듣기"), if (t > 10_800) 0 else null)
+            }
+            else -> {
+                g.round(240, 190, 800, 380, 26f, Pal.panel)
+                Fonts.draw(g, "설정 완료", 290f, 255f, Fonts.b(36f), Pal.text)
+                val p = obResult
+                val lines = listOf(
+                    "운전자 특성: " + p.needs.joinToString(" · ") { it.labelKo },
+                    "낮은 소리만 들림 → 낮은 알림음",
+                    "작은 소리를 못 들음 → 알림음 1.25배",
+                    "큰 소리는 들림 → 화면 깜빡임 + 알림음 함께",
+                    "알림 양: 보통 (처음 3번은 소리의 뜻을 함께)",
+                )
+                lines.forEachIndexed { k, l -> Fonts.draw(g, l, 290f, 315f + k * 46, Fonts.r(26f), if (k == 0) Pal.sky else Pal.text) }
+            }
+        }
+        Fonts.center(g, "부분 난청 운전자도 '소리 끄기' 대신 '내 귀에 맞는 소리'를 받습니다", W / 2f, 640f, Fonts.r(22f), Pal.dim)
+    }
+
     private fun scenarioIntro(g: Graphics2D, t: Long, i: Int, s: Scenario) {
         Fonts.center(g, "시나리오 ${i + 1} / ${scenarios.size}", W / 2f, 230f, Fonts.r(24f), Pal.dim)
         Fonts.center(g, s.titleKo, W / 2f, 300f, Fonts.b(52f), Pal.text)
@@ -354,10 +416,11 @@ private class VideoRenderer {
             "알림음 뒤 음성 · 위험이 끝날 때까지 화면 표시",
             "알림 중재 · 야간 감광 · 필요할 때만 영상 처리",
         ).forEachIndexed { k, l -> Fonts.draw(g, "• $l", colX[1], 236f + k * 40, Fonts.r(20f), Pal.text) }
-        g.round(110, 470, 1060, 110, 20f, Pal.panel)
-        Fonts.center(g, "카메라 없이도 지금 동작: 차량 경고 · 내비 카드 · 사이렌 · 뒷좌석 확인", W / 2f, 515f, Fonts.r(24f), Pal.text)
-        Fonts.center(g, "카메라 API가 열리면 신호 인식을 실제 영상으로 전환 (영상 입력 한 곳만 교체)", W / 2f, 555f, Fonts.r(22f), Pal.dim)
-        Fonts.center(g, "위치 미기록 · 주행 요약은 기기 안에만 · 공유는 사용자가 직접", W / 2f, 640f, Fonts.r(20f), Pal.dim)
+        Fonts.center(g, "사용자 맞춤: 질문형 첫 설정 · 내 귀에 맞춘 소리 · 알림 양 3단계 · 운전하며 익히기 · '지금 신호?'", W / 2f, 480f, Fonts.r(21f), Pal.green)
+        g.round(110, 505, 1060, 100, 20f, Pal.panel)
+        Fonts.center(g, "카메라 없이도 지금 동작: 차량 경고 · 내비 카드 · 사이렌 · 뒷좌석 확인", W / 2f, 545f, Fonts.r(24f), Pal.text)
+        Fonts.center(g, "카메라 API가 열리면 신호 인식을 실제 영상으로 전환 (영상 입력 한 곳만 교체)", W / 2f, 583f, Fonts.r(22f), Pal.dim)
+        Fonts.center(g, "위치 미기록 · 주행 요약은 기기 안에만 · 공유는 사용자가 직접", W / 2f, 660f, Fonts.r(20f), Pal.dim)
     }
 
     // ---- 시나리오 재생 ----
@@ -385,6 +448,8 @@ private class VideoRenderer {
         private var captionUntil = 0L
         private var summary: String? = null
         private var hazards: List<AlertType> = emptyList()
+        private var lastSignalOut: com.signalassist.core.EngineOutput? = null
+        private var pressedAt = -10_000L
 
         private fun advanceTo(t: Long) {
             val target = min((t / 100).toInt(), player.frameCount - 1)
@@ -401,6 +466,7 @@ private class VideoRenderer {
                 trip.update(out)?.let { summary = it.summaryKo() }
                 hazards = out.activeHazards
                 val now = sample.timestampMs
+                out.signal?.let { lastSignalOut = it.copy(timestampMs = now) }
                 val captions = ArrayList<String>()
                 for (d in out.deliveries) {
                     banner = d; bannerAt = now
@@ -411,6 +477,23 @@ private class VideoRenderer {
                 }
                 if (captions.isNotEmpty()) { caption = captions.take(2); captionUntil = now + 4_000 }
                 if (out.deliveries.isNotEmpty()) banner = out.deliveries.first()
+                // 운전자가 '? 지금 신호' 버튼을 누름
+                if (now in seg.queries) {
+                    pressedAt = now
+                    val a = SignalQuery.answer(lastSignalOut, now)
+                    val plan = SignalQuery.plan(profile, a)
+                    val d = Delivery(a, plan)
+                    banner = d; bannerAt = now
+                    if (plan.visualFlash) { flash = d; flashAt = now }
+                    audio.add(baseMs + now, a.tone, plan)
+                    voice = a.speech; voiceUntil = now + 4_500
+                    val pct = ((lastSignalOut?.confidence ?: 0f) * 100).roundToInt()
+                    caption = listOf(
+                        if (a.headline == "직접 확인") "운전자가 '지금 신호?'를 누름 → 신호등을 보지 못해 추측하지 않고 직접 확인 요청"
+                        else "운전자가 '지금 신호?'를 누름 → 최근 프레임 일치율 $pct%라 확실하게 답함",
+                    )
+                    captionUntil = now + 4_500
+                }
             }
         }
 
@@ -463,6 +546,14 @@ private class VideoRenderer {
             val x = 784; val y = 92; val w = 472; val h = 414
             g.round(x, y, w, h, 22f, Pal.panel)
             Fonts.draw(g, "앱 화면", x + 20f, y + 32f, Fonts.r(17f), Pal.dim)
+            if (profile.signalAssist) {
+                val pressed = sample.timestampMs - pressedAt in 0..700
+                val bw = Fonts.width(g, "? 지금 신호", Fonts.b(17f)) + 24
+                val bx = x + w - bw - 16f
+                g.round(bx, y + 10f, bw, 32f, 12f, if (pressed) Pal.amber else Pal.line)
+                Fonts.draw(g, "? 지금 신호", bx + 12f, y + 32f, Fonts.b(17f), if (pressed) Color.BLACK else Pal.text)
+                if (pressed) { g.color = Pal.amber; g.stroke = BasicStroke(3f); g.drawRoundRect((bx - 6).toInt(), y + 4, (bw + 12).toInt(), 44, 16, 16) }
+            }
             if (profile.signalAssist) {
                 // 4구 신호 패널 (위치 + 모양 + 색각이상 친화 색)
                 val cell = 92f; val left = x + (w - cell * 4) / 2f; val top = y + 48f
@@ -569,6 +660,7 @@ private class VideoRenderer {
         AlertType.REAR_SEAT_CHECK -> "이번 주행에 뒷좌석 탑승 + 주차(P) → 내리기 전 확인"
         AlertType.SIREN_NEARBY -> "실내 마이크에서 오르내리는 사이렌음 감지 → 화면 깜빡임 (기기 안에서만 분석)"
         AlertType.NAV_MANEUVER_SOON -> "내비 음성 대신 300m·100m 앞 큰 카드 (Pleos NaviHelper)"
+        AlertType.SIGNAL_STATUS -> "운전자가 지금 신호를 물음 → 확실할 때만 답함"
     }
 }
 

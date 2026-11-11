@@ -23,7 +23,7 @@ adb install apk/팀명_모두의운전석_release.apk
 ```
 
 ### 시연 영상
-- `docs/시연영상/모두의운전석_시연.mp4` (2분 38초, 가로): `./gradlew :demo:renderVideo`
+- `docs/시연영상/모두의운전석_시연.mp4` (2분 55초, 가로): `./gradlew :demo:renderVideo`
 - `docs/시연영상/모두의운전석_숏폼.mp4` (37초, 세로 숏폼): `./gradlew :demo:renderShorts`
 - 챕터, 내레이션 대본, 숏폼 게시글 예시는 `docs/시연영상/README.md`에 있습니다.
 

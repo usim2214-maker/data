@@ -35,7 +35,11 @@ data class OutputPlan(
 /**
  * 운전자 프로필. 고른 특성에 따라 ① 어떤 기능을 켤지 ② 알림을 어떤 감각으로 낼지 정한다.
  */
-data class DriverProfile(val needs: Set<DriverNeed>) {
+data class DriverProfile(
+    val needs: Set<DriverNeed>,
+    /** 개인 맞춤 설정 (첫 설정의 소리 테스트 결과 등) */
+    val prefs: AlertPreferences = AlertPreferences(),
+) {
 
     fun has(n: DriverNeed) = n in needs
 
@@ -63,7 +67,7 @@ data class DriverProfile(val needs: Set<DriverNeed>) {
      * - 청각장애만: +0.3초 (소리 없이 화면으로만 알아채야 하므로)
      */
     val reactionTimeS: Float
-        get() = 1.0f + (if (has(DriverNeed.ATTENTION)) 0.5f else 0f) + (if (hearingOnly) 0.3f else 0f)
+        get() = 1.0f + (if (has(DriverNeed.ATTENTION)) 0.5f else 0f) + (if (hearingOnly && !prefs.soundForHearing) 0.3f else 0f)
 
     private val hearingOnly get() = has(DriverNeed.HEARING) && needs.size == 1
 
@@ -77,13 +81,14 @@ data class DriverProfile(val needs: Set<DriverNeed>) {
     fun outputFor(alert: Alert): OutputPlan {
         val elderly = has(DriverNeed.ATTENTION)
         return OutputPlan(
-            tone = !hearingOnly,
+            // 부분 난청: 화면 깜빡임에 더해 (크고 낮은) 알림음도. 말소리는 알아듣기 어려워 음성은 끈다
+            tone = !hearingOnly || prefs.soundForHearing,
             voice = !hearingOnly,
             visualFlash = has(DriverNeed.HEARING) || alert.level >= AlertLevel.WARNING,
             largeText = has(DriverNeed.LOW_VISION) || elderly,
             flashPattern = FlashPattern.forLevel(alert.level),
-            toneGain = ToneLibrary.gainFor(alert.level),
-            lowPitchTones = elderly,
+            toneGain = (ToneLibrary.gainFor(alert.level) * prefs.volumeBoost).coerceAtMost(1f),
+            lowPitchTones = prefs.lowPitch ?: elderly,
             speechRate = when {
                 alert.level == AlertLevel.URGENT -> if (elderly) 1.0f else 1.15f
                 elderly -> 0.9f

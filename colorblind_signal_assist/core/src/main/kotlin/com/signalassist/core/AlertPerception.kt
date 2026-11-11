@@ -38,10 +38,11 @@ object ToneLibrary {
     fun durationMs(pattern: TonePattern): Int = base.getValue(pattern).sumOf { it.durMs + it.gapMs }
 
     fun gainFor(level: AlertLevel): Float = when (level) {
-        AlertLevel.INFO -> 0.55f
-        AlertLevel.CAUTION -> 0.7f
-        AlertLevel.WARNING -> 0.85f
-        AlertLevel.URGENT -> 1.0f
+        // 맞춤 설정으로 1.25배까지 키울 여유를 남긴다
+        AlertLevel.INFO -> 0.45f
+        AlertLevel.CAUTION -> 0.55f
+        AlertLevel.WARNING -> 0.68f
+        AlertLevel.URGENT -> 0.8f
     }
 
     /** PCM 16bit mono 로 합성 */

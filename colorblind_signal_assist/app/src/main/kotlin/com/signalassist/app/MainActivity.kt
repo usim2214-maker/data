@@ -86,6 +86,7 @@ class MainActivity : AppCompatActivity() {
         AssistService.start(this)
         requestPermissionsIfNeeded()
         connectUxRestrictions()
+        if (!settings.onboarded) startOnboarding()
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -395,7 +396,7 @@ class MainActivity : AppCompatActivity() {
                         settings.mode = m
                         // 시나리오를 고르면 그 시나리오가 보여주는 프로필로 맞춰 줌 (시연 편의)
                         if (m is AssistMode.Simulated) {
-                            Scenario.ALL.firstOrNull { it.name == m.scenarioName }?.let { settings.profile = DriverProfile(it.targetNeeds) }
+                            Scenario.ALL.firstOrNull { it.name == m.scenarioName }?.let { settings.profile = settings.profile.copy(needs = it.targetNeeds) }
                             syncProfileChecks()
                         }
                         publishConfig()
@@ -427,7 +428,7 @@ class MainActivity : AppCompatActivity() {
                 isChecked = settings.profile.has(need)
                 setOnCheckedChangeListener { _, _ ->
                     val needs = profileChecks.filter { it.value.isChecked }.keys
-                    settings.profile = DriverProfile(needs)
+                    settings.profile = settings.profile.copy(needs = needs)
                     publishConfig()
                     requestPermissionsIfNeeded()
                 }
@@ -435,6 +436,81 @@ class MainActivity : AppCompatActivity() {
             profileChecks[need] = cb
             addView(cb)
         }
+        addView(Button(this@MainActivity).apply {
+            text = "처음 설정 다시 하기"
+            minimumHeight = dp(76)
+            contentDescription = "질문과 소리 테스트로 알림을 다시 맞추기"
+            setOnClickListener { startOnboarding() }
+        })
+    }
+
+    // ---- 첫 설정: 상황 질문 4개 + 소리 테스트 3개 (주차 중에만) ----
+
+    private val onboardingTone by lazy { com.signalassist.app.alert.TonePlayer() }
+
+    private fun startOnboarding() {
+        val questions = com.signalassist.core.OnboardingQuestion.entries
+        val answers = LinkedHashMap<com.signalassist.core.OnboardingQuestion, Boolean>()
+        fun ask(i: Int) {
+            if (i == questions.size) { hearingCheck(answers); return }
+            val q = questions[i]
+            androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("처음 설정 ${i + 1} / ${questions.size + 1}")
+                .setMessage(q.textKo)
+                .setPositiveButton("예") { _, _ -> answers[q] = true; ask(i + 1) }
+                .setNegativeButton("아니요") { _, _ -> answers[q] = false; ask(i + 1) }
+                .setCancelable(false)
+                .show()
+        }
+        ask(0)
+    }
+
+    /** 실제 차 스피커로 소리 3가지를 들려주고 들렸는지 묻는다 */
+    private fun hearingCheck(answers: Map<com.signalassist.core.OnboardingQuestion, Boolean>) {
+        val probes = com.signalassist.core.HearingProbe.entries
+        val heard = LinkedHashMap<com.signalassist.core.HearingProbe, Boolean>()
+        fun probe(i: Int) {
+            if (i == probes.size) { finishOnboarding(answers, heard); return }
+            val p = probes[i]
+            onboardingTone.play(
+                com.signalassist.core.TonePattern.DOUBLE_MID,
+                OutputPlan(tone = true, voice = false, visualFlash = false, largeText = false,
+                    toneGain = com.signalassist.core.ToneLibrary.gainFor(p.level), lowPitchTones = p.lowPitch),
+            )
+            androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("소리 테스트 ${i + 1} / ${probes.size}")
+                .setMessage("방금 ${p.textKo}이 들리셨나요?\n(평소 운전할 때의 음량으로 맞춰 두고 들어 보세요)")
+                .setPositiveButton("들렸어요") { _, _ -> heard[p] = true; probe(i + 1) }
+                .setNegativeButton("안 들렸어요") { _, _ -> heard[p] = false; probe(i + 1) }
+                .setNeutralButton("다시 듣기") { _, _ -> probe(i) }
+                .setCancelable(false)
+                .show()
+        }
+        probe(0)
+    }
+
+    private fun finishOnboarding(
+        answers: Map<com.signalassist.core.OnboardingQuestion, Boolean>,
+        heard: Map<com.signalassist.core.HearingProbe, Boolean>,
+    ) {
+        val p = com.signalassist.core.Onboarding.build(answers, heard)
+        settings.profile = p
+        settings.onboarded = true
+        syncProfileChecks()
+        publishConfig()
+        requestPermissionsIfNeeded()
+        val parts = buildList {
+            if (p.needs.isEmpty()) add("기본 안전 알림(뒷좌석 확인)만 사용") else add(p.needs.joinToString(" · ") { it.labelKo })
+            if (p.prefs.lowPitch == true) add("낮은 알림음")
+            if (p.prefs.volumeBoost > 1f) add("알림음 크게")
+            if (p.prefs.soundForHearing) add("화면 깜빡임 + 알림음 함께")
+            else if (p.has(DriverNeed.HEARING)) add("소리 없이 화면으로")
+        }
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("설정 완료")
+            .setMessage(parts.joinToString("\n") + "\n\n아래 '알림 배우기'에서 각 알림의 소리를 미리 들어 보세요.")
+            .setPositiveButton("확인", null)
+            .show()
     }
 
     private fun syncProfileChecks() {
@@ -444,7 +520,7 @@ class MainActivity : AppCompatActivity() {
                 cb.setOnCheckedChangeListener(null)
                 cb.isChecked = p.has(need)
                 cb.setOnCheckedChangeListener { _, _ ->
-                    settings.profile = DriverProfile(profileChecks.filter { it.value.isChecked }.keys)
+                    settings.profile = settings.profile.copy(needs = profileChecks.filter { it.value.isChecked }.keys)
                     publishConfig()
                 }
             }

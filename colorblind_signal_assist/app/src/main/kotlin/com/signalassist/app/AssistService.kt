@@ -31,6 +31,7 @@ import com.signalassist.core.Alert
 import com.signalassist.core.AlertGuide
 import com.signalassist.core.AlertHistory
 import com.signalassist.core.Scenario
+import com.signalassist.core.SignalQuery
 import com.signalassist.core.TripRecorder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -53,6 +54,7 @@ class AssistService : Service() {
     private var activeToken = -1
     private var micWanted = false
     private val history = AlertHistory()
+    @Volatile private var lastSignal: com.signalassist.core.EngineOutput? = null
     private val trips = TripRecorder()
     private lateinit var settings: Settings
     private var sourceDescription = ""
@@ -70,6 +72,12 @@ class AssistService : Service() {
                 val now = System.currentTimeMillis()
                 when (req) {
                     UserRequest.Replay -> history.replayLast(profile, now)?.let { (alert, plan) ->
+                        notifier.notify(alert, plan, postHeadsUp = false)
+                        AssistBus.alerts.tryEmit(alert to plan)
+                    }
+                    UserRequest.QuerySignal -> {
+                        val alert = SignalQuery.answer(lastSignal, now)
+                        val plan = SignalQuery.plan(profile, alert)
                         notifier.notify(alert, plan, postHeadsUp = false)
                         AssistBus.alerts.tryEmit(alert to plan)
                     }
@@ -137,6 +145,7 @@ class AssistService : Service() {
     private fun onOutput(out: com.signalassist.core.DrivingOutput, frame: com.signalassist.core.Frame?) {
         scope.launch {
             // 중재(AlertArbiter)를 거친 전달 목록: 같은 순간엔 가장 중요한 알림만 소리·음성·깜빡임
+            out.signal?.let { lastSignal = it.copy(timestampMs = out.input.timestampMs) }
             history.record(out.deliveries)
             if (out.deliveries.any { it.alert.speechSuffix != null || it.plan.voice }) settings.hintCounts = controller.hintCounts.toMap()
             trips.update(out)?.let { summary ->

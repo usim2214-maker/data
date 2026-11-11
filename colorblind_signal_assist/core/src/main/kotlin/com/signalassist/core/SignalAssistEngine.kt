@@ -9,6 +9,8 @@ data class EngineOutput(
     val alerts: List<Alert>,
     /** 신호등까지 추정 거리(m). 모르면 null */
     val distanceM: Float? = null,
+    /** 현재 신호 상태에 대한 확신 정도 (0..1) */
+    val confidence: Float = 0f,
 )
 
 /** 신호 인식 파이프라인: 검출 -> 상태 안정화 -> 신호 알림 정책 */
@@ -29,7 +31,7 @@ class SignalAssistEngine(
         val change = tracker.update(detection)
         val d = distance.update(detection, frame.width, tracker.state.color)
         val alerts = policy.evaluate(tracker.state, change, vehicle, timestampMs, navigation, d, reactionTimeS)
-        return EngineOutput(timestampMs, detection, tracker.state, change, vehicle, alerts, d)
+        return EngineOutput(timestampMs, detection, tracker.state, change, vehicle, alerts, d, tracker.confidence)
     }
 
     val redUrgentActive get() = policy.redUrgentActive

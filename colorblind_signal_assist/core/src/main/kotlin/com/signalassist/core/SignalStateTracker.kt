@@ -31,6 +31,11 @@ class SignalStateTracker(
     var state: SignalState = SignalState.UNKNOWN
         private set
 
+    /** 최근 프레임 중 현재 상태와 같은 색으로 본 비율 (0..1). '지금 신호?' 질문에 답할 때 확신 정도로 쓴다 */
+    val confidence: Float
+        get() = if (state.color == SignalColor.UNKNOWN || colors.isEmpty()) 0f
+        else colors.count { it == state.color }.toFloat() / windowSize
+
     fun reset() {
         colors.clear(); arrows.clear(); unknownStreak = 0
         state = SignalState.UNKNOWN

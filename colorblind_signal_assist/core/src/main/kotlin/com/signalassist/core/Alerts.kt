@@ -58,6 +58,9 @@ enum class AlertType(
     HEADLIGHTS_OFF_DARK(AlertCategory.VEHICLE, AlertLevel.CAUTION, TonePattern.DOUBLE_MID, "주변이 어둡습니다. 전조등을 켜 주세요.", "☼", "전조등을 켜 주세요.", "전조등"),
     REAR_SEAT_CHECK(AlertCategory.VEHICLE, AlertLevel.WARNING, TonePattern.SINGLE_LONG, "내리기 전에 뒷좌석을 확인하세요.", "◉", "뒷좌석을 확인하세요.", "뒷좌석"),
 
+    /** 운전자가 '지금 신호?' 버튼으로 물었을 때의 답 (문구는 상황마다 만든다) */
+    SIGNAL_STATUS(AlertCategory.SIGNAL, AlertLevel.INFO, TonePattern.SOFT_CHIME, "신호등 상태 안내", "?", "신호등 상태 안내", "신호"),
+
     // ---- 주변 소리 (청각: 사이렌을 듣지 못함) ----
     SIREN_NEARBY(AlertCategory.ENVIRONMENT, AlertLevel.WARNING, TonePattern.RAPID_BEEPS, "긴급차량 사이렌이 들립니다. 주변을 살피고 길을 양보하세요.", "🚨", "사이렌, 길을 양보하세요.", "사이렌"),
 
@@ -74,9 +77,11 @@ data class Alert(
     val customHeadline: String? = null,
     /** 음성 끝에 덧붙이는 설명 (예: "두 음이 올라가면 초록불입니다.") */
     val speechSuffix: String? = null,
+    /** 기본 알림음 대신 쓸 소리 (예: 현재 신호 안내는 그 신호의 소리로) */
+    val customTone: TonePattern? = null,
 ) {
     val level get() = type.level
-    val tone get() = type.tone
+    val tone get() = customTone ?: type.tone
     val category get() = type.category
     val message get() = customMessage ?: type.messageKo
     val symbol get() = customSymbol ?: type.symbol

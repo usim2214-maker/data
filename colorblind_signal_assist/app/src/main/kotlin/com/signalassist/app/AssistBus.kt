@@ -34,6 +34,8 @@ sealed class UserRequest {
     data object Replay : UserRequest()
     /** 알림 배우기: 해당 알림을 시범으로 */
     data class Lesson(val type: AlertType) : UserRequest()
+    /** '지금 신호?' 현재 신호와 확신 정도를 물음 */
+    data object QuerySignal : UserRequest()
 }
 
 data class AssistConfig(val mode: AssistMode, val profile: DriverProfile, val restartToken: Int = 0)

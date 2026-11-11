@@ -15,6 +15,7 @@ object AlertGuide {
         Lesson(AlertType.RED_URGENT, "긴급", "빠르게 반복되는 소리는 빨간불인데 감속이 필요하다는 뜻입니다."),
         Lesson(AlertType.LEFT_ARROW_FOR_ROUTE, "좌회전", "짧은 차임과 함께 좌회전 신호와 내 경로를 알려드립니다."),
         Lesson(AlertType.SIGNAL_LOST, "확인 필요", "신호등을 놓치면 침묵하지 않고 직접 확인하라고 알려드립니다."),
+        Lesson(AlertType.SIGNAL_STATUS, "지금 신호?", "헷갈리면 '지금 신호' 버튼을 누르세요. 확실할 때만 답합니다."),
     )
     private val vehicle = listOf(
         Lesson(AlertType.SEATBELT_UNBUCKLED, "차량 경고", "같은 음이 두 번 울리면 차량 상태 경고입니다."),

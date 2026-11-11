@@ -70,6 +70,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var edgeFlash: View
     private lateinit var hazardBar: TextView
     private lateinit var muteButton: Button
+    private lateinit var queryButton: Button
     private lateinit var verbosityRow: LinearLayout
     private var lastAlertType: com.signalassist.core.AlertType? = null
     private lateinit var speedRow: LinearLayout
@@ -281,6 +282,7 @@ class MainActivity : AppCompatActivity() {
         cabinView.textSize = 22f * scale
         flash.textSize = 54f * scale
         panel.visibility = if (p.signalAssist) View.VISIBLE else View.GONE
+        if (::queryButton.isInitialized) queryButton.visibility = if (p.signalAssist) View.VISIBLE else View.GONE
         preview.visibility = if (p.signalAssist && !drivingRestricted) View.VISIBLE else View.GONE
         rebuildLessons(p)
         rebuildVerbosity(p)
@@ -379,6 +381,16 @@ class MainActivity : AppCompatActivity() {
             }
         }
         bannerRow.addView(muteButton)
+        // 교차로에서 헷갈릴 때: 현재 신호와 확신 정도를 말해 줌 (주행 중에도 한 번 누르기)
+        queryButton = Button(this).apply {
+            text = "? 지금 신호"
+            textSize = 24f
+            contentDescription = "지금 신호가 무엇인지 묻기"
+            minimumHeight = dp(76)
+            minimumWidth = dp(180)
+            setOnClickListener { AssistBus.requests.tryEmit(UserRequest.QuerySignal) }
+        }
+        bannerRow.addView(queryButton)
         bannerRow.addView(Button(this).apply {
             text = "↻ 다시 듣기"
             textSize = 24f
@@ -562,7 +574,8 @@ class MainActivity : AppCompatActivity() {
         }
         androidx.appcompat.app.AlertDialog.Builder(this)
             .setTitle("설정 완료")
-            .setMessage(parts.joinToString("\n") + "\n\n아래 '알림 배우기'에서 각 알림의 소리를 미리 들어 보세요.")
+            .setMessage(parts.joinToString("\n") + "\n\n아래 '알림 배우기'에서 각 알림의 소리를 미리 들어 보세요." +
+                if (p.signalAssist) "\n교차로에서 헷갈리면 '? 지금 신호' 버튼을 누르세요." else "")
             .setPositiveButton("확인", null)
             .show()
     }

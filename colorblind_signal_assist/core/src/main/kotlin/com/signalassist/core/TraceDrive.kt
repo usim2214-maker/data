@@ -76,6 +76,11 @@ class TracePlayer(
     private val visibleRangeM: Float = 150f,
     private val stopLineToLightM: Float = 12f,
     private val lighting: Lighting = Lighting.DAY,
+    /**
+     * 프레임을 직접 그리는 함수 (예: 실제 건물로 만든 3D 시점). null 이면 단순 합성 장면.
+     * 인자: (인덱스, 주행 기록, 보이는 신호 또는 null, 신호등까지 거리 m)
+     */
+    private val frameRenderer: ((Int, TraceStep, SignalState?, Float) -> Frame)? = null,
 ) : SampleSource {
     private val focalPx = width * 0.866f
 
@@ -89,6 +94,7 @@ class TracePlayer(
         val visible = tlsDist != null && tlsDist <= visibleRangeM && s.signalColor != SignalColor.UNKNOWN
         val lightDist = ((tlsDist ?: 200f) + stopLineToLightM).coerceAtLeast(6f)
         val truth = if (visible) SignalState(s.signalColor) else null
+        val custom = frameRenderer?.invoke(index, s, truth, lightDist)
         val horizon = height * 0.55f
         val shake = if (s.speedKmh > 1f) ((index * 7919) % 5 - 2).toFloat() else 0f
         val spec = SceneSpec(
@@ -117,7 +123,7 @@ class TracePlayer(
             cabin = CabinState(driverSeatbeltBuckled = true, doorOpen = false),
             navigation = nav,
             distanceM = lightDist,
-            frame = SyntheticSceneGenerator.render(spec),
+            frame = custom ?: SyntheticSceneGenerator.render(spec),
         )
     }
 }

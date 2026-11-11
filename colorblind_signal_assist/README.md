@@ -23,8 +23,8 @@ adb install apk/팀명_모두의운전석_release.apk
 ```
 
 ### 시연 영상
-- `docs/시연영상/모두의운전석_시연.mp4` (3분 34초, 가로): `./gradlew :demo:renderVideo`
-- `docs/시연영상/모두의운전석_센텀시티.mp4` (85초, 부산 센텀시티 실제 도로 주행): `./gradlew :demo:renderCentum`
+- `docs/시연영상/모두의운전석_시연.mp4` (3분 42초, 가로): `./gradlew :demo:renderVideo`
+- `docs/시연영상/모두의운전석_센텀시티.mp4` (93초, 부산 센텀시티 실제 도로 3D 주행): `./gradlew :demo:renderCentum`
 - `docs/시연영상/모두의운전석_숏폼.mp4` (37초, 세로 숏폼): `./gradlew :demo:renderShorts`
 - 챕터, 내레이션 대본, 숏폼 게시글 예시는 `docs/시연영상/README.md`에 있습니다.
 
@@ -145,6 +145,7 @@ adb install apk/팀명_모두의운전석_release.apk
 ## 실제 도로 검증 — 부산 해운대구 센텀시티
 
 OpenStreetMap 실제 도로·차로·신호등 위치로 SUMO 교통 시뮬레이션을 돌리고(주변 차량 포함), 해운대로 1.76km(신호 12곳)를 달린 기록을 엔진에 그대로 넣었습니다 (`sim/`).
+전방 시점은 OpenStreetMap 실제 건물 613개를 높이대로 세운 **3D 재현**(`demo/City3D.kt`, GPU 없이 동작하는 소프트웨어 렌더러)이고, **신호 인식기가 이 3D 화면을 보고 판단합니다**. 3D 화면에서도 알림 결과는 같았고, 긴급 경고는 운전자 제동 1.7초 전에 나왔습니다.
 
 | 시각 | 알림 | 상황 |
 |---|---|---|

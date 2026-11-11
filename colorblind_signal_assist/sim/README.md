@@ -6,7 +6,8 @@ OpenStreetMap 실제 도로망 위에서 SUMO 교통 시뮬레이션을 돌려 '
 pip install eclipse-sumo==1.21.0 traci==1.21.0 sumolib==1.21.0 pyproj
 python3 sim/run_centum.py          # data/centum_trace.csv, data/centum_map.txt
 ./gradlew :core:test               # TraceDriveTest: 주행 기록으로 엔진 전체 검증
-./gradlew :demo:renderCentum       # 센텀시티 시연 영상
+./gradlew :demo:renderCentum       # 센텀시티 시연 영상 (3D 항공·운전석 시점)
+./gradlew :demo:preview3d          # 3D 시점 미리보기 PNG + 인식 결과
 ```
 
 | 파일 | 내용 |

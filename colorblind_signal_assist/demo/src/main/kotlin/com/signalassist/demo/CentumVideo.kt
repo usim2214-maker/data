@@ -81,7 +81,7 @@ internal fun centumIntro(g: Graphics2D, t: Long) {
     Fonts.center(g, "부산 해운대구 센텀시티 · 해운대로", 640f, 300f, Fonts.b(54f), Pal.text)
     Fonts.center(g, "OpenStreetMap 실제 도로·차로·신호등 위치 + SUMO 교통 시뮬레이션 (주변 차량 포함)", 640f, 380f, Fonts.r(26f), Pal.sky)
     Fonts.center(g, "해운대로 → 센텀5로 · 센텀4로 · 센텀남대로 교차로 → APEC로  |  1.76km · 경로상 신호 12개", 640f, 430f, Fonts.r(24f), Pal.text)
-    Fonts.center(g, "※ 신호 주기는 시뮬레이션이 만든 값으로 실제 신호 주기와 다릅니다 · 전방 영상은 합성", 640f, 520f, Fonts.r(20f), Pal.dim)
+    Fonts.center(g, "※ 건물·도로는 OpenStreetMap 실제 데이터로 3D 재현 · 신호 주기는 시뮬레이션 생성값으로 실제와 다릅니다", 640f, 520f, Fonts.r(20f), Pal.dim)
     Fonts.center(g, "지도 데이터 © OpenStreetMap contributors", 640f, 560f, Fonts.r(18f), Pal.dim)
 }
 
@@ -145,7 +145,25 @@ private class CentumMap(file: File) {
  */
 internal class CentumRun(private val audio: AudioTimeline, private val standaloneIndex: Int?) {
     private val dir = listOf(File("../sim/data"), File("sim/data")).first { File(it, "centum_trace.csv").exists() }
-    private val player = TracePlayer(TraceParser.parse(File(dir, "centum_trace.csv").readLines()))
+    private val city = City3D(File(dir, "centum_map.txt"))
+    private val camBuf = java.awt.image.BufferedImage(960, 540, java.awt.image.BufferedImage.TYPE_INT_RGB)
+    private val carColors = listOf(Color(150, 155, 165), Color(60, 64, 72), Color(210, 212, 214), Color(120, 30, 34), Color(40, 60, 100))
+
+    /** 전방 카메라: 실제 센텀 건물로 만든 3D 시점 (신호 인식기도 이 화면을 본다) */
+    private fun render3D(index: Int, s: com.signalassist.core.TraceStep, light: SignalState?, lightDist: Float): com.signalassist.core.Frame {
+        val cam = City3D.Camera(s.x.toDouble(), s.y.toDouble(), 1.3, Math.toRadians(s.angleDeg.toDouble()), 0.0,
+            960, 540, 960 * 0.866, 480.0, 540 * 0.55)
+        val items = ArrayList<City3D.Item>()
+        if (light != null) items += City3D.Light(lightDist.toDouble(), 1.0, 4.0, light)
+        s.others.forEachIndexed { k, (ox, oy, a) ->
+            val d = Math.hypot((ox - s.x).toDouble(), (oy - s.y).toDouble())
+            if (d < 220) items += City3D.Car(ox, oy, a, carColors[(ox.toInt() * 31 + oy.toInt() * 17 + k).mod(carColors.size)], false, d)
+        }
+        city.render(camBuf, cam, items, viewRange = 700.0)
+        return City3D.toFrame(camBuf)
+    }
+
+    private val player = TracePlayer(TraceParser.parse(File(dir, "centum_trace.csv").readLines()), frameRenderer = ::render3D)
     private val map = CentumMap(File(dir, "centum_map.txt"))
     private val profile = DriverProfile(setOf(DriverNeed.COLOR_VISION))
     private val queries = listOf(350) // 첫 빨간불 대기 중 '지금 신호?' (35.0초)
@@ -162,7 +180,10 @@ internal class CentumRun(private val audio: AudioTimeline, private val standalon
             val out = engine.process(s.toInput())
             outputs += out.copy(input = out.input.copy(frame = null)) // 영상 프레임은 버리고 결과만 보관 (메모리)
             out.signal?.let { lastSignal = it.copy(timestampMs = s.timestampMs) }
-            if (out.deliveries.isNotEmpty()) eventIdx += i
+            if (out.deliveries.isNotEmpty()) {
+                eventIdx += i
+                out.deliveries.forEach { println("[3D] %.1fs %s".format(s.timestampMs / 1000.0, it.alert.message)) }
+            }
             if (i in queries) {
                 val a = SignalQuery.answer(lastSignal, s.timestampMs)
                 queryAnswers[i] = Delivery(a, SignalQuery.plan(profile, a))
@@ -204,7 +225,53 @@ internal class CentumRun(private val audio: AudioTimeline, private val standalon
     private var camIdx = -1
     private lateinit var cam: BufferedImage
 
+    /** 센텀시티 상공을 도는 항공 시점 (실제 건물 높이) */
+    private fun flyover(g: Graphics2D, img: BufferedImage, emit: (BufferedImage) -> Unit, ms: Long): Long {
+        val (rx, ry) = city.route
+        val cxw = rx.average(); val cyw = ry.average()
+        val frames = (ms * FPS / 1000.0).roundToInt()
+        val buf = BufferedImage(1280, 720, BufferedImage.TYPE_INT_RGB)
+        val labels = listOf(
+            Triple(map.stations, "Ⓜ", Color(60, 90, 160)),
+        )
+        repeat(frames) { f ->
+            val t = f.toDouble() / frames
+            val ang = Math.toRadians(205.0 + 70.0 * t)          // 남서쪽에서 시작해 천천히 돈다
+            val radius = 900.0 - 250.0 * t
+            val camX = cxw + radius * sin(ang); val camY = cyw + radius * cos(ang)
+            val height = 420.0 - 170.0 * t
+            val heading = Math.atan2(cxw - camX, cyw - camY)
+            val cam = City3D.Camera(camX, camY, height, heading, -Math.atan2(height, radius) + 0.05, 1280, 720, 1280 * 0.8, 640.0, 360.0)
+            city.render(buf, cam, emptyList(), drawRoute = true, viewRange = 2200.0)
+            g.drawImage(buf, 0, 0, null)
+            for ((list, mark, col) in labels) for (st in list) {
+                val p = city.projectPoint(cam, st.x.toDouble(), st.y.toDouble(), 30.0) ?: continue
+                if (p.x in 40.0..1200.0 && p.y in 60.0..680.0) g.chip(p.x.toFloat() - 40, p.y.toFloat() - 14, "$mark ${st.text}", col, size = 16f)
+            }
+            city.waterCenter?.let { (wx, wy) ->
+                city.projectPoint(cam, wx, wy, 2.0)?.let { p -> if (p.x in 40.0..1200.0 && p.y in 60.0..680.0) g.chip(p.x.toFloat() - 30, p.y.toFloat() - 12, "수영강", Color(30, 70, 120), size = 16f) }
+            }
+            // 출발점 표시
+            val sp = city.projectPoint(cam, rx.first().toDouble(), ry.first().toDouble(), 6.0)
+            if (sp != null) { g.color = Pal.green; g.fill(Ellipse2D.Double(sp.x - 9, sp.y - 9, 18.0, 18.0)); g.chip(sp.x.toFloat() + 12, sp.y.toFloat() - 14, "출발", Color(0, 0, 0, 170), size = 15f) }
+            val ep = city.projectPoint(cam, rx.last().toDouble(), ry.last().toDouble(), 6.0)
+            if (ep != null) { g.color = Pal.amber; g.fill(Ellipse2D.Double(ep.x - 9, ep.y - 9, 18.0, 18.0)); g.chip(ep.x.toFloat() + 12, ep.y.toFloat() - 14, "도착", Color(0, 0, 0, 170), size = 15f) }
+            g.round(24, 24, 760, 92, 18f, Color(0, 0, 0, 170))
+            Fonts.draw(g, "부산 해운대구 센텀시티 — 실제 건물 ${city.buildings.size}개를 높이대로 세운 3D", 44f, 62f, Fonts.b(24f), Color.WHITE)
+            Fonts.draw(g, "초록 선: 주행 경로 (해운대로 → APEC로, 1.76km, 신호 12곳)", 44f, 96f, Fonts.r(19f), Pal.sky)
+            Fonts.draw(g, "© OpenStreetMap contributors", 1080f, 706f, Fonts.r(14f), Color(40, 40, 40))
+            fadeBlack(g, f * 1000L / FPS, ms, 1280, 720)
+            emit(img)
+        }
+        return ms
+    }
+
     fun play(g: Graphics2D, img: BufferedImage, emit: (BufferedImage) -> Unit, baseMs: Long): Long {
+        val fly = flyover(g, img, emit, 8_000)
+        return fly + drive(g, img, emit, baseMs + fly)
+    }
+
+    private fun drive(g: Graphics2D, img: BufferedImage, emit: (BufferedImage) -> Unit, baseMs: Long): Long {
         val tl = timeline()
         var lastIdx = -1
         tl.forEachIndexed { f, (idx, rate) ->
@@ -267,8 +334,8 @@ internal class CentumRun(private val audio: AudioTimeline, private val standalon
             g.chip(cx + (l.centerX + r) * sx + 6, cy + (l.centerY - r) * sy - 4, l.color.labelKo + (distanceM?.let { " · %.0fm".format(it) } ?: ""), Color(0, 0, 0, 170), size = 15f)
         }
         if (out.activeHazards.isNotEmpty()) drawHazardBar(g, cx.toFloat(), cy.toFloat(), cw.toFloat(), out.activeHazards, now, 20f)
-        g.round(cx + 8, cy + ch - 34, 220, 26, 9f, Color(0, 0, 0, 160))
-        Fonts.draw(g, "전방 카메라 (합성 영상)", cx + 18f, cy + ch - 15f, Fonts.r(14f), Pal.dim)
+        g.round(cx + 8, cy + ch - 34, 236, 26, 9f, Color(0, 0, 0, 160))
+        Fonts.draw(g, "전방 시점 · 실제 건물 3D 재현", cx + 18f, cy + ch - 15f, Fonts.r(14f), Pal.dim)
 
         // 위치 정보 줄
         g.round(24, 452, 640, 58, 14f, Pal.panel)

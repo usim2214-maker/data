@@ -55,3 +55,12 @@ tasks.register<JavaExec>("renderCentum") {
     environment("LC_ALL", "C.UTF-8")
     workingDir = projectDir
 }
+
+tasks.register<JavaExec>("preview3d") {
+    group = "application"
+    mainClass.set("com.signalassist.demo.City3DPreviewKt")
+    classpath = sourceSets["main"].runtimeClasspath
+    jvmArgs("-Djava.awt.headless=true")
+    environment("LC_ALL", "C.UTF-8")
+    workingDir = projectDir
+}

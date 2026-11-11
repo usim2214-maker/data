@@ -132,13 +132,18 @@ def write_map(net, route, route_tls):
         if tags.get("railway") == "station" or tags.get("public_transport") == "station":
             x, y = net.convertLonLat2XY(float(n.get("lon")), float(n.get("lat")))
             lines.append("S %.1f %.1f %s역" % (x, y, tags.get("name", "")))
-    seen = set()
+    # 도로 이름: 같은 이름은 220m 마다 하나씩 (지도를 확대해서 봐도 보이도록)
+    placed = []
     for e in sorted(net.getEdges(), key=lambda e: -e.getLength()):
         nm = e.getName()
-        if nm and nm not in seen and e.getLength() > 120 and e.getPriority() >= 7:
-            seen.add(nm)
-            (x1, y1), (x2, y2) = e.getShape()[0], e.getShape()[-1]
-            lines.append("N %.1f %.1f %.1f %s" % ((x1 + x2) / 2, (y1 + y2) / 2, math.degrees(math.atan2(y2 - y1, x2 - x1)), nm))
+        if not nm or e.getLength() < 50 or e.getFunction() == "internal" or e.getType().endswith("service"):
+            continue
+        (x1, y1), (x2, y2) = e.getShape()[0], e.getShape()[-1]
+        mx, my = (x1 + x2) / 2, (y1 + y2) / 2
+        if any(n == nm and math.hypot(mx - px, my - py) < 220 for n, px, py in placed):
+            continue
+        placed.append((nm, mx, my))
+        lines.append("N %.1f %.1f %.1f %s" % (mx, my, math.degrees(math.atan2(y2 - y1, x2 - x1)), nm))
     for tid, idx, (x, y) in route_tls:
         lines.append("T %s %d %.1f %.1f" % (tid, idx, x, y))
     pts = " ".join("%.1f,%.1f" % p for e in route for p in e.getShape())

@@ -215,6 +215,8 @@ private sealed class Segment {
     class Card(val ms: Long, val onStart: ((Long) -> Unit)? = null, val draw: (Graphics2D, Long) -> Unit) : Segment()
     /** [queries]: 운전자가 '? 지금 신호' 버튼을 누르는 시나리오 시각들 */
     class Run(val index: Int, val scenario: Scenario, val trimMs: Long, val tripSummaryHoldMs: Long = 0, val queries: List<Long> = emptyList()) : Segment()
+    /** 직접 그리는 장면 (실제 도로 주행). 그린 길이(ms)를 돌려준다 */
+    class Custom(val play: (Graphics2D, BufferedImage, (BufferedImage) -> Unit, Long) -> Long) : Segment()
 }
 
 private class VideoRenderer {
@@ -223,7 +225,8 @@ private class VideoRenderer {
         private set
 
     private val scenarios = listOf(
-        Scenario.STOP_AND_GO, Scenario.RED_LIGHT_RISK, Scenario.YELLOW_DILEMMA,
+        // 정차 후 출발·적색 놓침은 실제 도로(센텀시티) 주행 장면이 대신 보여준다
+        Scenario.YELLOW_DILEMMA,
         Scenario.SIGNAL_OUT_OF_VIEW, Scenario.HEARING_DRIVE, Scenario.NIGHT_ARRIVAL,
     )
 
@@ -240,7 +243,11 @@ private class VideoRenderer {
         add(Segment.Card(6_000) { g, t -> opening(g, t) })
         add(Segment.Card(6_000) { g, t -> profiles(g, t) })
         add(Segment.Card(15_000, onStart = ::scheduleOnboardingTones) { g, t -> onboarding(g, t) })
-        scenarios.forEachIndexed { i, s ->
+        // 시나리오 1: 부산 센텀시티 실제 도로 (OpenStreetMap + SUMO)
+        add(Segment.Card(5_000) { g, t -> centumIntro(g, t); Fonts.center(g, "시나리오 1 / ${scenarios.size + 1}", W / 2f, 150f, Fonts.r(24f), Pal.dim) })
+        add(Segment.Custom { g, img, emit, base -> CentumRun(audio, standaloneIndex = 1).play(g, img, emit, base) })
+        scenarios.forEachIndexed { i0, s ->
+            val i = i0 + 1
             add(Segment.Card(3_500) { g, t -> scenarioIntro(g, t, i, s) })
             val trim = when (s.name) { "signal_out_of_view" -> 14_000L; "night_arrival" -> 17_000L; else -> s.durationMs }
             val queries = when (s.name) { "stop_and_go" -> listOf(9_000L); "signal_out_of_view" -> listOf(11_000L); else -> emptyList() }
@@ -270,6 +277,7 @@ private class VideoRenderer {
                     }
                     totalMs += seg.ms
                 }
+                is Segment.Custom -> totalMs += seg.play(g, img, emit, totalMs)
                 is Segment.Run -> {
                     val run = ScenarioRun(seg, totalMs)
                     val ms = seg.trimMs + seg.tripSummaryHoldMs
@@ -310,7 +318,7 @@ private class VideoRenderer {
             g.color = if (i == lit) cols[i] else Pal.off
             g.fillOval((cx - 22).toInt(), 430, 44, 44)
         }
-        Fonts.center(g, "시연 영상 · 신호 인식은 합성 영상 기반 시뮬레이션 (Pleos 공개 API에 카메라 미제공)", W / 2f, 560f, Fonts.r(20f), Pal.dim)
+        Fonts.center(g, "시연 영상 · 부산 센텀시티 실제 도로(OpenStreetMap + SUMO) 시뮬레이션과 합성 시나리오 · 전방 영상은 합성", W / 2f, 560f, Fonts.r(20f), Pal.dim)
         Fonts.center(g, "앱과 같은 판단 엔진으로 렌더링 · 알림음은 실제 앱의 소리 패턴", W / 2f, 592f, Fonts.r(20f), Pal.dim)
     }
 
@@ -389,7 +397,7 @@ private class VideoRenderer {
     }
 
     private fun scenarioIntro(g: Graphics2D, t: Long, i: Int, s: Scenario) {
-        Fonts.center(g, "시나리오 ${i + 1} / ${scenarios.size}", W / 2f, 230f, Fonts.r(24f), Pal.dim)
+        Fonts.center(g, "시나리오 ${i + 1} / ${scenarios.size + 1}", W / 2f, 230f, Fonts.r(24f), Pal.dim)
         Fonts.center(g, s.titleKo, W / 2f, 300f, Fonts.b(52f), Pal.text)
         val lines = intros[s.name].orEmpty()
         lines.forEachIndexed { k, l -> Fonts.center(g, l, W / 2f, 380f + k * 44, Fonts.r(27f), if (k == 0) Pal.text else Pal.sky) }
@@ -416,7 +424,8 @@ private class VideoRenderer {
             "알림음 뒤 음성 · 위험이 끝날 때까지 화면 표시",
             "알림 중재 · 야간 감광 · 필요할 때만 영상 처리",
         ).forEachIndexed { k, l -> Fonts.draw(g, "• $l", colX[1], 236f + k * 40, Fonts.r(20f), Pal.text) }
-        Fonts.center(g, "사용자 맞춤: 질문형 첫 설정 · 내 귀에 맞춘 소리 · 알림 양 3단계 · 운전하며 익히기 · '지금 신호?'", W / 2f, 480f, Fonts.r(21f), Pal.green)
+        Fonts.center(g, "사용자 맞춤: 질문형 첫 설정 · 내 귀에 맞춘 소리 · 알림 양 3단계 · 운전하며 익히기 · '지금 신호?'", W / 2f, 466f, Fonts.r(20f), Pal.green)
+        Fonts.center(g, "실제 도로 검증: 부산 센텀시티 해운대로 1.76km · 신호 12곳 (지도 © OpenStreetMap contributors)", W / 2f, 492f, Fonts.r(18f), Pal.sky)
         g.round(110, 505, 1060, 100, 20f, Pal.panel)
         Fonts.center(g, "카메라 없이도 지금 동작: 차량 경고 · 내비 카드 · 사이렌 · 뒷좌석 확인", W / 2f, 545f, Fonts.r(24f), Pal.text)
         Fonts.center(g, "카메라 API가 열리면 신호 인식을 실제 영상으로 전환 (영상 입력 한 곳만 교체)", W / 2f, 583f, Fonts.r(22f), Pal.dim)
@@ -642,26 +651,6 @@ private class VideoRenderer {
         }
     }
 
-    /** 알림이 왜 나왔는지 한 줄 설명 (심사위원용) */
-    private fun why(a: Alert): String = when (a.type) {
-        AlertType.GREEN_GO -> "초록불은 5프레임 중 4프레임이 일치해야 확정 (빨간불보다 엄격) → 정차 중이라 바로 안내"
-        AlertType.GREEN_REMINDER -> "초록불 3초 후에도 정차 중 → 한 번만 다시 알림"
-        AlertType.YELLOW_CAUTION -> "반응 1초 + 편안한 제동으로 정지선에 설 수 있는 거리 → 정지 준비"
-        AlertType.YELLOW_DILEMMA -> "정지선이 너무 가까워 급정거하면 추돌 위험 → '정지' 대신 주의 진행"
-        AlertType.RED_STOP -> "보통 제동으로 설 수 있는 거리 → 놀라지 않게 차분한 안내"
-        AlertType.RED_URGENT -> "반응 시간까지 계산하면 지금 강한 제동이 필요 → 긴급 경고 (고령자는 더 일찍)"
-        AlertType.SIGNAL_LOST -> "접근할 때 보이던 신호등이 사라짐 → 침묵 대신 직접 확인 요청"
-        AlertType.LEFT_ARROW_FOR_ROUTE, AlertType.LEFT_ARROW_NOT_FOR_ROUTE, AlertType.LEFT_ARROW_ON -> "좌회전 화살표 + 내비 경로를 함께 판단"
-        AlertType.SEATBELT_UNBUCKLED -> "벨트 경고음을 못 듣는 운전자 → 화면 깜빡임 (Pleos Vehicle State)"
-        AlertType.DOOR_OPEN_MOVING -> "주행 중 문 열림 → 긴급 (Pleos Vehicle State)"
-        AlertType.LOW_TIRE_PRESSURE -> "계기판 경고등을 놓치기 쉬움 → 다른 감각으로 (Pleos Vehicle State)"
-        AlertType.TURN_SIGNAL_LEFT_ON -> "방향지시등 20초 이상 + 30km/h 이상 + 안내 지점 아님 → 끄는 것을 잊음"
-        AlertType.HEADLIGHTS_OFF_DARK -> "어두운데 전조등 꺼짐 → 음성으로 (저시력)"
-        AlertType.REAR_SEAT_CHECK -> "이번 주행에 뒷좌석 탑승 + 주차(P) → 내리기 전 확인"
-        AlertType.SIREN_NEARBY -> "실내 마이크에서 오르내리는 사이렌음 감지 → 화면 깜빡임 (기기 안에서만 분석)"
-        AlertType.NAV_MANEUVER_SOON -> "내비 음성 대신 300m·100m 앞 큰 카드 (Pleos NaviHelper)"
-        AlertType.SIGNAL_STATUS -> "운전자가 지금 신호를 물음 → 확실할 때만 답함"
-    }
 }
 
 // ---- 공용 그리기 도구 ----
@@ -754,4 +743,25 @@ internal fun drawHazardBar(g: Graphics2D, x: Float, y: Float, w: Float, hazards:
     g.round(x, y, w, size * 2.2f, size, c)
     g.composite = old
     Fonts.draw(g, "⚠ " + hazards.joinToString("  ·  ") { it.ongoingLabelKo }, x + size, y + size * 1.5f, Fonts.b(size), Color.WHITE)
+}
+
+/** 알림이 왜 나왔는지 한 줄 설명 (심사위원용) */
+internal fun why(a: Alert): String = when (a.type) {
+    AlertType.GREEN_GO -> "초록불은 5프레임 중 4프레임이 일치해야 확정 (빨간불보다 엄격) → 정차 중이라 바로 안내"
+    AlertType.GREEN_REMINDER -> "초록불 3초 후에도 정차 중 → 한 번만 다시 알림"
+    AlertType.YELLOW_CAUTION -> "반응 1초 + 편안한 제동으로 정지선에 설 수 있는 거리 → 정지 준비"
+    AlertType.YELLOW_DILEMMA -> "정지선이 너무 가까워 급정거하면 추돌 위험 → '정지' 대신 주의 진행"
+    AlertType.RED_STOP -> "보통 제동으로 설 수 있는 거리 → 놀라지 않게 차분한 안내"
+    AlertType.RED_URGENT -> "반응 시간까지 계산하면 지금 강한 제동이 필요 → 긴급 경고 (고령자는 더 일찍)"
+    AlertType.SIGNAL_LOST -> "접근할 때 보이던 신호등이 사라짐 → 침묵 대신 직접 확인 요청"
+    AlertType.LEFT_ARROW_FOR_ROUTE, AlertType.LEFT_ARROW_NOT_FOR_ROUTE, AlertType.LEFT_ARROW_ON -> "좌회전 화살표 + 내비 경로를 함께 판단"
+    AlertType.SEATBELT_UNBUCKLED -> "벨트 경고음을 못 듣는 운전자 → 화면 깜빡임 (Pleos Vehicle State)"
+    AlertType.DOOR_OPEN_MOVING -> "주행 중 문 열림 → 긴급 (Pleos Vehicle State)"
+    AlertType.LOW_TIRE_PRESSURE -> "계기판 경고등을 놓치기 쉬움 → 다른 감각으로 (Pleos Vehicle State)"
+    AlertType.TURN_SIGNAL_LEFT_ON -> "방향지시등 20초 이상 + 30km/h 이상 + 안내 지점 아님 → 끄는 것을 잊음"
+    AlertType.HEADLIGHTS_OFF_DARK -> "어두운데 전조등 꺼짐 → 음성으로 (저시력)"
+    AlertType.REAR_SEAT_CHECK -> "이번 주행에 뒷좌석 탑승 + 주차(P) → 내리기 전 확인"
+    AlertType.SIREN_NEARBY -> "실내 마이크에서 오르내리는 사이렌음 감지 → 화면 깜빡임 (기기 안에서만 분석)"
+    AlertType.NAV_MANEUVER_SOON -> "내비 음성 대신 300m·100m 앞 큰 카드 (Pleos NaviHelper)"
+    AlertType.SIGNAL_STATUS -> "운전자가 지금 신호를 물음 → 확실할 때만 답함"
 }

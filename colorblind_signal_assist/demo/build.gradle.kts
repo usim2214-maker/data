@@ -44,3 +44,14 @@ tasks.register<JavaExec>("renderShorts") {
     environment("LC_ALL", "C.UTF-8")
     workingDir = projectDir
 }
+
+// 부산 센텀시티 실제 도로 주행 영상 (sim/run_centum.py 결과 필요)
+tasks.register<JavaExec>("renderCentum") {
+    group = "application"
+    description = "센텀시티 실제 도로 시뮬레이션 영상(mp4) 렌더링"
+    mainClass.set("com.signalassist.demo.CentumVideoKt")
+    classpath = sourceSets["main"].runtimeClasspath
+    jvmArgs("-Dfile.encoding=UTF-8", "-Dstdout.encoding=UTF-8", "-Djava.awt.headless=true")
+    environment("LC_ALL", "C.UTF-8")
+    workingDir = projectDir
+}

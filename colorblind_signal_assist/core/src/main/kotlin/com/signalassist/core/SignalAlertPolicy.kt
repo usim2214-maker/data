@@ -3,13 +3,16 @@ package com.signalassist.core
 data class AlertPolicyConfig(
     /** 이 속도 미만이면 정차로 본다 */
     val stoppedSpeedKmh: Float = 3f,
-    /** 거리를 모를 때: 적색인데 이 속도 이상이면 긴급 경고 */
-    val urgentSpeedKmh: Float = 25f,
     /**
      * 거리를 알 때: 정지선에 서려면 필요한 감속도(m/s²)가 이 값 이상이면 긴급 경고.
      * 일반적인 편안한 제동이 약 2~3 m/s² 이므로, 이 이상이 필요하면 '지금 밟아야 하는' 상황이다.
      */
     val urgentDecelMps2: Float = 2.5f,
+    /**
+     * 이 속도 미만이면 긴급 경고를 하지 않는다. 저속에서는 몇 m 안에 설 수 있고,
+     * 초록불로 바뀌어 출발하는 순간(초록 확정 전 0.4초)에 긴급 경고가 나오는 거짓 경보를 막는다.
+     */
+    val urgentMinSpeedKmh: Float = 15f,
     /** 황색에서 이 감속도(m/s²) 이하로 설 수 있으면 '정지 준비', 아니면 딜레마 구간으로 본다 */
     val comfortableStopDecelMps2: Float = 3.0f,
     /** 운전자 반응 시간(s). 알림을 듣고 브레이크를 밟기까지 */
@@ -90,11 +93,9 @@ class SignalAlertPolicy(private val config: AlertPolicyConfig = AlertPolicyConfi
         // 적색에서 '알림을 듣고 반응한 뒤에도 강하게 제동해야 하는가': 거리를 알면 필요한 감속도로, 모르면 차속으로
         // 이미 정지선을 지나 교차로 안에 있으면(신호등까지 거리가 정지선 간격보다 짧음) 적색 경고는 오히려 위험
         val pastStopLine = distanceToLightM != null && distanceToLightM < config.stopLineOffsetM - 2f
-        val redUrgent = !braking && !stopped && !pastStopLine && if (required != null) {
-            required >= config.urgentDecelMps2
-        } else {
-            vehicle.speedKmh >= config.urgentSpeedKmh
-        }
+        // 거리를 모를 때(등화가 너무 작게 보일 만큼 멀 때)는 긴급하지 않다 -> 일반 정지 안내만 (거짓 경보 방지)
+        val redUrgent = !braking && vehicle.speedKmh >= config.urgentMinSpeedKmh && !pastStopLine &&
+            required != null && required >= config.urgentDecelMps2
         redUrgentActive = state.color == SignalColor.RED && redUrgent
 
         if (change != null && change.from.color != change.to.color) {

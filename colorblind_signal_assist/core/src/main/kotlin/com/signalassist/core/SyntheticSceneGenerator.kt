@@ -29,6 +29,8 @@ data class SceneSpec(
     val leadCarBrakeLights: Boolean = true,
     /** false 면 신호등 없는 도로 (교차로 사이 구간) */
     val trafficLightVisible: Boolean = true,
+    /** 앞차를 그릴지 (실제 주행 기록에서 앞차가 없으면 false) */
+    val leadCarVisible: Boolean = true,
     val seed: Int = 0,
 )
 
@@ -123,6 +125,7 @@ object SyntheticSceneGenerator {
         fillRect(px, w, h, w * 0.85f, lampY, w * 0.85f + 4, horizon.toFloat(), intArrayOf(60, 60, 65))
         fillCircle(px, w, h, w * 0.85f - 12, lampY, 7f, intArrayOf(245, 242, 230))
         // 앞차 + 브레이크등 (지평선 아래 -> 무시되어야 함)
+        if (!spec.leadCarVisible) return
         val carY = horizon + 30f
         fillRect(px, w, h, w * 0.40f, carY, w * 0.58f, carY + 70f, intArrayOf(30, 32, 36))
         if (spec.leadCarBrakeLights) {

@@ -19,4 +19,6 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    // 실제 도로 주행 기록이 바뀌면 테스트를 다시 돌리도록 입력으로 등록
+    inputs.files(fileTree("../sim/data") { include("centum_trace.csv") }).withPropertyName("simTrace").optional()
 }

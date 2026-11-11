@@ -29,18 +29,19 @@ class SignalAlertPolicyTest {
     @Test
     fun `red at speed without braking repeats urgent warning`() {
         val p = SignalAlertPolicy()
-        val first = p.evaluate(st(SignalColor.RED), StateChange(st(SignalColor.YELLOW), st(SignalColor.RED)), v(45f), 0)
+        // 신호등 40m 앞을 45km/h 로 (정지선까지 강한 제동이 필요한 거리), 운전자가 반응하지 않는 상황이 계속됨
+        val first = p.evaluate(st(SignalColor.RED), StateChange(st(SignalColor.YELLOW), st(SignalColor.RED)), v(45f), 0, null, 40f)
         assertEquals(listOf(AlertType.RED_URGENT), first.map { it.type })
-        val repeats = (1..70).flatMap { p.evaluate(st(SignalColor.RED), null, v(45f), it * 100L) }
+        val repeats = (1..70).flatMap { p.evaluate(st(SignalColor.RED), null, v(45f), it * 100L, null, 40f) }
         assertEquals(2, repeats.size) // 3s, 6s
     }
 
     @Test
     fun `urgent warning stops once driver brakes hard`() {
         val p = SignalAlertPolicy()
-        p.evaluate(st(SignalColor.RED), StateChange(st(SignalColor.YELLOW), st(SignalColor.RED)), v(45f), 0)
+        p.evaluate(st(SignalColor.RED), StateChange(st(SignalColor.YELLOW), st(SignalColor.RED)), v(45f), 0, null, 40f)
         // 1초에 15km/h 씩 감속
-        val alerts = (1..30).flatMap { p.evaluate(st(SignalColor.RED), null, v((45f - it * 1.5f).coerceAtLeast(0f)), it * 100L) }
+        val alerts = (1..30).flatMap { p.evaluate(st(SignalColor.RED), null, v((45f - it * 1.5f).coerceAtLeast(0f)), it * 100L, null, 40f) }
         assertTrue(alerts.none { it.type == AlertType.RED_URGENT })
     }
 
@@ -66,10 +67,16 @@ class SignalAlertPolicyTest {
     }
 
     @Test
-    fun `unknown gear (Pleos has no gear API) still warns by speed`() {
+    fun `unknown gear (Pleos has no gear API) still warns`() {
         val p = SignalAlertPolicy()
-        val a = p.evaluate(st(SignalColor.RED), StateChange(st(SignalColor.YELLOW), st(SignalColor.RED)), v(45f, Gear.UNKNOWN), 0)
+        val a = p.evaluate(st(SignalColor.RED), StateChange(st(SignalColor.YELLOW), st(SignalColor.RED)), v(45f, Gear.UNKNOWN), 0, null, 40f)
         assertEquals(listOf(AlertType.RED_URGENT), a.map { it.type })
+    }
+
+    @Test
+    fun `unknown distance (light too far to measure) is a calm stop cue, never urgent`() {
+        val a = SignalAlertPolicy().evaluate(st(SignalColor.RED), StateChange(st(SignalColor.YELLOW), st(SignalColor.RED)), v(50f), 0, null, null)
+        assertEquals(listOf(AlertType.RED_STOP), a.map { it.type })
     }
 
     @Test
@@ -92,7 +99,7 @@ class SignalAlertPolicyTest {
         // 45km/h, 신호등 40m (정지선 28m): 필요한 감속 2.8 m/s² -> 긴급
         val near = SignalAlertPolicy().evaluate(st(SignalColor.RED), change, v(45f), 0, null, 40f)
         assertEquals(listOf(AlertType.RED_URGENT), near.map { it.type })
-        // 20km/h 인데 15m 앞 (정지선 3m): 저속이어도 필요한 감속 5.1 m/s² -> 긴급
+        // 20km/h 인데 15m 앞 (정지선 3m): 비교적 저속이어도 필요한 감속이 커서 -> 긴급
         val slowButClose = SignalAlertPolicy().evaluate(st(SignalColor.RED), change, v(20f), 0, null, 15f)
         assertEquals(listOf(AlertType.RED_URGENT), slowButClose.map { it.type })
     }
@@ -126,5 +133,13 @@ class SignalAlertPolicyTest {
         // 신호를 본 적 없는 정차 (정체 등)에는 안내하지 않음
         val q = SignalAlertPolicy()
         assertTrue((0..40).flatMap { q.evaluate(SignalState.UNKNOWN, null, v(0f), it * 100L) }.isEmpty())
+    }
+
+    @Test
+    fun `no urgent warning while pulling away at the stop line before green is confirmed`() {
+        val p = SignalAlertPolicy()
+        // 정지선에서 출발하는 중 (초록 확정 전이라 아직 RED 상태), 신호등 12m 앞
+        val a = (0..5).flatMap { p.evaluate(st(SignalColor.RED), null, v(it * 2.5f), it * 100L, null, 12f) }
+        assertTrue(a.none { it.type == AlertType.RED_URGENT }, "$a")
     }
 }

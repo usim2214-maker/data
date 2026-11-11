@@ -221,12 +221,19 @@ data class ScenarioSample(
  * 시나리오를 일정 fps 로 재생하며 (합성 프레임, 차량·실내·내비 상태)를 만든다.
  * Android 앱의 '시뮬레이션 모드'와 PC 데모·테스트가 같은 코드를 쓴다.
  */
+/** (프레임, 차량·실내·내비 상태)를 순서대로 내주는 공급원. 합성 시나리오와 실제 도로 주행 기록이 함께 쓴다 */
+interface SampleSource {
+    val frameCount: Int
+    fun sample(index: Int): ScenarioSample
+    fun samples(): Sequence<ScenarioSample> = (0 until frameCount).asSequence().map(::sample)
+}
+
 class ScenarioPlayer(
     val scenario: Scenario,
     val fps: Int = 10,
     private val width: Int = 960,
     private val height: Int = 540,
-) {
+) : SampleSource {
     /** 수평 화각 약 60° 카메라의 초점거리(px) */
     private val focalPx = width * 0.866f
     private val lampRadiusM = 0.15f // 300mm 등화
@@ -234,7 +241,7 @@ class ScenarioPlayer(
     private val lightLateralM = 1.0f
     private val frameIntervalMs = 1000L / fps
 
-    val frameCount: Int get() = (scenario.durationMs / frameIntervalMs).toInt() + 1
+    override val frameCount: Int get() = (scenario.durationMs / frameIntervalMs).toInt() + 1
 
     private val traveled = FloatArray(frameCount)
     private val distances = FloatArray(frameCount)
@@ -254,7 +261,7 @@ class ScenarioPlayer(
         }
     }
 
-    fun sample(index: Int): ScenarioSample {
+    override fun sample(index: Int): ScenarioSample {
         val i = index.coerceIn(0, frameCount - 1)
         val t = i * frameIntervalMs
         val distance = distances[i]
@@ -289,5 +296,4 @@ class ScenarioPlayer(
         )
     }
 
-    fun samples(): Sequence<ScenarioSample> = (0 until frameCount).asSequence().map(::sample)
 }

@@ -132,8 +132,9 @@ data class Scenario(
             targetNeeds = CV,
             durationMs = 16_000,
             phases = listOf(SignalPhase(0, s(SignalColor.RED)), SignalPhase(12_000, s(SignalColor.GREEN))),
-            speeds = listOf(SpeedKey(0, 30f), SpeedKey(2_000, 30f), SpeedKey(7_000, 0f), SpeedKey(16_000, 0f)),
-            startDistanceM = 45f,
+            // 빨간불을 보자마자(0.5초) 부드럽게 감속해 신호등 바로 아래(약 7.7m)에 정차
+            speeds = listOf(SpeedKey(0, 30f), SpeedKey(500, 30f), SpeedKey(7_000, 0f), SpeedKey(16_000, 0f)),
+            startDistanceM = 39f,
         )
 
         /** 야간, 적색 + 좌회전 화살표 동시 신호. 내비 경로는 좌회전 */

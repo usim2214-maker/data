@@ -17,6 +17,14 @@ data class OutputPlan(
     val largeText: Boolean,
     /** 야간: 화면 깜빡임 밝기를 낮춰 눈부심 방지 */
     val dimmed: Boolean = false,
+    /** 위험도에 맞는 깜빡임 방식 */
+    val flashPattern: FlashPattern = FlashPattern.DOUBLE,
+    /** 알림음 크기 (위험도별) */
+    val toneGain: Float = 1f,
+    /** 고령자용 낮은 음역 알림음 */
+    val lowPitchTones: Boolean = false,
+    /** 음성 속도 (긴급은 빠르게, 고령자는 천천히) */
+    val speechRate: Float = 1f,
 ) {
     /** 화면 배너·헤드업 알림만 (소리·음성·깜빡임 없음) */
     val silent get() = !tone && !voice && !visualFlash
@@ -49,6 +57,16 @@ data class DriverProfile(val needs: Set<DriverNeed>) {
     /** 내비 안내를 화면 카드로 미리 보여줄지 */
     val navigationCards get() = has(DriverNeed.HEARING) || has(DriverNeed.ATTENTION)
 
+    /**
+     * 알림을 받고 브레이크를 밟기까지 걸리는 시간(초). 긴급 경고 시점을 이만큼 앞당긴다.
+     * - 고령·주의력: +0.5초 (반응이 느려지는 경향)
+     * - 청각장애만: +0.3초 (소리 없이 화면으로만 알아채야 하므로)
+     */
+    val reactionTimeS: Float
+        get() = 1.0f + (if (has(DriverNeed.ATTENTION)) 0.5f else 0f) + (if (hearingOnly) 0.3f else 0f)
+
+    private val hearingOnly get() = has(DriverNeed.HEARING) && needs.size == 1
+
     /** 이 프로필에서 낼 알림인지 (색 구분에 문제 없는 주의력 프로필은 위험·리마인드만) */
     fun accepts(alert: Alert): Boolean {
         if (alert.category != AlertCategory.SIGNAL) return true
@@ -57,12 +75,20 @@ data class DriverProfile(val needs: Set<DriverNeed>) {
     }
 
     fun outputFor(alert: Alert): OutputPlan {
-        val hearingOnly = has(DriverNeed.HEARING) && needs.size == 1
+        val elderly = has(DriverNeed.ATTENTION)
         return OutputPlan(
             tone = !hearingOnly,
             voice = !hearingOnly,
             visualFlash = has(DriverNeed.HEARING) || alert.level >= AlertLevel.WARNING,
-            largeText = has(DriverNeed.LOW_VISION) || has(DriverNeed.ATTENTION),
+            largeText = has(DriverNeed.LOW_VISION) || elderly,
+            flashPattern = FlashPattern.forLevel(alert.level),
+            toneGain = ToneLibrary.gainFor(alert.level),
+            lowPitchTones = elderly,
+            speechRate = when {
+                alert.level == AlertLevel.URGENT -> if (elderly) 1.0f else 1.15f
+                elderly -> 0.9f
+                else -> 1.0f
+            },
         )
     }
 

@@ -48,10 +48,19 @@ class SignalAlertPolicy(private val config: AlertPolicyConfig = AlertPolicyConfi
     private var unknownSinceMs: Long? = null
     private var lostAnnounced = false
 
+    /** 지금 '적색 + 제동 필요' 상황이 계속되는 중인지 (화면 지속 표시용) */
+    var redUrgentActive = false
+        private set
+
+    /** 정차 중 신호등을 놓친 상태가 계속되는 중인지 (화면 지속 표시용) */
+    var signalLostActive = false
+        private set
+
     fun reset() {
         cooldowns.clear(); greenSinceMs = null; greenReminded = false
         prevSpeed = null; prevTimeMs = null; decelKmhPerS = 0f
         lastKnownMs = null; unknownSinceMs = null; lostAnnounced = false
+        redUrgentActive = false; signalLostActive = false
     }
 
     fun evaluate(
@@ -62,19 +71,23 @@ class SignalAlertPolicy(private val config: AlertPolicyConfig = AlertPolicyConfi
         navigation: NavigationState? = null,
         /** 신호등까지 추정 거리 (등화 크기 기반). null 이면 차속만으로 판단 */
         distanceToLightM: Float? = null,
+        /** 운전자 반응 시간(초). 프로필마다 다름 ([DriverProfile.reactionTimeS]). null 이면 설정값 */
+        reactionTimeS: Float? = null,
     ): List<Alert> {
+        val tr = reactionTimeS ?: config.reactionTimeS
         updateDecel(vehicle, nowMs)
         // 기어를 읽을 수 있을 때만 P/R 에서 끈다. (Pleos Vehicle State 에는 기어가 없어 UNKNOWN 일 수 있음)
         if (vehicle.gear == Gear.PARK || vehicle.gear == Gear.REVERSE) {
             greenSinceMs = null
+            redUrgentActive = false
             return emptyList()
         }
 
         val out = ArrayList<Alert>(2)
         val stopped = vehicle.speedKmh < config.stoppedSpeedKmh
         val braking = decelKmhPerS >= config.brakingDecelKmhPerS || vehicle.brakePedal == true
-        val required = requiredDecelMps2(vehicle.speedKmh, distanceToLightM)
-        // 적색에서 '지금 강하게 제동해야 하는가': 거리를 알면 필요한 감속도로, 모르면 차속으로
+        val required = requiredDecelMps2(vehicle.speedKmh, distanceToLightM, tr)
+        // 적색에서 '알림을 듣고 반응한 뒤에도 강하게 제동해야 하는가': 거리를 알면 필요한 감속도로, 모르면 차속으로
         // 이미 정지선을 지나 교차로 안에 있으면(신호등까지 거리가 정지선 간격보다 짧음) 적색 경고는 오히려 위험
         val pastStopLine = distanceToLightM != null && distanceToLightM < config.stopLineOffsetM - 2f
         val redUrgent = !braking && !stopped && !pastStopLine && if (required != null) {
@@ -82,6 +95,7 @@ class SignalAlertPolicy(private val config: AlertPolicyConfig = AlertPolicyConfi
         } else {
             vehicle.speedKmh >= config.urgentSpeedKmh
         }
+        redUrgentActive = state.color == SignalColor.RED && redUrgent
 
         if (change != null && change.from.color != change.to.color) {
             when (change.to.color) {
@@ -92,7 +106,7 @@ class SignalAlertPolicy(private val config: AlertPolicyConfig = AlertPolicyConfi
                     if (fromStop && stopped) fire(AlertType.GREEN_GO, nowMs, out)
                 }
                 SignalColor.YELLOW -> if (!stopped) {
-                    val stoppable = canStopComfortably(vehicle.speedKmh, distanceToLightM)
+                    val stoppable = canStopComfortably(vehicle.speedKmh, distanceToLightM, tr)
                     fire(if (stoppable == false) AlertType.YELLOW_DILEMMA else AlertType.YELLOW_CAUTION, nowMs, out)
                 }
                 SignalColor.RED -> when {
@@ -133,6 +147,7 @@ class SignalAlertPolicy(private val config: AlertPolicyConfig = AlertPolicyConfi
             fire(AlertType.SIGNAL_LOST, nowMs, out)
         }
         if (vehicle.speedKmh >= 10f) lostAnnounced = false
+        signalLostActive = lostAnnounced && state.color == SignalColor.UNKNOWN && stopped
 
         // 초록불인데 출발하지 않음 -> 한 번만 리마인드
         val since = greenSinceMs
@@ -147,22 +162,26 @@ class SignalAlertPolicy(private val config: AlertPolicyConfig = AlertPolicyConfi
         return out
     }
 
-    /** 정지선에 서기 위해 필요한 감속도 v²/(2d). 거리를 모르면 null */
-    private fun requiredDecelMps2(speedKmh: Float, distanceToLightM: Float?): Float? {
+    /**
+     * 알림 후 반응 시간 [reactionS] 동안 그대로 달린 뒤, 정지선에 서기 위해 필요한 감속도 v²/(2d).
+     * 반응할 여유조차 없으면 무한대. 거리를 모르면 null.
+     */
+    private fun requiredDecelMps2(speedKmh: Float, distanceToLightM: Float?, reactionS: Float): Float? {
         val d = distanceToLightM ?: return null
-        val stopDist = (d - config.stopLineOffsetM).coerceAtLeast(1f)
         val v = speedKmh / 3.6f
-        return v * v / (2f * stopDist)
+        val room = d - config.stopLineOffsetM - v * reactionS
+        if (room <= 0.5f) return Float.POSITIVE_INFINITY
+        return v * v / (2f * room)
     }
 
     /**
      * 황색 딜레마 구간 판단: 반응 시간 동안 달리는 거리를 빼고도 편안한 감속으로 정지선에 설 수 있는가.
      * 서기 어려운데 "정지하세요"라고 하면 급정거로 뒤차 추돌을 부를 수 있다. 거리를 모르면 null.
      */
-    private fun canStopComfortably(speedKmh: Float, distanceToLightM: Float?): Boolean? {
+    private fun canStopComfortably(speedKmh: Float, distanceToLightM: Float?, reactionS: Float): Boolean? {
         val d = distanceToLightM ?: return null
         val v = speedKmh / 3.6f
-        val brakingRoom = d - config.stopLineOffsetM - v * config.reactionTimeS
+        val brakingRoom = d - config.stopLineOffsetM - v * reactionS
         if (brakingRoom <= 0f) return false
         return v * v / (2f * brakingRoom) <= config.comfortableStopDecelMps2
     }

@@ -23,13 +23,17 @@ class SignalAssistEngine(
         vehicle: VehicleState,
         timestampMs: Long,
         navigation: NavigationState? = null,
+        reactionTimeS: Float? = null,
     ): EngineOutput {
         val detection = detector.detect(frame)
         val change = tracker.update(detection)
         val d = distance.update(detection, frame.width, tracker.state.color)
-        val alerts = policy.evaluate(tracker.state, change, vehicle, timestampMs, navigation, d)
+        val alerts = policy.evaluate(tracker.state, change, vehicle, timestampMs, navigation, d, reactionTimeS)
         return EngineOutput(timestampMs, detection, tracker.state, change, vehicle, alerts, d)
     }
+
+    val redUrgentActive get() = policy.redUrgentActive
+    val signalLostActive get() = policy.signalLostActive
 
     fun reset() {
         tracker.reset()
@@ -57,6 +61,11 @@ data class DrivingOutput(
     val alerts: List<Alert>,
     /** 중재를 거친 실제 전달 목록 (알림마다 소리·음성·깜빡임 여부) */
     val deliveries: List<Delivery> = emptyList(),
+    /**
+     * 지금 계속되고 있는 위험. 깜빡임은 1~2초 만에 끝나므로, 도로를 보느라 놓친 운전자(특히 청각장애)가
+     * 나중에 화면을 봐도 알 수 있도록 상황이 끝날 때까지 화면에 남겨 둔다.
+     */
+    val activeHazards: List<AlertType> = emptyList(),
 ) {
     val signalState: SignalState get() = signal?.state ?: SignalState.UNKNOWN
 }
@@ -84,7 +93,7 @@ class DrivingAssistEngine(
         val fresh = if (p.signalAssist && input.frame != null &&
             frameScheduler.shouldProcess(input.timestampMs, input.vehicle, input.navigation)
         ) {
-            signalEngine.process(input.frame, input.vehicle, input.timestampMs, input.navigation)
+            signalEngine.process(input.frame, input.vehicle, input.timestampMs, input.navigation, p.reactionTimeS)
                 .also { frameScheduler.observe(input.timestampMs, it); lastSignal = it }
         } else {
             null
@@ -106,8 +115,21 @@ class DrivingAssistEngine(
         sirenWasOn = siren
         alerts.sortByDescending { it.level }
         val deliveries = arbiter.arbitrate(alerts, p, input.timestampMs, input.cabin.isDark)
-        return DrivingOutput(input, signal, alerts, deliveries)
+        return DrivingOutput(input, signal, alerts, deliveries, activeHazards(input, p))
     }
+
+    private fun activeHazards(input: DrivingInput, p: DriverProfile): List<AlertType> = buildList {
+        val speed = input.vehicle.speedKmh
+        val c = input.cabin
+        if (p.signalAssist && signalEngine.redUrgentActive && p.accepts(Alert(AlertType.RED_URGENT, 0))) add(AlertType.RED_URGENT)
+        if (VehicleFeature.WARNINGS in p.vehicleFeatures) {
+            if (c.doorOpen == true && speed >= 5f) add(AlertType.DOOR_OPEN_MOVING)
+            if ((c.seatbeltWarning == true || c.driverSeatbeltBuckled == false) && speed >= 10f) add(AlertType.SEATBELT_UNBUCKLED)
+        }
+        if (p.sirenAlerts && input.sirenNearby == true) add(AlertType.SIREN_NEARBY)
+        if (VehicleFeature.TURN_SIGNAL in p.vehicleFeatures && vehiclePolicy.turnSignalForgotten) add(AlertType.TURN_SIGNAL_LEFT_ON)
+        if (p.has(DriverNeed.COLOR_VISION) && signalEngine.signalLostActive) add(AlertType.SIGNAL_LOST)
+    }.sortedByDescending { it.level }
 
     fun reset() {
         signalEngine.reset()

@@ -29,7 +29,8 @@ class NavigationAlertPolicy(private val thresholdsM: List<Float> = listOf(300f, 
             val meters = (Math.round(d / 10f) * 10).coerceAtLeast(10)
             val text = if (m == Maneuver.DESTINATION) "${meters}m 앞 목적지" else "${meters}m 앞 ${m.labelKo}"
             val road = nav.roadName?.let { " ($it)" } ?: ""
-            out += Alert(AlertType.NAV_MANEUVER_SOON, nowMs, customMessage = "$text$road", customSymbol = m.symbol)
+            out += Alert(AlertType.NAV_MANEUVER_SOON, nowMs, customMessage = "$text$road", customSymbol = m.symbol,
+                customHeadline = "${m.symbol} ${meters}m")
         }
         return out
     }

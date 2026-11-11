@@ -160,6 +160,7 @@ private class ShortsRenderer {
         var lamps: List<LampDetection> = emptyList()
         var distance: Float? = null
         var banner: Delivery? = null
+        var hazards: List<com.signalassist.core.AlertType> = emptyList()
         var flash: Delivery? = null
         var flashAt = 0L
         var index = -1
@@ -173,12 +174,13 @@ private class ShortsRenderer {
                 val out = engine.process(sample.toInput())
                 out.signal?.let { signal = it.state; lamps = it.detection.lamps; distance = it.distanceM }
                 trip.update(out)?.let { summary = it.summaryKo() }
+                hazards = out.activeHazards
                 if (!live) continue
                 val now = sample.timestampMs
                 for (d in out.deliveries) {
                     if (banner == null || !d.plan.silent) banner = d
                     if (d.plan.visualFlash) { flash = d; flashAt = now }
-                    if (d.plan.tone) audio.add(globalMs + (now - c.fromMs), d.alert.tone)
+                    if (d.plan.tone) audio.add(globalMs + (now - c.fromMs), d.alert.tone, d.plan)
                 }
             }
         }
@@ -216,6 +218,7 @@ private class ShortsRenderer {
             }
             val v = sample.vehicle
             g.chip(24f, camY + camH - 70f, "%.0f km/h".format(v.speedKmh), Color(0, 0, 0, 170), size = 34f)
+            if (hazards.isNotEmpty()) drawHazardBar(g, 24f, camY + 20f, SW - 48f, hazards, now, 38f)
 
             // 앱 화면
             val panelY = camY + camH + 40
@@ -267,31 +270,8 @@ private class ShortsRenderer {
                 for (ch in chips) x += g.chip(x, by + 170f, ch, Pal.line, size = 30f) + 12
             }
 
-            // 화면 깜빡임 (청각장애 프로필, 경고 이상)
-            flash?.let { fl ->
-                val dur = if (fl.alert.level == AlertLevel.URGENT) 2_400 else 1_800
-                val ft = now - flashAt
-                if (ft in 0..dur) {
-                    val keys = floatArrayOf(1f, 0.2f, 1f, 0.2f, 1f, 0f)
-                    val p = ft.toFloat() / dur * (keys.size - 1)
-                    val i = p.toInt().coerceAtMost(keys.size - 2)
-                    val peak = if (fl.plan.dimmed) 0.45f else 0.9f
-                    val a = (keys[i] + (keys[i + 1] - keys[i]) * (p - i)) * peak
-                    val old = g.composite
-                    g.composite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, a.coerceIn(0f, 1f))
-                    g.color = when (fl.alert.level) {
-                        AlertLevel.URGENT -> Pal.vermilion; AlertLevel.WARNING -> Color(170, 70, 0)
-                        AlertLevel.CAUTION -> Color(120, 110, 20); AlertLevel.INFO -> Color(0, 90, 140)
-                    }
-                    g.fillRect(0, 0, SW, SH)
-                    g.composite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, (a / peak).coerceIn(0f, 1f))
-                    Fonts.center(g, flashHeadline(fl.alert), SW / 2f, 820f, Fonts.b(170f), Color.WHITE)
-                    Fonts.wrap(g, fl.alert.message, Fonts.b(64f), SW - 140f).forEachIndexed { k, l ->
-                        Fonts.center(g, l, SW / 2f, 1000f + k * 84, Fonts.b(64f), Color.WHITE)
-                    }
-                    g.composite = old
-                }
-            }
+            // 화면 깜빡임 (위험도별 방식, 안내는 테두리만)
+            flash?.let { fl -> drawFlashOverlay(g, SW, SH, fl, now - flashAt, 150f, 62f, 820f, 990f) }
 
             // 주행 요약
             if (t > clipMs && summary != null) {

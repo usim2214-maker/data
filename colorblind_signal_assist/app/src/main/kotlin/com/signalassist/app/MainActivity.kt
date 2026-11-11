@@ -39,6 +39,7 @@ import com.signalassist.core.DriverProfile
 import com.signalassist.core.OutputPlan
 import com.signalassist.core.Scenario
 import com.signalassist.core.TurnSignal
+import com.signalassist.core.ongoingLabelKo
 import kotlinx.coroutines.launch
 
 /**
@@ -65,6 +66,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var status: TextView
     private lateinit var controls: LinearLayout
     private lateinit var flash: TextView
+    private lateinit var edgeFlash: View
+    private lateinit var hazardBar: TextView
     private lateinit var speedRow: LinearLayout
     private lateinit var lessonRow: LinearLayout
     private lateinit var tripView: TextView
@@ -135,6 +138,7 @@ class MainActivity : AppCompatActivity() {
     private fun render(s: UiSnapshot) {
         val out = s.output
         panel.state = out.signalState
+        renderHazards(out.activeHazards)
         if (!drivingRestricted && s.preview != null) preview.setImageBitmap(s.preview)
 
         val nav = out.input.navigation
@@ -150,30 +154,75 @@ class MainActivity : AppCompatActivity() {
         speedRow.visibility = if (!s.hasRealSpeed && !drivingRestricted) View.VISIBLE else View.GONE
     }
 
+    private var flashAnim: android.animation.ValueAnimator? = null
+
+    private fun levelColor(level: AlertLevel) = when (level) {
+        AlertLevel.URGENT -> SafePalette.VERMILION
+        AlertLevel.WARNING -> Color.rgb(170, 70, 0)
+        AlertLevel.CAUTION -> Color.rgb(120, 110, 20)
+        AlertLevel.INFO -> Color.rgb(0, 90, 140)
+    }
+
+    /**
+     * 화면 깜빡임: 위험도에 맞는 방식(FlashPattern)으로.
+     * - 안내: 테두리만 한 번 / 주의: 화면 한 번 / 경고: 두 번 / 긴급: 빠르게 다섯 번 (모두 초당 3회 이하)
+     * - 큰 한두 단어(headline)를 먼저, 문장은 작게: 한눈에 읽히도록
+     * - 야간에는 밝기를 낮춰 눈부심 방지
+     */
     private fun showAlert(alert: Alert, plan: OutputPlan) {
         banner.text = "${alert.symbol}  ${alert.message}"
         if (!plan.visualFlash) return
-        flash.text = "${alert.symbol}\n${alert.message}"
-        flash.setBackgroundColor(
-            when (alert.level) {
-                AlertLevel.URGENT -> SafePalette.VERMILION
-                AlertLevel.WARNING -> Color.rgb(170, 70, 0)
-                AlertLevel.CAUTION -> Color.rgb(120, 110, 20)
-                AlertLevel.INFO -> Color.rgb(0, 90, 140)
-            },
-        )
-        flash.visibility = View.VISIBLE
-        // 두 번 깜빡인 뒤 사라짐 (소리를 못 듣는 운전자가 주변 시야로도 알아챌 수 있게).
-        // 초당 3회 미만으로 깜빡여 광과민성 발작 기준을 넘지 않고, 야간에는 밝기를 낮춰 눈부심을 막는다.
+        val pattern = plan.flashPattern
+        val target: View = if (pattern.fullScreen) flash else edgeFlash
+        val color = levelColor(alert.level)
+        if (pattern.fullScreen) {
+            val head = "${alert.symbol} ${alert.headline}"
+            flash.text = android.text.SpannableString("$head\n${alert.message}").apply {
+                setSpan(android.text.style.RelativeSizeSpan(1.9f), 0, head.length, 0)
+            }
+            flash.setBackgroundColor(color)
+        } else {
+            (edgeFlash.background as android.graphics.drawable.GradientDrawable).setStroke(dp(14), color)
+        }
+        flashAnim?.cancel()
+        flash.visibility = View.GONE; edgeFlash.visibility = View.GONE
+        target.visibility = View.VISIBLE
         val peak = if (plan.dimmed) 0.45f else 1f
-        ObjectAnimator.ofFloat(flash, View.ALPHA, peak, 0.2f * peak, peak, 0.2f * peak, peak, 0f).apply {
-            duration = if (alert.level == AlertLevel.URGENT) 2_400 else 1_800
+        flashAnim = android.animation.ValueAnimator.ofInt(0, pattern.durationMs).apply {
+            duration = pattern.durationMs.toLong()
+            interpolator = android.view.animation.LinearInterpolator()
+            addUpdateListener { target.alpha = pattern.alphaAt((it.animatedValue as Int).toLong()) * peak }
             addListener(object : android.animation.AnimatorListenerAdapter() {
-                override fun onAnimationEnd(a: android.animation.Animator) { flash.visibility = View.GONE }
+                override fun onAnimationEnd(a: android.animation.Animator) { target.visibility = View.GONE }
             })
             start()
         }
     }
+
+    /**
+     * 계속되는 위험은 깜빡임이 끝나도 화면 위쪽에 남겨 둔다 (도로를 보느라 깜빡임을 놓친 운전자용).
+     * 천천히(1초 주기) 밝기가 변해 주변 시야에서도 눈에 띄게 한다.
+     */
+    private fun renderHazards(hazards: List<com.signalassist.core.AlertType>) {
+        if (hazards.isEmpty()) {
+            hazardBar.visibility = View.GONE
+            hazardPulse?.cancel(); hazardPulse = null
+            return
+        }
+        hazardBar.text = "⚠ " + hazards.joinToString("  ·  ") { it.ongoingLabelKo }
+        hazardBar.setBackgroundColor(levelColor(hazards.first().level))
+        hazardBar.visibility = View.VISIBLE
+        if (hazardPulse == null) {
+            hazardPulse = ObjectAnimator.ofFloat(hazardBar, View.ALPHA, 1f, 0.55f).apply {
+                duration = 500
+                repeatMode = android.animation.ValueAnimator.REVERSE
+                repeatCount = android.animation.ValueAnimator.INFINITE
+                start()
+            }
+        }
+    }
+
+    private var hazardPulse: ObjectAnimator? = null
 
     /** 주행이 끝나면(주차) 요약 표시 + 가족에게 공유 */
     private fun showTrip(text: String) {
@@ -251,6 +300,14 @@ class MainActivity : AppCompatActivity() {
             orientation = LinearLayout.VERTICAL
             setPadding(24, 16, 24, 16)
         }
+        hazardBar = label(28f, Color.WHITE).apply {
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setPadding(16, 10, 16, 10)
+            visibility = View.GONE
+            contentDescription = "진행 중인 위험"
+        }
+        content.addView(hazardBar)
         val body = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         panel = SignalPanelView(this)
         val side = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(16, 0, 0, 0) }
@@ -313,6 +370,15 @@ class MainActivity : AppCompatActivity() {
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
         root.addView(flash, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+        // 안내(INFO)용: 화면을 덮지 않고 테두리만 빛남
+        edgeFlash = View(this).apply {
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(Color.TRANSPARENT); setStroke(dp(14), SafePalette.SKY_BLUE)
+            }
+            visibility = View.GONE
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }
+        root.addView(edgeFlash, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         return root
     }
 

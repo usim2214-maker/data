@@ -25,6 +25,9 @@ class VehicleAlertPolicy(private val config: VehicleAlertConfig = VehicleAlertCo
     private var headlightAnnounced = false
     private var turnSignalOnSince: Long? = null
     private var turnSignalAnnounced = false
+
+    /** 방향지시등 '깜빡함' 알림 후에도 여전히 켜져 있는지 (화면 지속 표시용) */
+    val turnSignalForgotten get() = turnSignalAnnounced && turnSignalOnSince != null
     private var rearSeenThisTrip = false
 
     fun reset() {

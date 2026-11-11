@@ -19,6 +19,7 @@ import com.signalassist.core.SignalState
 import com.signalassist.core.TonePattern
 import com.signalassist.core.TripRecorder
 import com.signalassist.core.TurnSignal
+import com.signalassist.core.ongoingLabelKo
 import java.awt.AlphaComposite
 import java.awt.BasicStroke
 import java.awt.Color
@@ -81,36 +82,22 @@ internal fun encodeVideo(out: File, w: Int, h: Int, audio: AudioTimeline, render
 
 // ---------------------------------------------------------------- 오디오
 
-/** 앱 TonePlayer 와 같은 알림음을 타임라인에 섞는다 */
+/** 앱과 같은 알림음(core ToneLibrary: 배음, 고령자 저음역, 위험도별 크기)을 타임라인에 섞는다 */
 internal class AudioTimeline {
-    private data class Note(val f: Double, val ms: Int, val gap: Int = 60)
-    private val patterns = mapOf(
-        TonePattern.RISING_DOUBLE to listOf(Note(523.0, 150), Note(784.0, 220)),
-        TonePattern.SINGLE_LONG to listOf(Note(660.0, 500)),
-        TonePattern.FALLING_TRIPLE to listOf(Note(880.0, 150), Note(660.0, 150), Note(440.0, 260)),
-        TonePattern.RAPID_BEEPS to List(6) { Note(1000.0, 80, 50) },
-        TonePattern.SOFT_CHIME to listOf(Note(1047.0, 120)),
-        TonePattern.DOUBLE_MID to listOf(Note(740.0, 140, 120), Note(740.0, 140)),
-    )
-    private val events = ArrayList<Pair<Long, TonePattern>>()
+    private data class Event(val atMs: Long, val pattern: TonePattern, val lowPitch: Boolean, val gain: Float)
+    private val events = ArrayList<Event>()
 
-    fun add(atMs: Long, p: TonePattern) { events += atMs to p }
+    fun add(atMs: Long, p: TonePattern, plan: com.signalassist.core.OutputPlan? = null) {
+        events += Event(atMs, p, plan?.lowPitchTones ?: false, plan?.toneGain ?: 1f)
+    }
 
     fun writeWav(file: File, totalMs: Long) {
         val n = (totalMs * SR / 1000).toInt() + SR
         val mix = FloatArray(n)
-        for ((at, p) in events) {
-            var pos = (at * SR / 1000).toInt()
-            for (note in patterns.getValue(p)) {
-                val len = note.ms * SR / 1000
-                val fade = min(len / 4, SR / 100)
-                for (i in 0 until len) {
-                    if (pos + i >= n) break
-                    val env = when { i < fade -> i.toDouble() / fade; i > len - fade -> (len - i).toDouble() / fade; else -> 1.0 }
-                    mix[pos + i] += (sin(2 * PI * note.f * i / SR) * env * 0.5).toFloat()
-                }
-                pos += len + note.gap * SR / 1000
-            }
+        for (e in events) {
+            val pcm = com.signalassist.core.ToneLibrary.synthesize(e.pattern, SR, e.lowPitch, e.gain * 0.6f)
+            val pos = (e.atMs * SR / 1000).toInt()
+            for (i in pcm.indices) if (pos + i < n) mix[pos + i] += pcm[i] / 32768f
         }
         DataOutputStream(FileOutputStream(file).buffered()).use { o ->
             fun le32(v: Int) { o.write(v and 0xff); o.write(v shr 8 and 0xff); o.write(v shr 16 and 0xff); o.write(v shr 24 and 0xff) }
@@ -157,11 +144,12 @@ internal object Fonts {
         var i = 0
         while (i < s.length) {
             val cp = s.codePointAt(i)
-            val f = if (font.canDisplay(cp)) font else symbol.deriveFont(font.style, font.size2D)
+            val useMain = usesMain(font, cp)
+            val f = if (useMain) font else symbol.deriveFont(font.style, font.size2D)
             var j = i + Character.charCount(cp)
             while (j < s.length) {
                 val c2 = s.codePointAt(j)
-                if ((if (font.canDisplay(c2)) font else null) != (if (f == font) font else null)) break
+                if (usesMain(font, c2) != useMain) break
                 j += Character.charCount(c2)
             }
             val run = s.substring(i, j)
@@ -172,6 +160,10 @@ internal object Fonts {
         }
         return cx - x
     }
+
+    /** 화살표·기호 블록은 나눔 글꼴이 빈 글리프로 그리는 경우가 있어 항상 기호 글꼴로 */
+    private fun usesMain(font: Font, cp: Int): Boolean =
+        font.canDisplay(cp) && cp !in 0x2190..0x21FF && cp !in 0x2600..0x27BF
 
     fun width(g: Graphics2D, text: String, font: Font): Float {
         val img = BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB)
@@ -359,6 +351,7 @@ private class VideoRenderer {
             "거리·제동 물리로 긴급 경고 판단",
             "황색 딜레마 구간: 급정거 유도 안 함",
             "인식 실패는 숨기지 않고 '직접 확인'",
+            "알림음 뒤 음성 · 위험이 끝날 때까지 화면 표시",
             "알림 중재 · 야간 감광 · 필요할 때만 영상 처리",
         ).forEachIndexed { k, l -> Fonts.draw(g, "• $l", colX[1], 236f + k * 40, Fonts.r(20f), Pal.text) }
         g.round(110, 470, 1060, 110, 20f, Pal.panel)
@@ -391,6 +384,7 @@ private class VideoRenderer {
         private var caption: List<String> = emptyList()
         private var captionUntil = 0L
         private var summary: String? = null
+        private var hazards: List<AlertType> = emptyList()
 
         private fun advanceTo(t: Long) {
             val target = min((t / 100).toInt(), player.frameCount - 1)
@@ -405,13 +399,14 @@ private class VideoRenderer {
                     distanceM = sig.distanceM
                 }
                 trip.update(out)?.let { summary = it.summaryKo() }
+                hazards = out.activeHazards
                 val now = sample.timestampMs
                 val captions = ArrayList<String>()
                 for (d in out.deliveries) {
                     banner = d; bannerAt = now
                     if (d.plan.visualFlash) { flash = d; flashAt = now }
-                    if (d.plan.tone) audio.add(baseMs + now, d.alert.tone)
-                    if (d.plan.voice) { voice = d.alert.message; voiceUntil = now + 3_200 }
+                    if (d.plan.tone) audio.add(baseMs + now, d.alert.tone, d.plan)
+                    if (d.plan.voice) { voice = d.alert.speech; voiceUntil = now + 3_200 }
                     captions += if (d.plan.silent) "동시에 나온 덜 중요한 알림은 소리 없이 화면에만 (알림 중재)" else why(d.alert)
                 }
                 if (captions.isNotEmpty()) { caption = captions.take(2); captionUntil = now + 4_000 }
@@ -427,6 +422,7 @@ private class VideoRenderer {
             g.color = Pal.bg; g.fillRect(0, 0, W, H)
             topBar(g, now)
             camera(g)
+            if (hazards.isNotEmpty()) drawHazardBar(g, 24f, 92f, 736f, hazards, now, 22f)
             appPanel(g)
             bottom(g, now)
             drawFlash(g, now)
@@ -527,27 +523,7 @@ private class VideoRenderer {
 
         private fun drawFlash(g: Graphics2D, now: Long) {
             val f = flash ?: return
-            val dur = if (f.alert.level == AlertLevel.URGENT) 2_400 else 1_800
-            val t = now - flashAt
-            if (t < 0 || t > dur) return
-            val keys = floatArrayOf(1f, 0.2f, 1f, 0.2f, 1f, 0f)
-            val p = t.toFloat() / dur * (keys.size - 1)
-            val i = p.toInt().coerceAtMost(keys.size - 2)
-            val peak = if (f.plan.dimmed) 0.45f else 0.9f
-            val a = (keys[i] + (keys[i + 1] - keys[i]) * (p - i)) * peak
-            val old = g.composite
-            g.composite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, a.coerceIn(0f, 1f))
-            g.color = when (f.alert.level) {
-                AlertLevel.URGENT -> Pal.vermilion; AlertLevel.WARNING -> Color(170, 70, 0)
-                AlertLevel.CAUTION -> Color(120, 110, 20); AlertLevel.INFO -> Color(0, 90, 140)
-            }
-            g.fillRect(0, 0, W, H)
-            g.composite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, (a / peak).coerceIn(0f, 1f))
-            Fonts.center(g, flashHeadline(f.alert), W / 2f, 300f, Fonts.b(96f), Color.WHITE)
-            Fonts.wrap(g, f.alert.message, Fonts.b(46f), W - 160f).forEachIndexed { k, l ->
-                Fonts.center(g, l, W / 2f, 400f + k * 60, Fonts.b(46f), Color.WHITE)
-            }
-            g.composite = old
+            drawFlashOverlay(g, W, H, f, now - flashAt, 96f, 46f, 300f, 400f)
         }
 
         private fun tripCard(g: Graphics2D, text: String) {
@@ -582,7 +558,7 @@ private class VideoRenderer {
         AlertType.YELLOW_CAUTION -> "반응 1초 + 편안한 제동으로 정지선에 설 수 있는 거리 → 정지 준비"
         AlertType.YELLOW_DILEMMA -> "정지선이 너무 가까워 급정거하면 추돌 위험 → '정지' 대신 주의 진행"
         AlertType.RED_STOP -> "보통 제동으로 설 수 있는 거리 → 놀라지 않게 차분한 안내"
-        AlertType.RED_URGENT -> "감속 없이 접근, 정지선까지 필요한 제동이 2.5m/s² 초과 → 긴급 경고"
+        AlertType.RED_URGENT -> "반응 시간까지 계산하면 지금 강한 제동이 필요 → 긴급 경고 (고령자는 더 일찍)"
         AlertType.SIGNAL_LOST -> "접근할 때 보이던 신호등이 사라짐 → 침묵 대신 직접 확인 요청"
         AlertType.LEFT_ARROW_FOR_ROUTE, AlertType.LEFT_ARROW_NOT_FOR_ROUTE, AlertType.LEFT_ARROW_ON -> "좌회전 화살표 + 내비 경로를 함께 판단"
         AlertType.SEATBELT_UNBUCKLED -> "벨트 경고음을 못 듣는 운전자 → 화면 깜빡임 (Pleos Vehicle State)"
@@ -638,13 +614,52 @@ internal fun toneName(t: TonePattern) = when (t) {
     TonePattern.DOUBLE_MID -> "같은 음 두 번"
 }
 
-/** 화면 깜빡임의 큰 제목: 신호는 모양 + 낱말로 (기호만 크게 그리면 빈 상자처럼 보임) */
-internal fun flashHeadline(a: Alert): String = when (a.type) {
-    AlertType.RED_STOP, AlertType.RED_URGENT -> "■ 정지"
-    AlertType.YELLOW_CAUTION, AlertType.YELLOW_DILEMMA -> "▲ 주의"
-    AlertType.GREEN_GO, AlertType.GREEN_REMINDER -> "● 진행"
-    AlertType.SIGNAL_LOST -> "? 직접 확인"
-    AlertType.LEFT_ARROW_ON, AlertType.LEFT_ARROW_FOR_ROUTE, AlertType.LEFT_ARROW_NOT_FOR_ROUTE -> "← 좌회전"
-    AlertType.SIREN_NEARBY -> "⚠ 사이렌"
-    else -> a.symbol
+/** 화면 깜빡임의 큰 제목: 모양 기호 + 한두 단어 (core 의 Alert.headline) */
+internal fun flashHeadline(a: Alert): String = "${a.symbol.replace("🚨", "⚠")} ${a.headline}"
+
+/**
+ * 화면 깜빡임 (앱과 같은 FlashPattern): 안내는 테두리만, 주의 1회, 경고 2회, 긴급 5회 (초당 3회 이하).
+ * 배경은 펄스로 깜빡이고 글자는 끝날 때까지 또렷하게 남겨 읽기 쉽게 한다.
+ */
+internal fun drawFlashOverlay(g: Graphics2D, w: Int, h: Int, d: Delivery, tMs: Long, headSize: Float, msgSize: Float, headY: Float, msgY: Float) {
+    val p = d.plan.flashPattern
+    if (tMs < 0 || tMs >= p.durationMs) return
+    val peak = if (d.plan.dimmed) 0.45f else 0.9f
+    val a = p.alphaAt(tMs) * peak
+    val color = when (d.alert.level) {
+        AlertLevel.URGENT -> Pal.vermilion; AlertLevel.WARNING -> Color(170, 70, 0)
+        AlertLevel.CAUTION -> Color(120, 110, 20); AlertLevel.INFO -> Pal.sky
+    }
+    val old = g.composite
+    if (!p.fullScreen) {
+        g.composite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, (p.alphaAt(tMs)).coerceIn(0f, 1f))
+        g.color = color; g.stroke = BasicStroke(w / 60f)
+        g.drawRect(0, 0, w, h)
+        g.composite = old
+        return
+    }
+    g.composite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, a.coerceIn(0f, 1f))
+    g.color = color
+    g.fillRect(0, 0, w, h)
+    val textAlpha = if (tMs < p.durationMs - 200) 1f else (p.durationMs - tMs) / 200f
+    g.composite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.55f * textAlpha)
+    g.color = Color.BLACK
+    g.fillRect(0, (headY - headSize * 1.2f).toInt(), w, (msgY - headY + headSize * 1.2f + msgSize * 2.6f).toInt())
+    g.composite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, textAlpha.coerceIn(0f, 1f))
+    Fonts.center(g, flashHeadline(d.alert), w / 2f, headY, Fonts.b(headSize), Color.WHITE)
+    Fonts.wrap(g, d.alert.message, Fonts.b(msgSize), w - 140f).take(2).forEachIndexed { k, l ->
+        Fonts.center(g, l, w / 2f, msgY + k * msgSize * 1.3f, Fonts.b(msgSize), Color.WHITE)
+    }
+    g.composite = old
+}
+
+/** 계속되는 위험 표시줄: 상황이 끝날 때까지 남고, 1초 주기로 천천히 밝기가 변한다 */
+internal fun drawHazardBar(g: Graphics2D, x: Float, y: Float, w: Float, hazards: List<AlertType>, nowMs: Long, size: Float) {
+    val pulse = 0.75f + 0.25f * sin(2 * PI * nowMs / 1000.0).toFloat()
+    val c = levelColor(hazards.first().level)
+    val old = g.composite
+    g.composite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, pulse)
+    g.round(x, y, w, size * 2.2f, size, c)
+    g.composite = old
+    Fonts.draw(g, "⚠ " + hazards.joinToString("  ·  ") { it.ongoingLabelKo }, x + size, y + size * 1.5f, Fonts.b(size), Color.WHITE)
 }

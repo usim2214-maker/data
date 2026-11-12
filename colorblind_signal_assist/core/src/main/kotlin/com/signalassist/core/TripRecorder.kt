@@ -21,7 +21,7 @@ data class TripSummary(
             append(vehicle.entries.sortedByDescending { it.key.level }.joinToString(", ") { "${labelOf(it.key)} ${it.value}회" })
         }
         append("\n")
-        append(if (urgentCount == 0) "긴급 경고 없이 안전하게 주행했습니다." else "긴급 경고 ${urgentCount}회가 있었습니다. 다음 주행에서 신호 접근 속도를 확인해 보세요.")
+        append(if (urgentCount == 0) "기록된 긴급 경고는 없습니다." else "긴급 경고 ${urgentCount}회가 있었습니다. 다음 주행에서 신호 접근 속도를 확인해 보세요.")
     }
 
     private fun labelOf(t: AlertType) = when (t) {
@@ -53,6 +53,11 @@ class TripRecorder(private val endAfterStoppedMs: Long = 180_000) {
     fun update(output: DrivingOutput): TripSummary? {
         val now = output.input.timestampMs
         val v = output.input.vehicle
+        if (!v.hasValidSpeed) {
+            lastMs = null
+            stoppedSinceMs = null
+            return null
+        }
         val start = startMs
         if (start == null) {
             if (v.speedKmh > 5f) { startMs = now; lastMs = now; distanceM = 0.0; counts.clear() } else return null

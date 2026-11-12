@@ -13,7 +13,9 @@ import kotlin.math.roundToInt
 object SignalQuery {
     private const val SURE = 0.8f
     private const val MAYBE = 0.6f
-    private const val STALE_MS = 2_000L
+    const val STALE_MS = 2_000L
+
+    fun isFresh(signal: EngineOutput, nowMs: Long) = nowMs - signal.timestampMs in 0..STALE_MS
 
     private fun word(c: SignalColor) = when (c) {
         SignalColor.RED -> "빨간불"; SignalColor.YELLOW -> "노란불"; SignalColor.GREEN -> "초록불"; SignalColor.UNKNOWN -> "신호"
@@ -31,7 +33,7 @@ object SignalQuery {
     }
 
     fun answer(signal: EngineOutput?, nowMs: Long): Alert {
-        val stale = signal == null || nowMs - signal.timestampMs > STALE_MS
+        val stale = signal == null || !isFresh(signal, nowMs)
         val c = signal?.state?.color ?: SignalColor.UNKNOWN
         val conf = signal?.confidence ?: 0f
         if (stale || c == SignalColor.UNKNOWN || conf < MAYBE) {

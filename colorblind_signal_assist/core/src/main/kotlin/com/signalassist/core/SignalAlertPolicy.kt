@@ -78,6 +78,11 @@ class SignalAlertPolicy(private val config: AlertPolicyConfig = AlertPolicyConfi
         reactionTimeS: Float? = null,
     ): List<Alert> {
         val tr = reactionTimeS ?: config.reactionTimeS
+        if (!vehicle.hasValidSpeed) {
+            prevSpeed = null; prevTimeMs = null; decelKmhPerS = 0f
+            redUrgentActive = false; greenSinceMs = null
+            return emptyList()
+        }
         updateDecel(vehicle, nowMs)
         // 기어를 읽을 수 있을 때만 P/R 에서 끈다. (Pleos Vehicle State 에는 기어가 없어 UNKNOWN 일 수 있음)
         if (vehicle.gear == Gear.PARK || vehicle.gear == Gear.REVERSE) {

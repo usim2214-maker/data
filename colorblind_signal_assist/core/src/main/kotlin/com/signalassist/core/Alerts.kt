@@ -44,7 +44,7 @@ enum class AlertType(
     LEFT_ARROW_NOT_FOR_ROUTE(AlertCategory.SIGNAL, AlertLevel.CAUTION, TonePattern.SOFT_CHIME, "좌회전 신호입니다. 직진은 기다리세요.", "←", "좌회전 신호, 직진은 대기하세요.", "직진 대기"),
     YELLOW_CAUTION(AlertCategory.SIGNAL, AlertLevel.CAUTION, TonePattern.SINGLE_LONG, "노란불입니다. 정지를 준비하세요.", "▲", "노란불, 정지 준비하세요.", "주의"),
     /** 정지선이 너무 가까워 편안하게 설 수 없을 때: 급정거(추돌 위험)를 유도하지 않는다 */
-    YELLOW_DILEMMA(AlertCategory.SIGNAL, AlertLevel.CAUTION, TonePattern.SINGLE_LONG, "노란불입니다. 급정거하지 말고 주의해서 진행하세요.", "▲", "노란불, 급정거 말고 주의해서 진행하세요.", "주의 진행"),
+    YELLOW_DILEMMA(AlertCategory.SIGNAL, AlertLevel.CAUTION, TonePattern.SINGLE_LONG, "노란불입니다. 신호와 주변 상황을 직접 확인하세요.", "▲", "노란불, 주변 상황을 직접 확인하세요.", "직접 확인"),
     RED_STOP(AlertCategory.SIGNAL, AlertLevel.WARNING, TonePattern.FALLING_TRIPLE, "빨간불입니다. 정지하세요.", "■", "빨간불, 정지하세요.", "정지"),
     /** 인식 실패를 숨기지 않는다: 침묵을 '여전히 빨간불'로 오해하지 않게 */
     SIGNAL_LOST(AlertCategory.SIGNAL, AlertLevel.CAUTION, TonePattern.SOFT_CHIME, "신호등이 보이지 않습니다. 신호를 직접 확인하세요.", "?", "신호등이 안 보입니다. 직접 확인하세요.", "직접 확인"),

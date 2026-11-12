@@ -23,6 +23,9 @@ import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.Spinner
 import android.widget.TextView
+import android.widget.ScrollView
+import android.graphics.drawable.GradientDrawable
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -53,9 +56,9 @@ class MainActivity : AppCompatActivity() {
 
     private val modeItems: List<ModeItem> =
         Scenario.ALL.map { ModeItem(AssistMode.Simulated(it.name), "시뮬레이션: ${it.titleKo}") } + listOf(
-            ModeItem(AssistMode.LiveNoCamera, "실차: 차량 경고·내비 (카메라 없이)"),
-            ModeItem(AssistMode.LiveSyntheticSignal, "실차 + 가상 신호 주기"),
-            ModeItem(AssistMode.LiveTestImages, "실차 + 테스트 이미지(assets)"),
+            ModeItem(AssistMode.LiveNoCamera, "차량 보조 · 신호·내비 미연결"),
+            ModeItem(AssistMode.LiveSyntheticSignal, "체험 · 차량 정보 + 가상 신호"),
+            ModeItem(AssistMode.LiveTestImages, "체험 · 차량 정보 + 테스트 이미지"),
         )
 
     private lateinit var settings: Settings
@@ -78,7 +81,28 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tripView: TextView
     private lateinit var tripRow: LinearLayout
     private var restartToken = 0
-    private var drivingRestricted = false
+    private var drivingRestricted = true
+    private var platformRestricted = true
+    private var selectedPage = 0
+    private var onboardingDialog: AlertDialog? = null
+    private var onboardingPromptShown = false
+    private lateinit var modeBadge: TextView
+    private lateinit var headline: TextView
+    private lateinit var replayButton: Button
+    private lateinit var homePage: View
+    private lateinit var settingsPage: View
+    private lateinit var demoPage: View
+    private lateinit var tabs: LinearLayout
+    private lateinit var connectionView: TextView
+    private lateinit var previewCard: LinearLayout
+    private lateinit var previewHint: TextView
+    private var hasPreview = false
+    private lateinit var modeSpinner: Spinner
+    private var lastAlertAt = 0L
+    private val backgroundColor = Color.rgb(11, 18, 29)
+    private val cardColor = Color.rgb(22, 34, 50)
+    private val mutedColor = Color.rgb(178, 194, 211)
+    private val accentColor = Color.rgb(114, 210, 223)
     private var car: Car? = null
     private var uxManager: CarUxRestrictionsManager? = null
 
@@ -91,7 +115,10 @@ class MainActivity : AppCompatActivity() {
         AssistService.start(this)
         requestPermissionsIfNeeded()
         connectUxRestrictions()
-        if (!settings.onboarded) startOnboarding()
+        if (!packageManager.hasSystemFeature("android.hardware.type.automotive")) {
+            platformRestricted = false
+            updateRestrictions()
+        }
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -103,6 +130,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        onboardingDialog?.dismiss()
+        onboardingTone.stop()
+        flashAnim?.cancel()
+        hazardPulse?.cancel()
         runCatching { uxManager?.unregisterListener() }
         car?.disconnect()
         super.onDestroy()
@@ -111,6 +142,10 @@ class MainActivity : AppCompatActivity() {
     private fun publishConfig() {
         AssistBus.config.value = AssistConfig(settings.mode, settings.profile, restartToken)
         applyProfileToUi(settings.profile)
+        if (::modeSpinner.isInitialized) {
+            val index = modeItems.indexOfFirst { it.mode.key == settings.mode.key }.coerceAtLeast(0)
+            if (modeSpinner.selectedItemPosition != index) modeSpinner.setSelection(index)
+        }
     }
 
     // ---- 주행 중 UX 제약 ----
@@ -124,7 +159,9 @@ class MainActivity : AppCompatActivity() {
         }
         car = runCatching {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                Car.createCar(this, null, Car.CAR_WAIT_TIMEOUT_DO_NOT_WAIT) { c, ready -> if (ready) onReady(c) }
+                Car.createCar(this, null, Car.CAR_WAIT_TIMEOUT_DO_NOT_WAIT) { c, ready -> if (ready) onReady(c) else runOnUiThread {
+                    platformRestricted = true; updateRestrictions()
+                } }
             } else {
                 Car.createCar(this)?.also(onReady)
             }
@@ -133,31 +170,104 @@ class MainActivity : AppCompatActivity() {
 
     /** 주행 중에는 설정·영상 미리보기를 숨기고 큰 상태 표시만 남긴다 */
     private fun applyRestrictions(r: CarUxRestrictions) {
-        drivingRestricted = r.isRequiresDistractionOptimization
-        val vis = if (drivingRestricted) View.GONE else View.VISIBLE
-        controls.visibility = vis
-        preview.visibility = if (drivingRestricted || !settings.profile.signalAssist) View.GONE else View.VISIBLE
+        platformRestricted = r.isRequiresDistractionOptimization
+        updateRestrictions()
+    }
+
+    private fun updateRestrictions() {
+        val snap = AssistBus.snapshot.value
+        val moving = !settings.mode.isDemo && snap?.output?.input?.vehicle?.let {
+            it.hasValidSpeed && it.speedKmh > 0f
+        } == true
+        drivingRestricted = platformRestricted || moving
+        if (drivingRestricted) {
+            selectedPage = 0
+            onboardingDialog?.dismiss()
+            onboardingTone.stop()
+            onboardingDialog = null
+            muteButton.visibility = View.GONE
+        }
+        showPage(selectedPage)
+        if (!drivingRestricted && !settings.onboarded && !onboardingPromptShown) {
+            onboardingPromptShown = true
+            startOnboarding()
+        }
+    }
+
+    private fun showPage(page: Int) {
+        selectedPage = if (drivingRestricted) 0 else page
+        homePage.visibility = if (selectedPage == 0) View.VISIBLE else View.GONE
+        settingsPage.visibility = if (selectedPage == 1) View.VISIBLE else View.GONE
+        demoPage.visibility = if (selectedPage == 2) View.VISIBLE else View.GONE
+        tabs.visibility = if (drivingRestricted) View.GONE else View.VISIBLE
+        for (i in 0 until tabs.childCount) {
+            (tabs.getChildAt(i) as Button).apply {
+                isSelected = i == selectedPage
+                setTextColor(if (isSelected) backgroundColor else Color.WHITE)
+                background = rounded(if (isSelected) accentColor else cardColor)
+            }
+        }
+        preview.visibility = if (selectedPage == 2 && hasPreview) View.VISIBLE else View.GONE
     }
 
     // ---- 표시 ----
-
     private fun render(s: UiSnapshot) {
         val out = s.output
         panel.state = out.signalState
+        hasPreview = s.preview != null
+        previewHint.text = when {
+            !settings.mode.isDemo -> "위에서 체험 시나리오를 선택하세요."
+            !settings.profile.signalAssist -> "이 체험에서는 차량·소리 알림을 확인합니다."
+            !hasPreview -> "체험 영상 입력을 기다리고 있습니다."
+            else -> "체험용 합성 영상"
+        }
+        updateRestrictions()
         renderHazards(out.activeHazards)
-        if (!drivingRestricted && s.preview != null) preview.setImageBitmap(s.preview)
-
+        if (selectedPage == 2 && s.preview != null) preview.setImageBitmap(s.preview)
         val nav = out.input.navigation
-        navCard.text = if (nav?.guiding == true && nav.distanceToManeuverM != null && nav.nextManeuver != null) {
-            val m = nav.nextManeuver!!
-            "${m.symbol}  ${Math.round(nav.distanceToManeuverM!! / 10f) * 10}m  ${m.labelKo}" + (nav.roadName?.let { "\n$it" } ?: "")
-        } else {
-            "경로 안내 없음"
+        navCard.text = when {
+            !settings.mode.isDemo -> "내비게이션 미연결\n경로 안내를 사용할 수 없습니다"
+            nav?.guiding == true && nav.distanceToManeuverM != null && nav.nextManeuver != null ->
+                "${nav.nextManeuver!!.symbol} ${Math.round(nav.distanceToManeuverM!! / 10f) * 10}m · ${nav.nextManeuver!!.labelKo}" +
+                    (nav.roadName?.let { "\n$it" } ?: "")
+            nav == null -> "체험 내비 정보 없음"
+            else -> "목적지를 설정하면 경로를 표시합니다"
         }
         cabinView.text = describeCabin(out.input.cabin)
         val v = out.input.vehicle
-        status.text = "%.0f km/h · 기어 %s · %s".format(v.speedKmh, gearKo(v.gear), s.sourceDescription)
-        speedRow.visibility = if (!s.hasRealSpeed && !drivingRestricted) View.VISIBLE else View.GONE
+        val speed = if (v.hasValidSpeed) "%.0f km/h".format(v.speedKmh) else "차속 확인 불가"
+        val signal = when {
+            !settings.profile.signalAssist -> "신호 보조 꺼짐"
+            !settings.mode.isDemo -> "신호 인식 미연결"
+            out.signal == null -> "신호 확인 불가"
+            else -> "신호 체험 중"
+        }
+        val mic = when {
+            !settings.profile.sirenAlerts -> "사이렌 감지 꺼짐"
+            out.input.sirenNearby == null -> "마이크 사용 불가"
+            settings.mode is AssistMode.Simulated -> "사이렌 체험 중"
+            else -> "마이크 감지 중"
+        }
+        status.text = "$speed · 기어 ${gearKo(v.gear)} · $signal"
+        connectionView.text = "$signal\n" +
+            (if (settings.mode.isDemo) "체험 입력 사용 중" else "내비게이션 미연결") + "\n$mic\n" +
+            (if (s.hasRealSpeed && !settings.mode.isDemo) "차속 수신 중" else if (settings.mode.isDemo) "체험용 차속 사용 가능" else "차속 미수신 또는 연결 끊김")
+        modeBadge.text = if (settings.mode.isDemo) "체험 모드 · 가상 정보 포함" else "차량 보조 · 지원 상태 확인"
+        modeBadge.setTextColor(if (settings.mode.isDemo) SafePalette.AMBER else accentColor)
+        speedRow.visibility = if (settings.mode.isDemo && settings.mode !is AssistMode.Simulated && !drivingRestricted) View.VISIBLE else View.GONE
+        panel.visibility = if (settings.profile.signalAssist && settings.mode.isDemo) View.VISIBLE else View.GONE
+        queryButton.visibility = if (settings.profile.signalAssist) View.VISIBLE else View.GONE
+        if (lastAlertAt == 0L || android.os.SystemClock.elapsedRealtime() - lastAlertAt > 8_000) {
+            lastAlertType = null
+            muteButton.visibility = View.GONE
+            headline.text = when {
+                out.activeHazards.isNotEmpty() -> out.activeHazards.first().headlineKo
+                !v.hasValidSpeed && !settings.mode.isDemo -> "차량 연결을 확인하세요"
+                settings.mode.isDemo -> "알림 체험 중"
+                else -> "차량 보조 사용 중"
+            }
+            banner.text = if (settings.mode.isDemo) "가상 신호입니다. 실제 주행 판단에 사용하지 마세요." else "신호 인식·내비 안내는 연결되지 않았습니다."
+        }
     }
 
     private var flashAnim: android.animation.ValueAnimator? = null
@@ -176,15 +286,19 @@ class MainActivity : AppCompatActivity() {
      * - 야간에는 밝기를 낮춰 눈부심 방지
      */
     private fun showAlert(alert: Alert, plan: OutputPlan) {
-        banner.text = "${alert.symbol}  ${alert.message}"
+        lastAlertAt = android.os.SystemClock.elapsedRealtime()
+        headline.text = "${alert.symbol} ${alert.headline}"
+        banner.text = alert.message
         lastAlertType = alert.type
         muteButton.visibility = if (alert.type.mutable && !drivingRestricted) View.VISIBLE else View.GONE
         if (!plan.visualFlash) return
         val pattern = plan.flashPattern
-        val target: View = if (pattern.fullScreen) flash else edgeFlash
+        val fullScreen = settings.fullScreenFlash && pattern.fullScreen
+        val target: View = if (fullScreen) flash else edgeFlash
         val color = levelColor(alert.level)
-        if (pattern.fullScreen) {
+        if (fullScreen) {
             val head = "${alert.symbol} ${alert.headline}"
+            flash.textSize = 30f
             flash.text = android.text.SpannableString("$head\n${alert.message}").apply {
                 setSpan(android.text.style.RelativeSizeSpan(1.9f), 0, head.length, 0)
             }
@@ -217,7 +331,8 @@ class MainActivity : AppCompatActivity() {
             hazardPulse?.cancel(); hazardPulse = null
             return
         }
-        hazardBar.text = "⚠ " + hazards.joinToString("  ·  ") { it.ongoingLabelKo }
+        hazardBar.text = "⚠ " + hazards.first().ongoingLabelKo + if (hazards.size > 1) " · 외 ${hazards.size - 1}건" else ""
+        hazardBar.contentDescription = hazards.joinToString(". ") { it.ongoingLabelKo }
         hazardBar.setBackgroundColor(levelColor(hazards.first().level))
         hazardBar.visibility = View.VISIBLE
         if (hazardPulse == null) {
@@ -276,14 +391,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun applyProfileToUi(p: DriverProfile) {
-        val scale = if (p.has(DriverNeed.LOW_VISION) || p.has(DriverNeed.ATTENTION)) 1.4f else 1f
-        banner.textSize = 30f * scale
-        navCard.textSize = (if (p.navigationCards) 40f else 26f) * scale
+        val scale = if (settings.largeText || p.has(DriverNeed.LOW_VISION) || p.has(DriverNeed.ATTENTION)) 1.25f else 1f
+        headline.textSize = 32f * scale
+        banner.textSize = 20f * scale
+        navCard.textSize = 26f * scale
+        navCard.visibility = if (p.navigationCards) View.VISIBLE else View.GONE
+        replayButton.text = if (p.has(DriverNeed.HEARING)) "알림 다시 보기" else "알림 다시 확인"
         cabinView.textSize = 22f * scale
         flash.textSize = 54f * scale
-        panel.visibility = if (p.signalAssist) View.VISIBLE else View.GONE
+        panel.visibility = if (p.signalAssist && settings.mode.isDemo) View.VISIBLE else View.GONE
+        queryButton.isEnabled = settings.mode.isDemo
+        queryButton.alpha = if (queryButton.isEnabled) 1f else 0.45f
         if (::queryButton.isInitialized) queryButton.visibility = if (p.signalAssist) View.VISIBLE else View.GONE
-        preview.visibility = if (p.signalAssist && !drivingRestricted) View.VISIBLE else View.GONE
+        preview.visibility = if (selectedPage == 2 && hasPreview && !drivingRestricted) View.VISIBLE else View.GONE
         rebuildLessons(p)
         rebuildVerbosity(p)
     }
@@ -297,6 +417,7 @@ class MainActivity : AppCompatActivity() {
             val selected = p.prefs.verbosity == v
             verbosityRow.addView(Button(this).apply {
                 text = (if (selected) "✓ " else "") + v.labelKo
+                textSize = 20f
                 minimumHeight = dp(76)
                 contentDescription = "알림 양 ${v.labelKo}: ${v.descriptionKo}" + if (selected) ", 선택됨" else ""
                 setOnClickListener {
@@ -322,130 +443,172 @@ class MainActivity : AppCompatActivity() {
     private fun rebuildLessons(p: DriverProfile) {
         if (!::lessonRow.isInitialized) return
         lessonRow.removeAllViews()
-        lessonRow.addView(label(18f, Color.LTGRAY).apply { text = "알림 배우기: " })
+        lessonRow.addView(label(18f, Color.LTGRAY).apply { text = "알림 배우기" })
         for (lesson in AlertGuide.lessonsFor(p)) {
             lessonRow.addView(Button(this).apply {
                 text = "${lesson.type.symbol} ${lesson.titleKo}"
+                minimumHeight = dp(76)
+                textSize = 20f
                 contentDescription = "${lesson.titleKo} 알림 들어보기. ${lesson.explanationKo}"
-                setOnClickListener { AssistBus.requests.tryEmit(UserRequest.Lesson(lesson.type)) }
+                setOnClickListener { if (!drivingRestricted) AssistBus.requests.tryEmit(UserRequest.Lesson(lesson.type)) }
             })
         }
     }
 
     // ---- UI 구성 ----
 
+    private fun rounded(color: Int) = GradientDrawable().apply {
+        setColor(color); cornerRadius = dp(18).toFloat()
+    }
+
+    private fun column() = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+    private fun card() = column().apply {
+        background = rounded(cardColor)
+        setPadding(dp(20), dp(16), dp(20), dp(16))
+    }
+    private fun addSpace(parent: LinearLayout, height: Int = 12) {
+        parent.addView(View(this), LinearLayout.LayoutParams(1, dp(height)))
+    }
+    private fun action(title: String, click: () -> Unit) = Button(this).apply {
+        text = title; textSize = 20f; isAllCaps = false
+        minimumHeight = dp(76); setTextColor(Color.WHITE)
+        background = rounded(cardColor)
+        setPadding(dp(12), dp(8), dp(12), dp(8))
+        setOnClickListener { click() }
+    }
+    private fun scroll(content: View) = ScrollView(this).apply {
+        isFillViewport = true; clipToPadding = false
+        addView(content, FrameLayout.LayoutParams(-1, -2))
+    }
+    private fun resetDisplayedAlert() {
+        lastAlertAt = 0L; lastAlertType = null
+        headline.text = "입력 연결 확인 중"
+        banner.text = "연결 상태를 확인하고 있습니다."
+        hasPreview = false
+        preview.setImageDrawable(null)
+        panel.state = com.signalassist.core.SignalState.UNKNOWN
+    }
+
     private fun buildUi(): View {
-        val root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
-        val content = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(24, 16, 24, 16)
-        }
-        hazardBar = label(28f, Color.WHITE).apply {
-            typeface = Typeface.DEFAULT_BOLD
-            gravity = Gravity.CENTER
-            setPadding(16, 10, 16, 10)
-            visibility = View.GONE
-            contentDescription = "진행 중인 위험"
-        }
-        content.addView(hazardBar)
-        val body = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        panel = SignalPanelView(this)
-        val side = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(16, 0, 0, 0) }
-        preview = ImageView(this).apply { adjustViewBounds = true; scaleType = ImageView.ScaleType.FIT_CENTER }
-        navCard = label(40f, Color.WHITE).apply { typeface = Typeface.DEFAULT_BOLD; setBackgroundColor(Color.rgb(20, 30, 45)); setPadding(20, 12, 20, 12) }
-        cabinView = label(22f, Color.LTGRAY)
-        side.addView(preview, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
-        side.addView(navCard)
-        side.addView(cabinView)
-        body.addView(panel, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 3f))
-        body.addView(side, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 2f))
-        content.addView(body, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
-
-        banner = label(30f, Color.WHITE).apply { typeface = Typeface.DEFAULT_BOLD }
-        status = label(18f, Color.GRAY)
-        // 마지막 알림 + 큰 '다시 듣기' 버튼 (주행 중에도 한 번 누르기로 사용 가능, 터치 영역 76dp 이상)
-        val bannerRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        bannerRow.addView(banner, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        // 주차 중에만: 방금 알림이 필요 없으면 끄기 (안전에 중요한 알림은 버튼이 나오지 않음)
-        muteButton = Button(this).apply {
-            text = "이 알림 끄기"
-            visibility = View.GONE
-            minimumHeight = dp(76)
-            setOnClickListener {
-                val t = lastAlertType ?: return@setOnClickListener
-                val p = settings.profile
-                settings.profile = p.copy(prefs = p.prefs.copy(muted = p.prefs.muted + t))
-                publishConfig()
-                visibility = View.GONE
-                android.widget.Toast.makeText(this@MainActivity, "'${t.headlineKo}' 알림을 껐습니다. 설정에서 다시 켤 수 있습니다.", android.widget.Toast.LENGTH_LONG).show()
-            }
-        }
-        bannerRow.addView(muteButton)
-        // 교차로에서 헷갈릴 때: 현재 신호와 확신 정도를 말해 줌 (주행 중에도 한 번 누르기)
-        queryButton = Button(this).apply {
-            text = "? 지금 신호"
-            textSize = 24f
-            contentDescription = "지금 신호가 무엇인지 묻기"
-            minimumHeight = dp(76)
-            minimumWidth = dp(180)
-            setOnClickListener { AssistBus.requests.tryEmit(UserRequest.QuerySignal) }
-        }
-        bannerRow.addView(queryButton)
-        bannerRow.addView(Button(this).apply {
-            text = "↻ 다시 듣기"
-            textSize = 24f
-            contentDescription = "마지막 알림 다시 듣기"
-            minimumHeight = dp(76)
-            minimumWidth = dp(180)
-            setOnClickListener { AssistBus.requests.tryEmit(UserRequest.Replay) }
-        })
-        content.addView(bannerRow)
-        content.addView(status)
-
-        controls = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        controls.addView(buildModeRow())
-        controls.addView(buildProfileRow())
-        verbosityRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        controls.addView(verbosityRow)
-        speedRow = buildSpeedRow()
-        controls.addView(speedRow)
-        tripView = label(20f, Color.WHITE)
-        tripRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            visibility = View.GONE
-            addView(tripView, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-            addView(Button(this@MainActivity).apply {
-                text = "가족에게 공유"
-                contentDescription = "지난 주행 요약을 가족에게 공유"
-                setOnClickListener { shareTrip() }
+        val root = FrameLayout(this).apply { setBackgroundColor(backgroundColor) }
+        val shell = column().apply { setPadding(dp(20), dp(12), dp(20), dp(12)) }
+        modeBadge = label(16f, accentColor).apply { typeface = Typeface.DEFAULT_BOLD }
+        modeBadge.text = if (settings.mode.isDemo) "체험 모드 · 가상 정보 포함" else "차량 보조 · 지원 상태 확인"
+        shell.addView(modeBadge)
+        tabs = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        listOf("주행", "설정", "체험").forEachIndexed { index, title ->
+            tabs.addView(action(title) { showPage(index) }, LinearLayout.LayoutParams(0, dp(60), 1f).apply {
+                setMargins(dp(3), dp(6), dp(3), dp(10))
             })
         }
-        controls.addView(tripRow)
-        settings.trips.firstOrNull()?.let { tripView.text = "지난 주행\n$it"; tripRow.visibility = View.VISIBLE }
-        lessonRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        controls.addView(HorizontalScrollView(this).apply { addView(lessonRow) })
-        content.addView(controls)
-        root.addView(content)
+        shell.addView(tabs)
+        val pages = FrameLayout(this)
+        shell.addView(pages, LinearLayout.LayoutParams(-1, 0, 1f))
+        val home = column()
+        hazardBar = label(24f, Color.WHITE).apply {
+            gravity = Gravity.CENTER; typeface = Typeface.DEFAULT_BOLD
+            setPadding(dp(12), dp(12), dp(12), dp(12)); visibility = View.GONE
+        }
+        home.addView(hazardBar); addSpace(home)
+        val focus = card()
+        headline = label(32f, Color.WHITE).apply { typeface = Typeface.DEFAULT_BOLD; text = "차량 연결을 확인하세요" }
+        banner = label(20f, mutedColor).apply { text = "사용 가능한 기능을 확인하고 있습니다." }
+        focus.addView(headline); focus.addView(banner)
+        panel = SignalPanelView(this)
+        focus.addView(panel, LinearLayout.LayoutParams(-1, dp(180)))
+        navCard = label(26f, Color.WHITE)
+        focus.addView(navCard)
+        home.addView(focus); addSpace(home)
+        val buttons = LinearLayout(this).apply {
+            orientation = if (resources.configuration.screenWidthDp < 600 || resources.configuration.fontScale > 1.2f) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
+        }
+        queryButton = action("지금 신호 확인") { AssistBus.requests.tryEmit(UserRequest.QuerySignal) }
+        replayButton = action("알림 다시 확인") { AssistBus.requests.tryEmit(UserRequest.Replay) }
+        listOf(queryButton, replayButton).forEach { b ->
+            buttons.addView(b, if (buttons.orientation == LinearLayout.HORIZONTAL) LinearLayout.LayoutParams(0, -2, 1f).apply { setMargins(dp(3), 0, dp(3), 0) }
+            else LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
+        }
+        status = label(16f, mutedColor)
+        val homeContainer = column()
+        homeContainer.addView(scroll(home), LinearLayout.LayoutParams(-1, 0, 1f))
+        homeContainer.addView(buttons)
+        homeContainer.addView(status)
+        homePage = homeContainer
+        pages.addView(homePage, FrameLayout.LayoutParams(-1, -1))
 
-        flash = TextView(this).apply {
-            gravity = Gravity.CENTER
-            setTextColor(Color.WHITE)
-            typeface = Typeface.DEFAULT_BOLD
-            visibility = View.GONE
-            // 같은 내용을 음성 알림이 이미 전달하므로 화면 낭독기가 중복으로 읽지 않게
-            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-        }
-        root.addView(flash, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
-        // 안내(INFO)용: 화면을 덮지 않고 테두리만 빛남
-        edgeFlash = View(this).apply {
-            background = android.graphics.drawable.GradientDrawable().apply {
-                setColor(Color.TRANSPARENT); setStroke(dp(14), SafePalette.SKY_BLUE)
+        controls = column()
+        controls.addView(label(26f, Color.WHITE).apply { text = "내게 맞는 알림"; typeface = Typeface.DEFAULT_BOLD })
+        controls.addView(label(17f, mutedColor).apply { text = "주차 중에 설정할 수 있습니다. 필요한 도움을 선택하세요." })
+        controls.addView(buildProfileRow()); addSpace(controls)
+        val appearance = card()
+        appearance.addView(label(22f, Color.WHITE).apply { text = "보기 편하게" })
+        appearance.addView(CheckBox(this).apply {
+            text = "글씨 더 크게"; textSize = 20f; minimumHeight = dp(76); setTextColor(Color.WHITE)
+            isChecked = settings.largeText
+            setOnCheckedChangeListener { _, checked -> settings.largeText = checked; applyProfileToUi(settings.profile) }
+        })
+        appearance.addView(CheckBox(this).apply {
+            text = "전체 화면 강조 사용"; textSize = 20f; minimumHeight = dp(76); setTextColor(Color.WHITE)
+            isChecked = settings.fullScreenFlash
+            setOnCheckedChangeListener { _, checked -> settings.fullScreenFlash = checked }
+        })
+        appearance.addView(label(17f, mutedColor).apply { text = "기본은 테두리 강조입니다. 전체 화면 강조는 알림 배우기에서 먼저 확인하세요." })
+        controls.addView(appearance); addSpace(controls)
+        verbosityRow = column(); controls.addView(verbosityRow)
+        muteButton = action("최근 알림 끄기") {
+            if (!drivingRestricted) lastAlertType?.takeIf { it.mutable }?.let { type ->
+                val p = settings.profile
+                settings.profile = p.copy(prefs = p.prefs.copy(muted = p.prefs.muted + type))
+                publishConfig(); muteButton.visibility = View.GONE
             }
-            visibility = View.GONE
-            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }.apply { visibility = View.GONE }
+        controls.addView(muteButton); addSpace(controls)
+        lessonRow = column(); controls.addView(lessonRow)
+        tripView = label(18f, Color.WHITE)
+        tripRow = column().apply {
+            visibility = View.GONE; addView(tripView)
+            addView(action("주행 요약 공유") { if (!drivingRestricted) shareTrip() })
         }
-        root.addView(edgeFlash, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+        settings.trips.firstOrNull()?.let { tripView.text = "지난 주행\n$it"; tripRow.visibility = View.VISIBLE }
+        controls.addView(tripRow); addSpace(controls)
+        connectionView = label(18f, mutedColor)
+        controls.addView(label(22f, Color.WHITE).apply { text = "기능 연결 상태" })
+        controls.addView(connectionView)
+        cabinView = label(18f, mutedColor); controls.addView(cabinView)
+        settingsPage = scroll(controls); pages.addView(settingsPage)
+
+        val demo = column()
+        demo.addView(label(26f, Color.WHITE).apply { text = "알림 체험"; typeface = Typeface.DEFAULT_BOLD })
+        demo.addView(label(18f, SafePalette.AMBER).apply { text = "가상 신호와 시나리오입니다. 실제 주행 판단에 사용하지 마세요." })
+        demo.addView(buildModeRow()); addSpace(demo)
+        demo.addView(action("체험 종료 · 차량 보조로") {
+            if (!drivingRestricted) {
+                settings.mode = AssistMode.LiveNoCamera
+                restartToken++; resetDisplayedAlert(); publishConfig(); showPage(0)
+            }
+        })
+        speedRow = buildSpeedRow(); demo.addView(speedRow)
+        preview = ImageView(this).apply { adjustViewBounds = true; scaleType = ImageView.ScaleType.FIT_CENTER; contentDescription = "체험용 합성 영상" }
+        addSpace(demo)
+        previewHint = label(18f, mutedColor).apply { text = "위에서 체험 시나리오를 선택하세요." }
+        previewCard = card()
+        previewCard.addView(previewHint)
+        previewCard.addView(preview, LinearLayout.LayoutParams(-1, dp(220)))
+        demo.addView(previewCard)
+        demoPage = scroll(demo); pages.addView(demoPage)
+        root.addView(shell)
+        flash = TextView(this).apply {
+            gravity = Gravity.CENTER; setTextColor(Color.WHITE); textSize = 32f
+            typeface = Typeface.DEFAULT_BOLD; setPadding(dp(28), dp(28), dp(28), dp(28))
+            visibility = View.GONE; importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }
+        root.addView(flash, FrameLayout.LayoutParams(-1, -1))
+        edgeFlash = View(this).apply {
+            background = GradientDrawable().apply { setColor(Color.TRANSPARENT); setStroke(dp(8), accentColor) }
+            visibility = View.GONE; importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }
+        root.addView(edgeFlash, FrameLayout.LayoutParams(-1, -1))
+        showPage(0)
         return root
     }
 
@@ -453,18 +616,20 @@ class MainActivity : AppCompatActivity() {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
         val spinner = Spinner(this@MainActivity).apply {
+            modeSpinner = this
             adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, modeItems.map { it.label })
             setSelection(modeItems.indexOfFirst { it.mode.key == settings.mode.key }.coerceAtLeast(0))
             onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
                 override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
                     val m = modeItems[pos].mode
-                    if (m.key != settings.mode.key) {
+                    if (m.key != settings.mode.key && !drivingRestricted) {
                         settings.mode = m
                         // 시나리오를 고르면 그 시나리오가 보여주는 프로필로 맞춰 줌 (시연 편의)
                         if (m is AssistMode.Simulated) {
                             Scenario.ALL.firstOrNull { it.name == m.scenarioName }?.let { settings.profile = settings.profile.copy(needs = it.targetNeeds) }
                             syncProfileChecks()
                         }
+                        resetDisplayedAlert()
                         publishConfig()
                     }
                 }
@@ -475,18 +640,23 @@ class MainActivity : AppCompatActivity() {
         addView(Button(this@MainActivity).apply {
             minimumHeight = dp(76)
             text = "다시 시작"
-            setOnClickListener { restartToken++; publishConfig() }
+            setOnClickListener { if (!drivingRestricted) { restartToken++; resetDisplayedAlert(); publishConfig() } }
         })
     }
 
     private val profileChecks = HashMap<DriverNeed, CheckBox>()
 
     private fun buildProfileRow() = LinearLayout(this).apply {
-        orientation = LinearLayout.HORIZONTAL
-        addView(label(18f, Color.LTGRAY).apply { text = "운전자 특성: " })
+        orientation = LinearLayout.VERTICAL
+        addView(label(18f, Color.LTGRAY).apply { text = "필요한 도움" })
         for (need in DriverNeed.entries) {
             val cb = CheckBox(this@MainActivity).apply {
-                text = need.labelKo
+                text = when (need) {
+                    DriverNeed.COLOR_VISION -> "신호 색을 소리·모양으로 확인"
+                    DriverNeed.HEARING -> "소리 알림을 화면으로 확인"
+                    DriverNeed.LOW_VISION -> "작은 정보를 크게 보고 음성으로 듣기"
+                    DriverNeed.ATTENTION -> "놓치기 쉬운 정보를 한 번 더 확인"
+                }
                 setTextColor(Color.WHITE)
                 textSize = 20f
                 minimumHeight = dp(76) // 차량 화면 권장 터치 영역
@@ -503,7 +673,7 @@ class MainActivity : AppCompatActivity() {
             addView(cb)
         }
         addView(Button(this@MainActivity).apply {
-            text = "처음 설정 다시 하기"
+            text = "내게 맞는 알림 설정"
             minimumHeight = dp(76)
             contentDescription = "질문과 소리 테스트로 알림을 다시 맞추기"
             setOnClickListener { startOnboarding() }
@@ -512,15 +682,17 @@ class MainActivity : AppCompatActivity() {
 
     // ---- 첫 설정: 상황 질문 4개 + 소리 테스트 3개 (주차 중에만) ----
 
-    private val onboardingTone by lazy { com.signalassist.app.alert.TonePlayer() }
+    private val onboardingTone = com.signalassist.app.alert.TonePlayer()
 
     private fun startOnboarding() {
+        if (drivingRestricted || onboardingDialog?.isShowing == true) return
         val questions = com.signalassist.core.OnboardingQuestion.entries
         val answers = LinkedHashMap<com.signalassist.core.OnboardingQuestion, Boolean>()
         fun ask(i: Int) {
+            if (drivingRestricted || isFinishing) return
             if (i == questions.size) { hearingCheck(answers); return }
             val q = questions[i]
-            androidx.appcompat.app.AlertDialog.Builder(this)
+            onboardingDialog = androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("처음 설정 ${i + 1} / ${questions.size + 1}")
                 .setMessage(q.textKo)
                 .setPositiveButton("예") { _, _ -> answers[q] = true; ask(i + 1) }
@@ -536,6 +708,7 @@ class MainActivity : AppCompatActivity() {
         val probes = com.signalassist.core.HearingProbe.entries
         val heard = LinkedHashMap<com.signalassist.core.HearingProbe, Boolean>()
         fun probe(i: Int) {
+            if (drivingRestricted || isFinishing) return
             if (i == probes.size) { finishOnboarding(answers, heard); return }
             val p = probes[i]
             onboardingTone.play(
@@ -543,7 +716,7 @@ class MainActivity : AppCompatActivity() {
                 OutputPlan(tone = true, voice = false, visualFlash = false, largeText = false,
                     toneGain = com.signalassist.core.ToneLibrary.gainFor(p.level), lowPitchTones = p.lowPitch),
             )
-            androidx.appcompat.app.AlertDialog.Builder(this)
+            onboardingDialog = androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("소리 테스트 ${i + 1} / ${probes.size}")
                 .setMessage("방금 ${p.textKo}이 들리셨나요?\n(평소 운전할 때의 음량으로 맞춰 두고 들어 보세요)")
                 .setPositiveButton("들렸어요") { _, _ -> heard[p] = true; probe(i + 1) }
@@ -560,6 +733,7 @@ class MainActivity : AppCompatActivity() {
         heard: Map<com.signalassist.core.HearingProbe, Boolean>,
     ) {
         val p = com.signalassist.core.Onboarding.build(answers, heard)
+        if (drivingRestricted) return
         settings.profile = p
         settings.onboarded = true
         syncProfileChecks()
@@ -572,7 +746,7 @@ class MainActivity : AppCompatActivity() {
             if (p.prefs.soundForHearing) add("화면 깜빡임 + 알림음 함께")
             else if (p.has(DriverNeed.HEARING)) add("소리 없이 화면으로")
         }
-        androidx.appcompat.app.AlertDialog.Builder(this)
+        onboardingDialog = androidx.appcompat.app.AlertDialog.Builder(this)
             .setTitle("설정 완료")
             .setMessage(parts.joinToString("\n") + "\n\n아래 '알림 배우기'에서 각 알림의 소리를 미리 들어 보세요." +
                 if (p.signalAssist) "\n교차로에서 헷갈리면 '? 지금 신호' 버튼을 누르세요." else "")
@@ -589,6 +763,7 @@ class MainActivity : AppCompatActivity() {
                 cb.setOnCheckedChangeListener { _, _ ->
                     settings.profile = settings.profile.copy(needs = profileChecks.filter { it.value.isChecked }.keys)
                     publishConfig()
+                    requestPermissionsIfNeeded()
                 }
             }
         }
@@ -605,6 +780,7 @@ class MainActivity : AppCompatActivity() {
             max = 80
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(s: SeekBar?, p: Int, fromUser: Boolean) {
+                    if (!fromUser || drivingRestricted || !settings.mode.isDemo) return
                     AssistBus.speedOverrideKmh = p.toFloat()
                     value.text = "시연용 차속: $p km/h"
                 }
@@ -617,7 +793,7 @@ class MainActivity : AppCompatActivity() {
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
     private fun label(sizeSp: Float, color: Int) = TextView(this).apply {
-        textSize = sizeSp; setTextColor(color); setPadding(0, 6, 0, 6)
+        textSize = sizeSp; setTextColor(color); setPadding(0, dp(6), 0, dp(6))
     }
 
     private fun requestPermissionsIfNeeded() {

@@ -16,14 +16,16 @@ sealed class AssistMode(val key: String) {
     data object LiveTestImages : AssistMode("live_images")
     data object LiveNoCamera : AssistMode("live_nocam")
 
+    val isDemo get() = this != LiveNoCamera
+
     companion object {
         fun fromKey(key: String?): AssistMode = when {
-            key == null -> Simulated("stop_and_go")
+            key == null -> LiveNoCamera
             key.startsWith("scenario:") -> Simulated(key.removePrefix("scenario:"))
             key == LiveSyntheticSignal.key -> LiveSyntheticSignal
             key == LiveTestImages.key -> LiveTestImages
             key == LiveNoCamera.key -> LiveNoCamera
-            else -> Simulated("stop_and_go")
+            else -> LiveNoCamera
         }
     }
 }

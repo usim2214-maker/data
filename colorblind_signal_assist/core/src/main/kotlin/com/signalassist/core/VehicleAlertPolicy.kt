@@ -43,7 +43,7 @@ class VehicleAlertPolicy(private val config: VehicleAlertConfig = VehicleAlertCo
         features: Set<VehicleFeature> = VehicleFeature.entries.toSet(),
     ): List<Alert> {
         val out = ArrayList<Alert>(2)
-        val speed = vehicle.speedKmh
+        val speed = if (vehicle.hasValidSpeed) vehicle.speedKmh else Float.NaN
         val moving = speed >= config.movingSpeedKmh
 
         if (VehicleFeature.WARNINGS in features) {

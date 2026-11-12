@@ -78,7 +78,8 @@ data class DriverProfile(
         if (prefs.verbosity == Verbosity.MINIMAL && t.mutable) return false
         if (alert.category != AlertCategory.SIGNAL) return true
         if (has(DriverNeed.COLOR_VISION)) return true
-        return alert.type == AlertType.GREEN_REMINDER || alert.type == AlertType.RED_URGENT
+        return alert.type == AlertType.GREEN_REMINDER || alert.type == AlertType.RED_URGENT ||
+            (signalAssist && alert.type == AlertType.SIGNAL_LOST)
     }
 
     fun outputFor(alert: Alert): OutputPlan {

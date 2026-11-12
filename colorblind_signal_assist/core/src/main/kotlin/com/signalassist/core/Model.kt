@@ -66,7 +66,36 @@ data class VehicleState(
     val gear: Gear = Gear.UNKNOWN,
     /** Pleos Vehicle State `getCurrentBrakePedalStatus` */
     val brakePedal: Boolean? = null,
-)
+    val speedStatus: InputStatus = InputStatus.AVAILABLE,
+) {
+    val hasValidSpeed get() = speedStatus == InputStatus.AVAILABLE && speedKmh.isFinite() && speedKmh >= 0f
+}
+
+enum class InputStatus { AVAILABLE, UNAVAILABLE, STALE }
+
+/** Continuous speed expires; on-change gear remains valid until disconnect/error. */
+class VehicleTelemetry(private val timeoutMs: Long = 3_000) {
+    private var speed: Float? = null
+    private var receivedAt: Long? = null
+    private var gear = Gear.UNKNOWN
+
+    @Synchronized fun updateSpeed(value: Float, nowMs: Long) {
+        speed = value.takeIf { it.isFinite() && it >= 0f }
+        receivedAt = if (speed != null) nowMs else null
+    }
+    @Synchronized fun updateGear(value: Gear) { gear = value }
+    @Synchronized fun invalidateSpeed() { speed = null; receivedAt = null }
+    @Synchronized fun reset() { invalidateSpeed(); gear = Gear.UNKNOWN }
+    @Synchronized fun current(nowMs: Long): VehicleState {
+        val age = receivedAt?.let { nowMs - it }
+        val status = when {
+            age == null -> InputStatus.UNAVAILABLE
+            age !in 0..timeoutMs -> InputStatus.STALE
+            else -> InputStatus.AVAILABLE
+        }
+        return VehicleState(if (status == InputStatus.AVAILABLE) speed!! else Float.NaN, gear, speedStatus = status)
+    }
+}
 
 enum class TurnSignal { NONE, LEFT, RIGHT, HAZARD }
 

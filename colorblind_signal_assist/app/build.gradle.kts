@@ -14,8 +14,23 @@ android {
         // 공모전 개발 환경 요건: minSdk 28
         minSdk = 28
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
+    }
+
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+        unitTests.all {
+            it.systemProperty("robolectric.dependency.repo.url", "https://repo.maven.apache.org/maven2")
+            it.systemProperty("maven.repo.local", layout.buildDirectory.dir("robolectric-cache").get().asFile.absolutePath)
+            val testHome = layout.buildDirectory.dir("test-home").get().asFile
+            it.systemProperty("user.home", testHome.absolutePath)
+            val testTemp = layout.buildDirectory.dir("test-tmp").get().asFile
+            it.systemProperty("java.io.tmpdir", testTemp.absolutePath)
+            it.doFirst { testHome.mkdirs(); testTemp.mkdirs() }
+            it.maxHeapSize = "1g"
+            it.testLogging { events("passed", "failed", "skipped") }
+        }
     }
 
     // AAOS 차량 API (android.car.*) — 플랫폼 optional 라이브러리
@@ -52,6 +67,9 @@ android {
 }
 
 dependencies {
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation(files("${android.sdkDirectory}/platforms/android-34/optional/android.car.jar"))
     implementation(project(":core"))
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")

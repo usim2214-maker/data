@@ -66,10 +66,22 @@ class AlertHistory(private val capacity: Int = 10) {
 
     val recent: List<Delivery> get() = items.toList().asReversed()
 
+    fun clear() = items.clear()
+
     /** 가장 최근 알림을 프로필의 모든 감각으로 다시 (중재로 조용해졌던 것도 소리·음성으로) */
-    fun replayLast(profile: DriverProfile, nowMs: Long): Delivery? {
+    fun replayLast(profile: DriverProfile, nowMs: Long, currentSignal: EngineOutput? = null): Delivery? {
         val last = items.lastOrNull() ?: return null
-        val plan = profile.outputFor(last.alert).let { it.copy(visualFlash = it.visualFlash || profile.has(DriverNeed.HEARING)) }
-        return Delivery(last.alert.copy(timestampMs = nowMs), plan)
+        if (last.alert.category == AlertCategory.SIGNAL) {
+            val answer = SignalQuery.answer(currentSignal, nowMs)
+            return Delivery(answer, SignalQuery.plan(profile, answer))
+        }
+        val seconds = ((nowMs - last.alert.timestampMs).coerceAtLeast(0) / 1000)
+        val elapsed = if (seconds < 60) "${seconds}초 전" else "${seconds / 60}분 전"
+        val replay = last.alert.copy(timestampMs = nowMs,
+            customMessage = "이전 알림, $elapsed. ${last.alert.message}",
+            customHeadline = "이전 알림 · ${last.alert.headline}",
+            customTone = TonePattern.SOFT_CHIME, speechSuffix = null)
+        val plan = profile.outputFor(replay).let { it.copy(visualFlash = it.visualFlash || profile.has(DriverNeed.HEARING)) }
+        return Delivery(replay, plan)
     }
 }

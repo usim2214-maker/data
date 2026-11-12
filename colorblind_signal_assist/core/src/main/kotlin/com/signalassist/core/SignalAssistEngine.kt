@@ -87,23 +87,32 @@ class DrivingAssistEngine(
     val hints: HintTracker = HintTracker(),
 ) {
     private var lastSignal: EngineOutput? = null
+    private var inputLost = false
 
     private var sirenWasOn = false
     private var lastSirenAlertMs: Long? = null
 
     fun process(input: DrivingInput): DrivingOutput {
         val p = profile
+        val expired = lastSignal?.let { !SignalQuery.isFresh(it, input.timestampMs) } == true
+        if (!p.signalAssist || expired) {
+            inputLost = p.signalAssist && expired
+            lastSignal = null
+            signalEngine.reset()
+            frameScheduler.reset()
+        }
         // 영상 처리는 필요할 때만 (FrameScheduler). 건너뛴 프레임에서는 직전 신호 상태를 그대로 보여준다
         val fresh = if (p.signalAssist && input.frame != null &&
             frameScheduler.shouldProcess(input.timestampMs, input.vehicle, input.navigation)
         ) {
             signalEngine.process(input.frame, input.vehicle, input.timestampMs, input.navigation, p.reactionTimeS)
-                .also { frameScheduler.observe(input.timestampMs, it); lastSignal = it }
+                .also { frameScheduler.observe(input.timestampMs, it); lastSignal = it; inputLost = false }
         } else {
             null
         }
         val signal = fresh ?: lastSignal?.takeIf { p.signalAssist }?.copy(change = null, alerts = emptyList())
         val alerts = ArrayList<Alert>()
+        if (expired && fresh == null && p.signalAssist) alerts += Alert(AlertType.SIGNAL_LOST, input.timestampMs)
         fresh?.alerts?.filterTo(alerts) { p.accepts(it) }
         alerts += vehiclePolicy.evaluate(input.cabin, input.vehicle, input.timestampMs, input.navigation, p.vehicleFeatures)
         if (p.navigationCards) alerts += navigationPolicy.evaluate(input.navigation, input.timestampMs)
@@ -125,7 +134,7 @@ class DrivingAssistEngine(
     }
 
     private fun activeHazards(input: DrivingInput, p: DriverProfile): List<AlertType> = buildList {
-        val speed = input.vehicle.speedKmh
+        val speed = if (input.vehicle.hasValidSpeed) input.vehicle.speedKmh else Float.NaN
         val c = input.cabin
         if (p.signalAssist && signalEngine.redUrgentActive && p.accepts(Alert(AlertType.RED_URGENT, 0))) add(AlertType.RED_URGENT)
         if (VehicleFeature.WARNINGS in p.vehicleFeatures) {
@@ -134,7 +143,7 @@ class DrivingAssistEngine(
         }
         if (p.sirenAlerts && input.sirenNearby == true) add(AlertType.SIREN_NEARBY)
         if (VehicleFeature.TURN_SIGNAL in p.vehicleFeatures && vehiclePolicy.turnSignalForgotten) add(AlertType.TURN_SIGNAL_LEFT_ON)
-        if (p.has(DriverNeed.COLOR_VISION) && signalEngine.signalLostActive) add(AlertType.SIGNAL_LOST)
+        if (p.signalAssist && (signalEngine.signalLostActive || inputLost)) add(AlertType.SIGNAL_LOST)
     }.sortedByDescending { it.level }
 
     fun reset() {
@@ -144,6 +153,7 @@ class DrivingAssistEngine(
         arbiter.reset()
         frameScheduler.reset()
         lastSignal = null
+        inputLost = false
         sirenWasOn = false
         lastSirenAlertMs = null
     }

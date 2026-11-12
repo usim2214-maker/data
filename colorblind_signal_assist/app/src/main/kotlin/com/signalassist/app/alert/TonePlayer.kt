@@ -12,6 +12,18 @@ import com.signalassist.core.TonePattern
  * 색을 구분하기 어려운 운전자도 소리만 듣고 진행/주의/정지를 구분할 수 있게 하는 것이 목적.
  */
 class TonePlayer {
+    private val tracks = java.util.Collections.synchronizedSet(mutableSetOf<AudioTrack>())
+
+    fun stop() {
+        synchronized(tracks) {
+            tracks.toList().forEach { track ->
+                runCatching { track.stop() }
+                runCatching { track.release() }
+            }
+            tracks.clear()
+        }
+    }
+
     private val sampleRate = 44_100
     private val cache = HashMap<Pair<TonePattern, Boolean>, ShortArray>()
 
@@ -37,11 +49,14 @@ class TonePlayer {
             .setTransferMode(AudioTrack.MODE_STATIC)
             .setBufferSizeInBytes(pcm.size * 2)
             .build()
+        tracks.add(track)
         track.write(pcm, 0, pcm.size)
         track.setVolume(plan.toneGain) // 안내 < 주의 < 경고 < 긴급
         track.setNotificationMarkerPosition(pcm.size)
         track.setPlaybackPositionUpdateListener(object : AudioTrack.OnPlaybackPositionUpdateListener {
-            override fun onMarkerReached(t: AudioTrack) = t.release()
+            override fun onMarkerReached(t: AudioTrack) {
+                synchronized(tracks) { if (tracks.remove(t)) t.release() }
+            }
             override fun onPeriodicNotification(t: AudioTrack) = Unit
         })
         track.play()

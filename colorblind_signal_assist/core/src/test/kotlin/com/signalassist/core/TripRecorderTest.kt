@@ -21,7 +21,7 @@ class TripRecorderTest {
         assertEquals(1, t.alertCounts[AlertType.HEADLIGHTS_OFF_DARK])
         assertTrue(t.distanceKm in 0.07f..0.11f, "distance ${t.distanceKm}")
         val text = t.summaryKo()
-        assertTrue("뒷좌석 확인 1회" in text && "긴급 경고 없이" in text, text)
+        assertTrue("뒷좌석 확인 1회" in text && "기록된 긴급 경고는 없습니다" in text, text)
     }
 
     @Test

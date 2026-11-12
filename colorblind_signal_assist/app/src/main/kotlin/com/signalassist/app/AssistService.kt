@@ -64,14 +64,14 @@ class AssistService : Service() {
         notifier = AlertNotifier(this)
         settings = Settings(this)
         controller = AssistController(scope, ::onOutput)
-        controller.hintCounts.putAll(settings.hintCounts)
+        controller.restoreHints(settings.hintCounts)
         startAsForeground()
         scope.launch {
             AssistBus.requests.collect { req ->
                 val profile = controller.profile
-                val now = System.currentTimeMillis()
+                val now = android.os.SystemClock.elapsedRealtime()
                 when (req) {
-                    UserRequest.Replay -> history.replayLast(profile, now)?.let { (alert, plan) ->
+                    UserRequest.Replay -> history.replayLast(profile, now, lastSignal)?.let { (alert, plan) ->
                         notifier.notify(alert, plan, postHeadsUp = false)
                         AssistBus.alerts.tryEmit(alert to plan)
                     }
@@ -120,6 +120,13 @@ class AssistService : Service() {
 
     private fun startMode(mode: AssistMode) {
         liveVehicle = null
+        lastSignal = null
+        history.clear()
+        notifier.clearPending()
+        AssistBus.snapshot.value = null
+        AssistBus.tripSummary.value = null
+        trips.finish(android.os.SystemClock.elapsedRealtime())
+        AssistBus.speedOverrideKmh = null
         val sources = when (mode) {
             is AssistMode.Simulated -> {
                 val scenario = Scenario.ALL.firstOrNull { it.name == mode.scenarioName } ?: Scenario.ALL.first()
@@ -128,7 +135,9 @@ class AssistService : Service() {
                     ScenarioSirenSource(s))
             }
             else -> {
-                val vehicle = CarPropertyVehicleDataSource(this) { AssistBus.speedOverrideKmh }.also { liveVehicle = it }
+                val vehicle = CarPropertyVehicleDataSource(this) {
+                    if (mode.isDemo) AssistBus.speedOverrideKmh else null
+                }.also { liveVehicle = it }
                 val frames = when (mode) {
                     AssistMode.LiveSyntheticSignal -> SyntheticCycleFrameSource()
                     AssistMode.LiveTestImages -> AssetImageFrameSource(this).takeUnless { it.isEmpty }
@@ -145,9 +154,9 @@ class AssistService : Service() {
     private fun onOutput(out: com.signalassist.core.DrivingOutput, frame: com.signalassist.core.Frame?) {
         scope.launch {
             // 중재(AlertArbiter)를 거친 전달 목록: 같은 순간엔 가장 중요한 알림만 소리·음성·깜빡임
-            out.signal?.let { lastSignal = it.copy(timestampMs = out.input.timestampMs) }
+            lastSignal = out.signal
             history.record(out.deliveries)
-            if (out.deliveries.any { it.alert.speechSuffix != null || it.plan.voice }) settings.hintCounts = controller.hintCounts.toMap()
+            if (out.deliveries.any { it.alert.speechSuffix != null || it.plan.voice }) settings.hintCounts = controller.hintCounts()
             trips.update(out)?.let { summary ->
                 val text = summary.summaryKo()
                 settings.addTrip(text)

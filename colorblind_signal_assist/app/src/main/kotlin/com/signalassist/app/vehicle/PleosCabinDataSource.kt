@@ -36,7 +36,7 @@ class PleosCabinDataSource(private val context: Context) : CabinDataSource {
     override val name = "Vehicle State (실내 상태)"
 
     private var propertyManager: CarPropertyManager? = null
-    private val connection = CarConnection(context, ::register)
+    private val connection = CarConnection(context, ::register, ::clearValues)
 
     @Volatile private var driverBelt: Boolean? = null
     @Volatile private var lowTire: Boolean? = null
@@ -48,6 +48,10 @@ class PleosCabinDataSource(private val context: Context) : CabinDataSource {
 
     private val callback = object : CarPropertyManager.CarPropertyEventCallback {
         override fun onChangeEvent(v: CarPropertyValue<*>) {
+            if (v.status != CarPropertyValue.STATUS_AVAILABLE) {
+                onErrorEvent(v.propertyId, v.areaId)
+                return
+            }
             val value = v.value
             when (v.propertyId) {
                 VehiclePropertyIds.SEAT_BELT_BUCKLED ->
@@ -67,7 +71,21 @@ class PleosCabinDataSource(private val context: Context) : CabinDataSource {
             }
         }
 
-        override fun onErrorEvent(propertyId: Int, areaId: Int) = Unit
+        override fun onErrorEvent(propertyId: Int, areaId: Int) {
+            when (propertyId) {
+                VehiclePropertyIds.SEAT_BELT_BUCKLED -> driverBelt = null
+                VehiclePropertyIds.DOOR_POS -> doors.remove(areaId)
+                VehiclePropertyIds.TURN_SIGNAL_STATE, VehiclePropertyIds.HAZARD_LIGHTS_STATE -> turnSignal = null
+                VehiclePropertyIds.HEADLIGHTS_STATE -> headlights = null
+                VehiclePropertyIds.NIGHT_MODE -> night = null
+                VehiclePropertyIds.SEAT_OCCUPANCY -> rearSeats.remove(areaId)
+            }
+        }
+    }
+
+    private fun clearValues() {
+        driverBelt = null; lowTire = null; turnSignal = null; headlights = null; night = null
+        doors.clear(); rearSeats.clear()
     }
 
     override fun start() = connection.connect()
@@ -113,6 +131,7 @@ class PleosCabinDataSource(private val context: Context) : CabinDataSource {
         runCatching { propertyManager?.unregisterCallback(callback) }
         propertyManager = null
         connection.disconnect()
+        clearValues()
     }
 
     private companion object {

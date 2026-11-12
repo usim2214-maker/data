@@ -15,12 +15,12 @@ import kotlin.math.abs
 /**
  * AAOS 표준 Car API 연결 도우미. (Pleos Connect 는 AAOS 기반이며 Android API 호환을 유지)
  */
-internal class CarConnection(private val context: Context, private val onReady: (Car) -> Unit) {
+internal class CarConnection(private val context: Context, private val onReady: (Car) -> Unit, private val onDisconnected: () -> Unit = {}) {
     private var car: Car? = null
 
     fun connect() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            car = Car.createCar(context, null, Car.CAR_WAIT_TIMEOUT_DO_NOT_WAIT) { c, ready -> if (ready) onReady(c) }
+            car = Car.createCar(context, null, Car.CAR_WAIT_TIMEOUT_DO_NOT_WAIT) { c, ready -> if (ready) onReady(c) else onDisconnected() }
         } else {
             car = runCatching { Car.createCar(context) }.getOrNull()?.also(onReady)
         }
@@ -46,20 +46,27 @@ class CarPropertyVehicleDataSource(
     override val name = "Car API (차속·기어)"
 
     private var propertyManager: CarPropertyManager? = null
-    private val connection = CarConnection(context, ::register)
+    private val telemetry = com.signalassist.core.VehicleTelemetry()
+    private val connection = CarConnection(context, ::register, telemetry::reset)
 
-    @Volatile private var speedKmh: Float? = null
-    @Volatile private var gear = Gear.UNKNOWN
 
     private val callback = object : CarPropertyManager.CarPropertyEventCallback {
         override fun onChangeEvent(value: CarPropertyValue<*>) {
+            val available = value.status == CarPropertyValue.STATUS_AVAILABLE
             when (value.propertyId) {
-                VehiclePropertyIds.PERF_VEHICLE_SPEED -> speedKmh = abs(value.value as Float) * 3.6f
-                VehiclePropertyIds.GEAR_SELECTION, VehiclePropertyIds.CURRENT_GEAR -> gear = mapGear(value.value as Int)
+                VehiclePropertyIds.PERF_VEHICLE_SPEED -> {
+                    val speed = if (available) value.value as? Float else null
+                    if (speed == null) telemetry.invalidateSpeed()
+                    else telemetry.updateSpeed(abs(speed) * 3.6f, android.os.SystemClock.elapsedRealtime())
+                }
+                VehiclePropertyIds.GEAR_SELECTION, VehiclePropertyIds.CURRENT_GEAR ->
+                    telemetry.updateGear(if (available) (value.value as? Int)?.let(::mapGear) ?: Gear.UNKNOWN else Gear.UNKNOWN)
             }
         }
 
         override fun onErrorEvent(propertyId: Int, areaId: Int) {
+            if (propertyId == VehiclePropertyIds.PERF_VEHICLE_SPEED) telemetry.invalidateSpeed()
+            else telemetry.updateGear(Gear.UNKNOWN)
             Log.w(TAG, "property error id=$propertyId area=$areaId")
         }
     }
@@ -82,16 +89,20 @@ class CarPropertyVehicleDataSource(
         }.onFailure { Log.w(TAG, "gear not available: ${it.message}") }
     }
 
-    override fun current(nowMs: Long) =
-        VehicleState(speedKmh = speedOverrideKmh() ?: speedKmh ?: 0f, gear = gear)
+    override fun current(nowMs: Long): VehicleState {
+        val actual = telemetry.current(nowMs)
+        val simulated = speedOverrideKmh()?.takeIf { it.isFinite() && it >= 0f }
+        return if (simulated == null) actual else actual.copy(speedKmh = simulated,
+            speedStatus = com.signalassist.core.InputStatus.AVAILABLE)
+    }
 
-    /** 차속을 한 번이라도 실제로 받았는지 (에뮬레이터에서는 false) */
-    val hasRealSpeed get() = speedKmh != null
+    val hasRealSpeed get() = telemetry.current(android.os.SystemClock.elapsedRealtime()).hasValidSpeed
 
     override fun stop() {
         runCatching { propertyManager?.unregisterCallback(callback) }
         propertyManager = null
         connection.disconnect()
+        telemetry.reset()
     }
 
     private fun mapGear(g: Int): Gear = when (g) {

@@ -40,7 +40,7 @@ object SafePalette {
 class SignalPanelView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) : View(context, attrs) {
 
     init {
-        contentDescription = "현재 신호: 인식 중"
+        contentDescription = "현재 신호: 확인 불가"
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
     }
 
@@ -52,7 +52,7 @@ class SignalPanelView @JvmOverloads constructor(context: Context, attrs: Attribu
                     SignalColor.RED -> "정지"
                     SignalColor.YELLOW -> "주의"
                     SignalColor.GREEN -> "진행"
-                    SignalColor.UNKNOWN -> "인식 중"
+                    SignalColor.UNKNOWN -> "확인 불가"
                 } + if (value.leftTurnArrow) ", 좌회전 신호" else ""
             }
             field = value
@@ -75,7 +75,7 @@ class SignalPanelView @JvmOverloads constructor(context: Context, attrs: Attribu
     override fun onDraw(canvas: Canvas) {
         val w = width.toFloat()
         val h = height.toFloat()
-        canvas.drawColor(Color.BLACK)
+        canvas.drawColor(Color.rgb(22, 34, 50))
 
         // 4구 신호등
         val housingH = h * 0.42f
@@ -114,12 +114,15 @@ class SignalPanelView @JvmOverloads constructor(context: Context, attrs: Attribu
             SignalColor.RED -> SignalSymbols.STOP to "정지"
             SignalColor.YELLOW -> SignalSymbols.CAUTION to "주의"
             SignalColor.GREEN -> SignalSymbols.GO to "진행"
-            SignalColor.UNKNOWN -> "?" to "신호 인식 중"
+            SignalColor.UNKNOWN -> "?" to "신호 확인 불가"
         }
         val arrow = if (state.leftTurnArrow) "  ${SignalSymbols.LEFT_ARROW} 좌회전" else ""
         text.color = Color.WHITE
         text.textSize = h * 0.2f
-        canvas.drawText("$symbol $label$arrow", w / 2, top + cell + h * 0.3f, text)
+        val caption = "$symbol $label$arrow"
+        val measured = text.measureText(caption)
+        if (measured > w * 0.9f) text.textSize *= w * 0.9f / measured
+        canvas.drawText(caption, w / 2, top + cell + h * 0.3f, text)
 
         flashLevel?.let {
             stroke.color = if (it == AlertLevel.URGENT) vermilion else amber

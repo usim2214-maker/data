@@ -17,6 +17,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.ensureActive
 
 /** 한 번에 쓰는 입력 공급원 묶음 */
 class Sources(
@@ -48,22 +50,23 @@ class AssistController(
     private val engine = DrivingAssistEngine()
 
     var profile: DriverProfile
-        get() = engine.profile
-        set(value) { engine.profile = value }
+        get() = synchronized(engine) { engine.profile }
+        set(value) { synchronized(engine) { engine.profile = value } }
 
     /** 운전하며 익히기 횟수 (서비스가 저장·복원) */
-    val hintCounts: MutableMap<com.signalassist.core.AlertType, Int> get() = engine.hints.counts
+    fun restoreHints(counts: Map<com.signalassist.core.AlertType, Int>) = synchronized(engine) { engine.hints.counts.putAll(counts) }
+    fun hintCounts(): Map<com.signalassist.core.AlertType, Int> = synchronized(engine) { engine.hints.counts.toMap() }
 
     fun start(newSources: Sources) {
         stop()
         sources = newSources.also { it.start() }
-        engine.reset()
+        synchronized(engine) { engine.reset() }
         val interval = 1000L / tickHz
-        job = scope.launch(Dispatchers.Default) {
+        job = scope.launch {
             var tick = 0
             while (isActive) {
-                val now = System.currentTimeMillis()
-                val wantFrame = engine.profile.signalAssist && tick++ % frameEvery == 0
+                val now = android.os.SystemClock.elapsedRealtime()
+                val wantFrame = profile.signalAssist && tick++ % frameEvery == 0
                 val frame = if (wantFrame) newSources.frames?.nextFrame(now) else null
                 val input = DrivingInput(
                     timestampMs = now,
@@ -73,8 +76,10 @@ class AssistController(
                     navigation = newSources.navigation.current(now),
                     sirenNearby = newSources.siren.current(now),
                 )
-                onOutput(engine.process(input), frame)
-                delay((interval - (System.currentTimeMillis() - now)).coerceAtLeast(5))
+                val output = withContext(Dispatchers.Default) { synchronized(engine) { engine.process(input) } }
+                ensureActive()
+                onOutput(output, frame)
+                delay((interval - (android.os.SystemClock.elapsedRealtime() - now)).coerceAtLeast(5))
             }
         }
     }

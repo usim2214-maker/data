@@ -113,10 +113,18 @@ class AlertNotifier(private val context: Context) : TextToSpeech.OnInitListener 
         NotificationManagerCompat.from(context).notify(notificationId++, n)
     }
 
-    fun shutdown() {
+    fun clearPending() {
         handler.removeCallbacksAndMessages(null)
+        tone.stop()
+        val manager = NotificationManagerCompat.from(context)
+        for (id in maxOf(1000, notificationId - 64) until notificationId) manager.cancel(id)
         focus?.let { audioManager.abandonAudioFocusRequest(it) }
+        focus = null
         tts.stop()
+    }
+
+    fun shutdown() {
+        clearPending()
         tts.shutdown()
     }
 

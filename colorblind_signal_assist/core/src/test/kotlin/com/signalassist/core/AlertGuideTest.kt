@@ -28,9 +28,10 @@ class AlertGuideTest {
         val h = AlertHistory()
         assertNull(h.replayLast(DriverProfile.COLOR_VISION_ONLY, 0))
         val silenced = OutputPlan(tone = false, voice = false, visualFlash = false, largeText = false)
-        h.record(listOf(Delivery(Alert(AlertType.LEFT_ARROW_ON, 100), silenced)))
+        h.record(listOf(Delivery(Alert(AlertType.LOW_TIRE_PRESSURE, 100), silenced)))
         val r = h.replayLast(DriverProfile.COLOR_VISION_ONLY, 5_000)!!
-        assertEquals(AlertType.LEFT_ARROW_ON, r.alert.type)
+        assertEquals(AlertType.LOW_TIRE_PRESSURE, r.alert.type)
+        assertTrue(r.alert.message.startsWith("이전 알림"))
         assertTrue(r.plan.voice && r.plan.tone)
         assertEquals(5_000, r.alert.timestampMs)
         val deaf = h.replayLast(DriverProfile(setOf(DriverNeed.HEARING)), 6_000)!!

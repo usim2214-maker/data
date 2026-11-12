@@ -29,43 +29,53 @@ class MicSirenSource(private val context: Context) : SirenSource {
     override val name = "실내 마이크 (사이렌 감지)"
     private val sampleRate = 16_000
     @Volatile private var detected: Boolean? = null
-    @Volatile private var running = false
+    @Volatile private var activeRun: java.util.concurrent.atomic.AtomicBoolean? = null
+    @Volatile private var recorder: AudioRecord? = null
     private var thread: Thread? = null
 
     @SuppressLint("MissingPermission")
     override fun start() {
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            detected = null
-            return
-        }
+        stop()
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) return
         val minBuf = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
         if (minBuf <= 0) return
-        running = true
+        val token = java.util.concurrent.atomic.AtomicBoolean(true)
+        activeRun = token
         thread = Thread({
-            val record = runCatching {
-                AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, AudioFormat.CHANNEL_IN_MONO,
+            var record: AudioRecord? = null
+            try {
+                val audio = AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, AudioFormat.CHANNEL_IN_MONO,
                     AudioFormat.ENCODING_PCM_16BIT, maxOf(minBuf, 4096))
-            }.getOrNull()
-            if (record == null || record.state != AudioRecord.STATE_INITIALIZED) {
-                Log.w(TAG, "microphone unavailable"); running = false; return@Thread
+                record = audio
+                if (audio.state != AudioRecord.STATE_INITIALIZED || !token.get()) return@Thread
+                recorder = audio
+                audio.startRecording()
+                val detector = SirenDetector()
+                val buf = ShortArray(1024)
+                while (token.get()) {
+                    val n = audio.read(buf, 0, buf.size)
+                    if (n <= 0) break
+                    val result = detector.feed(buf, n)
+                    if (activeRun === token && token.get()) detected = result
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "microphone unavailable", e)
+            } finally {
+                runCatching { record?.stop() }
+                record?.release()
+                if (activeRun === token) { detected = null; recorder = null }
             }
-            val detector = SirenDetector()
-            val buf = ShortArray(1024)
-            record.startRecording()
-            detected = false
-            while (running) {
-                val n = record.read(buf, 0, buf.size)
-                if (n > 0) detected = detector.feed(buf, n)
-            }
-            record.stop()
-            record.release()
         }, "siren-detector").apply { isDaemon = true; start() }
     }
 
     override fun current(nowMs: Long): Boolean? = detected
 
     override fun stop() {
-        running = false
+        activeRun?.set(false)
+        activeRun = null
+        runCatching { recorder?.stop() }
+        recorder = null
+        thread?.interrupt()
         thread = null
         detected = null
     }

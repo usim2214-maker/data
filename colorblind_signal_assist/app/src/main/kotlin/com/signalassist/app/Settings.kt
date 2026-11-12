@@ -60,6 +60,14 @@ class Settings(context: Context) {
         prefs.edit().putString(KEY_TRIPS, list.joinToString(TRIP_SEP)).apply()
     }
 
+    var largeText: Boolean
+        get() = prefs.getBoolean("large_text", false)
+        set(value) { prefs.edit().putBoolean("large_text", value).apply() }
+
+    var fullScreenFlash: Boolean
+        get() = prefs.getBoolean("full_screen_flash", false)
+        set(value) { prefs.edit().putBoolean("full_screen_flash", value).apply() }
+
     private companion object {
         const val KEY_NEEDS = "needs"
         const val KEY_MODE = "mode"

@@ -75,3 +75,13 @@ tasks.register<JavaExec>("renderAppVideo") {
     environment("LC_ALL", "C.UTF-8")
     workingDir = projectDir
 }
+
+tasks.register<JavaExec>("renderNavVideo") {
+    group = "application"
+    description = "내비와 함께 쓰기 시연 영상 (내비 위 알림 카드)"
+    mainClass.set("com.signalassist.demo.NavVideoKt")
+    classpath = sourceSets["main"].runtimeClasspath
+    jvmArgs("-Dfile.encoding=UTF-8", "-Dstdout.encoding=UTF-8", "-Djava.awt.headless=true", "-Xmx3g")
+    environment("LC_ALL", "C.UTF-8")
+    workingDir = projectDir
+}

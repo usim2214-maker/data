@@ -42,7 +42,12 @@ data class GlanceCard(
                 AlertType.YELLOW_CAUTION, AlertType.YELLOW_DILEMMA -> Shape.TRIANGLE_CAUTION
                 AlertType.GREEN_GO, AlertType.GREEN_REMINDER -> Shape.CIRCLE_GO
                 AlertType.LEFT_ARROW_ON, AlertType.LEFT_ARROW_FOR_ROUTE, AlertType.LEFT_ARROW_NOT_FOR_ROUTE -> Shape.ARROW_LEFT
-                AlertType.SIGNAL_LOST, AlertType.SIGNAL_STATUS -> Shape.QUESTION
+                // '지금 신호' 답: 답한 신호의 모양 (확실하지 않으면 '?')
+                AlertType.SIGNAL_STATUS -> when (alert.symbol) {
+                    "■" -> Shape.OCTAGON_STOP; "▲" -> Shape.TRIANGLE_CAUTION; "●" -> Shape.CIRCLE_GO; "←" -> Shape.ARROW_LEFT
+                    else -> Shape.QUESTION
+                }
+                AlertType.SIGNAL_LOST -> Shape.QUESTION
                 AlertType.SIREN_NEARBY -> Shape.SIREN
                 AlertType.NAV_MANEUVER_SOON -> Shape.ARROW_TURN
                 else -> Shape.WARNING

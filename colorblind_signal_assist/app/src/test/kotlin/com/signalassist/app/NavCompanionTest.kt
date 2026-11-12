@@ -13,6 +13,7 @@ import com.signalassist.core.DriverNeed
 import com.signalassist.core.DriverProfile
 import com.signalassist.core.DrivingAssistEngine
 import com.signalassist.core.OutputPlan
+import com.signalassist.core.SignalQuery
 import com.signalassist.core.TraceParser
 import com.signalassist.core.TracePlayer
 import org.junit.After
@@ -58,6 +59,12 @@ class NavCompanionTest {
         assertEquals(96, icon.width)
         // 아이콘 가운데는 채워진 모양 (투명하지 않음)
         assertTrue(icon.getPixel(48, 30) ushr 24 > 0)
+    }
+
+    @Test fun signalAnswerCardUsesAnsweredSignalShape() {
+        val a = Alert(AlertType.SIGNAL_STATUS, 0, customMessage = "지금은 빨간불입니다.", customSymbol = "■", customHeadline = "빨간불")
+        assertEquals(GlanceCard.Shape.OCTAGON_STOP, GlanceCard.of(a).shape)
+        assertEquals(GlanceCard.Shape.QUESTION, GlanceCard.of(a.copy(customSymbol = "?")).shape)
     }
 
     @Test fun urgentStaysLongerAndVehicleCardHasNoSignalQuery() {
@@ -119,11 +126,20 @@ class NavCompanionTest {
         val profile = DriverProfile(setOf(DriverNeed.COLOR_VISION))
         val engine = DrivingAssistEngine(profile)
         val notifier = AlertNotifier(app)
-        val log = StringBuilder("index\tt_ms\ttype\tlevel\ttitle\ttext\tactions\ttimeout_ms\ticon\tspeech\n")
+        val log = StringBuilder("index\tt_ms\ttype\tlevel\ttitle\ttext\tactions\ttimeout_ms\ticon\tspeech\ttone\tplan_tone\tsource\n")
         var k = 0
+        var lastSignal: com.signalassist.core.EngineOutput? = null
         for (i in 0 until player.frameCount) {
             val sample = player.sample(i)
-            for (d in engine.process(sample.toInput()).deliveries) {
+            val o = engine.process(sample.toInput())
+            o.signal?.let { lastSignal = it.copy(timestampMs = sample.timestampMs) }
+            val list = o.deliveries.map { it to "engine" }.toMutableList()
+            // 첫 빨간불 대기 중 운전자가 카드의 '지금 신호' 버튼을 누름
+            if (i == 350) {
+                val a = SignalQuery.answer(lastSignal, sample.timestampMs)
+                list += com.signalassist.core.Delivery(a, SignalQuery.plan(profile, a)) to "tap_query"
+            }
+            for ((d, src) in list) {
                 val a = d.alert
                 val n = notifier.buildCard(a)
                 val card = GlanceCard.of(a)
@@ -131,7 +147,7 @@ class NavCompanionTest {
                 File(out, iconName).outputStream().use { card.icon(192).compress(Bitmap.CompressFormat.PNG, 100, it) }
                 val actions = n.actions.joinToString("|") { it.title.toString() }
                 log.append("$i\t${sample.timestampMs}\t${a.type}\t${a.level}\t${n.extras.getString(Notification.EXTRA_TITLE)}\t" +
-                    "${n.extras.getCharSequence(Notification.EXTRA_TEXT)}\t$actions\t${card.timeoutMs}\t$iconName\t${a.speech}\n")
+                    "${n.extras.getCharSequence(Notification.EXTRA_TEXT)}\t$actions\t${card.timeoutMs}\t$iconName\t${a.speech}\t${a.tone}\t${d.plan.tone}\t$src\n")
             }
         }
         shadowOf(Looper.getMainLooper()).idle()

@@ -129,6 +129,16 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        AssistBus.uiVisible = true
+    }
+
+    override fun onPause() {
+        AssistBus.uiVisible = false
+        super.onPause()
+    }
+
     override fun onDestroy() {
         onboardingDialog?.dismiss()
         onboardingTone.stop()
@@ -553,6 +563,12 @@ class MainActivity : AppCompatActivity() {
             setOnCheckedChangeListener { _, checked -> settings.fullScreenFlash = checked }
         })
         appearance.addView(label(17f, mutedColor).apply { text = "기본은 테두리 강조입니다. 전체 화면 강조는 알림 배우기에서 먼저 확인하세요." })
+        appearance.addView(CheckBox(this).apply {
+            text = "내비와 함께 쓰기"; textSize = 20f; minimumHeight = dp(76); setTextColor(Color.WHITE)
+            isChecked = settings.navCompanion
+            setOnCheckedChangeListener { _, checked -> settings.navCompanion = checked; AssistService.refreshStatus(this@MainActivity) }
+        })
+        appearance.addView(label(17f, mutedColor).apply { text = "시동을 걸면 자동으로 켜지고, 내비를 보는 동안 알림이 내비 위 카드로 뜹니다. 카드에서 '다시 듣기'·'지금 신호'를 누를 수 있습니다." })
         controls.addView(appearance); addSpace(controls)
         verbosityRow = column(); controls.addView(verbosityRow)
         muteButton = action("최근 알림 끄기") {

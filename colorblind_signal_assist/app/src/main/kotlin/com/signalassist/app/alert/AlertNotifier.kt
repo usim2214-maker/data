@@ -2,6 +2,8 @@ package com.signalassist.app.alert
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Intent
 import android.content.Context
 import android.content.pm.PackageManager
 import android.media.AudioAttributes
@@ -14,6 +16,9 @@ import android.speech.tts.TextToSpeech
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import com.signalassist.app.AssistBus
+import com.signalassist.app.AssistService
+import com.signalassist.app.MainActivity
 import com.signalassist.app.R
 import com.signalassist.core.Alert
 import com.signalassist.core.AlertLevel
@@ -37,7 +42,6 @@ class AlertNotifier(private val context: Context) : TextToSpeech.OnInitListener 
     private var focus: AudioFocusRequest? = null
     private val tts = TextToSpeech(context, this)
     private var ttsReady = false
-    private var notificationId = 1000
 
     init {
         val channel = NotificationChannel(CHANNEL_ID, context.getString(R.string.channel_name), NotificationManager.IMPORTANCE_HIGH)
@@ -65,7 +69,8 @@ class AlertNotifier(private val context: Context) : TextToSpeech.OnInitListener 
             val delay = if (plan.tone) ToneLibrary.durationMs(alert.tone) + 80L else 0L
             handler.postDelayed({ speak(alert, plan) }, delay)
         }
-        if (postHeadsUp) postNotification(alert)
+        // 앱 화면이 보이는 중이면 화면이 직접 크게 보여주므로 카드는 띄우지 않는다 (중복 방지)
+        if (postHeadsUp && !AssistBus.uiVisible) postNotification(alert)
     }
 
     private fun speak(alert: Alert, plan: OutputPlan) {
@@ -101,23 +106,39 @@ class AlertNotifier(private val context: Context) : TextToSpeech.OnInitListener 
             ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) !=
             PackageManager.PERMISSION_GRANTED
         ) return
-        val n = NotificationCompat.Builder(context, CHANNEL_ID)
+        NotificationManagerCompat.from(context).notify(cardId(alert), buildCard(alert))
+    }
+
+    /**
+     * 내비 위에 뜨는 한눈 카드: 큰 모양 아이콘 + 짧은 제목 + 한 문장, 위험도별로 떠 있는 시간이 다르다.
+     * 같은 종류(신호/차량/내비/주변 소리)의 새 카드는 이전 카드를 바꿔 끼워 카드가 쌓이지 않게 한다.
+     * 버튼: '다시 듣기'(모든 카드), '지금 신호'(신호 카드) — 큰 터치 영역의 알림 버튼으로 바로 누른다.
+     */
+    fun buildCard(alert: Alert): android.app.Notification {
+        val card = GlanceCard.of(alert)
+        val b = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
-            .setContentTitle("${alert.symbol} ${alert.headline}")
-            .setContentText(alert.message)
+            .setLargeIcon(card.icon())
+            .setColor(card.color)
+            .setContentTitle(card.title)
+            .setContentText(card.text)
             .setCategory(NotificationCompat.CATEGORY_NAVIGATION)
             .setPriority(if (alert.level >= AlertLevel.WARNING) NotificationCompat.PRIORITY_MAX else NotificationCompat.PRIORITY_HIGH)
-            .setTimeoutAfter(if (alert.level == AlertLevel.URGENT) 6_000 else 4_000)
+            .setTimeoutAfter(card.timeoutMs)
             .setAutoCancel(true)
-            .build()
-        NotificationManagerCompat.from(context).notify(notificationId++, n)
+            .setContentIntent(PendingIntent.getActivity(context, 0, Intent(context, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE))
+            .addAction(0, ACTION_LABEL_REPLAY, AssistService.actionIntent(context, AssistService.ACTION_REPLAY))
+        if (card.offerSignalQuery) b.addAction(0, ACTION_LABEL_QUERY, AssistService.actionIntent(context, AssistService.ACTION_QUERY))
+        return b.build()
     }
+
+    private fun cardId(alert: Alert) = CARD_ID_BASE + alert.category.ordinal
 
     fun clearPending() {
         handler.removeCallbacksAndMessages(null)
         tone.stop()
         val manager = NotificationManagerCompat.from(context)
-        for (id in maxOf(1000, notificationId - 64) until notificationId) manager.cancel(id)
+        for (c in com.signalassist.core.AlertCategory.entries) manager.cancel(CARD_ID_BASE + c.ordinal)
         focus?.let { audioManager.abandonAudioFocusRequest(it) }
         focus = null
         tts.stop()
@@ -128,7 +149,10 @@ class AlertNotifier(private val context: Context) : TextToSpeech.OnInitListener 
         tts.shutdown()
     }
 
-    private companion object {
+    companion object {
         const val CHANNEL_ID = "signal_alerts"
+        const val CARD_ID_BASE = 1000
+        const val ACTION_LABEL_REPLAY = "다시 듣기"
+        const val ACTION_LABEL_QUERY = "지금 신호"
     }
 }

@@ -65,6 +65,11 @@ class AssistService : Service() {
         settings = Settings(this)
         controller = AssistController(scope, ::onOutput)
         controller.restoreHints(settings.hintCounts)
+        // 시동(부팅) 때 화면 없이 켜진 경우: 저장된 프로필로 바로 시작. 가상 신호(체험 모드)로는 절대 시작하지 않는다
+        if (AssistBus.config.value == null && settings.onboarded) {
+            val mode = settings.mode.takeUnless { it.isDemo } ?: AssistMode.LiveNoCamera
+            AssistBus.config.value = AssistConfig(mode, settings.profile)
+        }
         startAsForeground()
         scope.launch {
             AssistBus.requests.collect { req ->
@@ -72,13 +77,13 @@ class AssistService : Service() {
                 val now = android.os.SystemClock.elapsedRealtime()
                 when (req) {
                     UserRequest.Replay -> history.replayLast(profile, now, lastSignal)?.let { (alert, plan) ->
-                        notifier.notify(alert, plan, postHeadsUp = false)
+                        notifier.notify(alert, plan) // 화면이 안 보이면(내비 사용 중) 카드로도 다시 보여준다
                         AssistBus.alerts.tryEmit(alert to plan)
                     }
                     UserRequest.QuerySignal -> {
                         val alert = SignalQuery.answer(lastSignal, now)
                         val plan = SignalQuery.plan(profile, alert)
-                        notifier.notify(alert, plan, postHeadsUp = false)
+                        notifier.notify(alert, plan)
                         AssistBus.alerts.tryEmit(alert to plan)
                     }
                     is UserRequest.Lesson -> {
@@ -107,7 +112,14 @@ class AssistService : Service() {
         }
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action) {
+            ACTION_REPLAY -> AssistBus.requests.tryEmit(UserRequest.Replay)
+            ACTION_QUERY -> AssistBus.requests.tryEmit(UserRequest.QuerySignal)
+            ACTION_REFRESH -> startAsForeground()
+        }
+        return START_STICKY
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -183,25 +195,55 @@ class AssistService : Service() {
         val open = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE,
         )
+        val companion = settings.navCompanion
         val n: Notification = NotificationCompat.Builder(this, SERVICE_CHANNEL)
             .setSmallIcon(android.R.drawable.ic_menu_info_details)
             .setContentTitle(getString(R.string.app_name))
-            .setContentText(getString(R.string.service_running))
+            .setContentText(getString(if (companion) R.string.service_running_nav else R.string.service_running))
             .setContentIntent(open)
             .setOngoing(true)
+            .apply {
+                if (companion) {
+                    addAction(0, AlertNotifier.ACTION_LABEL_REPLAY, actionIntent(this@AssistService, ACTION_REPLAY))
+                    addAction(0, AlertNotifier.ACTION_LABEL_QUERY, actionIntent(this@AssistService, ACTION_QUERY))
+                }
+            }
             .build()
         val micGranted = checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED
-        var type = if (Build.VERSION.SDK_INT >= 34) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0
+        val base = if (Build.VERSION.SDK_INT >= 34) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0
+        var type = base
         if (micWanted && micGranted && Build.VERSION.SDK_INT >= 30) type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
-        ServiceCompat.startForeground(this, NOTIFICATION_ID, n, type)
+        try {
+            ServiceCompat.startForeground(this, NOTIFICATION_ID, n, type)
+        } catch (e: RuntimeException) {
+            // 시동 직후(부팅 수신)처럼 화면이 없을 때는 마이크 유형으로 시작할 수 없다 -> 마이크 없이 시작.
+            // 사이렌 감지는 운전자가 앱 화면을 한 번 열면 다시 켜진다.
+            if (type == base) throw e
+            ServiceCompat.startForeground(this, NOTIFICATION_ID, n, base)
+        }
     }
 
     companion object {
         private const val SERVICE_CHANNEL = "assist_service"
         private const val NOTIFICATION_ID = 1
 
+        const val ACTION_REPLAY = "com.signalassist.app.action.REPLAY"
+        const val ACTION_QUERY = "com.signalassist.app.action.QUERY_SIGNAL"
+        const val ACTION_REFRESH = "com.signalassist.app.action.REFRESH"
+
         fun start(context: Context) {
             context.startForegroundService(Intent(context, AssistService::class.java))
         }
+
+        /** 설정 변경 후 상태 알림 문구·버튼 갱신 */
+        fun refreshStatus(context: Context) {
+            context.startForegroundService(Intent(context, AssistService::class.java).setAction(ACTION_REFRESH))
+        }
+
+        /** 알림 카드 버튼: 서비스에 바로 요청 (화면을 열지 않는다 — 운전 중 내비 화면 유지) */
+        fun actionIntent(context: Context, action: String): PendingIntent = PendingIntent.getService(
+            context, action.hashCode(), Intent(context, AssistService::class.java).setAction(action),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
     }
 }

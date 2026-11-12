@@ -4,5 +4,6 @@
     <string name="channel_name">운전 보조 알림</string>
     <string name="channel_desc">신호등 색 변화, 차량 경고, 내비 안내를 운전자 특성에 맞게 알려줍니다</string>
     <string name="service_channel_name">동작 상태</string>
+    <string name="service_running_nav">내비와 함께 동작 중 · 알림은 내비 위 카드로 뜹니다</string>
     <string name="service_running">운전 보조 알림이 동작 중입니다</string>
 </resources>

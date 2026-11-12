@@ -68,6 +68,11 @@ class Settings(context: Context) {
         get() = prefs.getBoolean("full_screen_flash", false)
         set(value) { prefs.edit().putBoolean("full_screen_flash", value).apply() }
 
+    /** 내비와 함께 쓰기: 시동을 걸면 알림 엔진을 자동으로 켜고, 알림은 내비 위 카드로 띄운다 */
+    var navCompanion: Boolean
+        get() = prefs.getBoolean("nav_companion", true)
+        set(value) { prefs.edit().putBoolean("nav_companion", value).apply() }
+
     private companion object {
         const val KEY_NEEDS = "needs"
         const val KEY_MODE = "mode"

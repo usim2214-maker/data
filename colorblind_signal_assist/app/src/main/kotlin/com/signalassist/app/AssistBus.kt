@@ -63,4 +63,7 @@ object AssistBus {
 
     /** Pleos 에뮬레이터는 차속을 시뮬레이션하지 못하므로 시연용 차속 (null 이면 실제 값) */
     @Volatile var speedOverrideKmh: Float? = null
+
+    /** 앱 화면이 지금 보이는지. 보이면 화면이 직접 알려주므로 내비 위 카드(HUN)는 띄우지 않는다 */
+    @Volatile var uiVisible: Boolean = false
 }

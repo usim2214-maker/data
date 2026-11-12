@@ -52,6 +52,23 @@
 
 ---
 
+# 0.2.0 실제 앱 화면 시연
+
+`모두의운전석_실제앱_v0.2.mp4` — 1280×720, 2분 27초, 알림음 포함
+
+- **오른쪽 앱 화면은 0.2.0 소스를 그대로 실행해 그린 실제 화면**입니다. 에뮬레이터 없이 Robolectric으로 MainActivity를 실행하고, 판단 엔진 결과를 앱의 실제 데이터 통로(AssistBus)로 0.1초마다 넣으며 화면을 녹화했습니다.
+- 구성:
+  - 0.2.0 정지 화면 3장 (차량 보조 모드, 내게 맞는 알림, 체험 모드)
+  - 시나리오 1: 부산 센텀시티 3D 주행 (색각이상, "지금 신호 확인" 포함)
+  - 시나리오 2: 청각장애 (전체 화면 강조 켬)
+- 다시 만들기:
+  ```bash
+  ./gradlew :app:testDebugUnitTest --tests '*DemoRecordingTest*' -Precord=true   # 실제 화면 녹화 (app/build/recording)
+  ./gradlew :demo:renderAppVideo
+  ```
+
+---
+
 # 실제 도로 단독 영상
 
 `모두의운전석_센텀시티.mp4` — 1280×720, 93초 (3D 항공 시점 + 3D 운전석 시점). 부산 해운대구 센텀시티 해운대로 1.76km 주행 (OpenStreetMap + SUMO). 다시 만들기: `python3 sim/run_centum.py && ./gradlew :demo:renderCentum`

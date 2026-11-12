@@ -16,6 +16,10 @@ class NavigationAndProfileTest {
             p.evaluate(nav, i * 500L)
         }.map { it.message }
         assertEquals(listOf("300m 앞 좌회전", "100m 앞 좌회전"), msgs)
+        // 깜빡임 제목에는 회전 기호를 넣지 않는다 (화면이 symbol 을 따로 붙이므로 중복 방지)
+        val a = NavigationAlertPolicy().evaluate(NavigationState(true, Maneuver.LEFT, 250f), 0).single()
+        assertEquals("250m", a.headline)
+        assertEquals("↰", a.symbol)
     }
 
     @Test

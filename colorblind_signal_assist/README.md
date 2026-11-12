@@ -23,6 +23,7 @@ adb install apk/팀명_모두의운전석_release.apk
 ```
 
 ### 시연 영상
+- `docs/시연영상/모두의운전석_실제앱_v0.2.mp4` (2분 27초): **0.2.0 실제 앱 화면** 녹화 (Robolectric, 에뮬레이터 없이) — `./gradlew :app:testDebugUnitTest --tests '*DemoRecordingTest*' -Precord=true && ./gradlew :demo:renderAppVideo`
 - `docs/시연영상/모두의운전석_시연.mp4` (3분 42초, 가로): `./gradlew :demo:renderVideo`
 - `docs/시연영상/모두의운전석_센텀시티.mp4` (93초, 부산 센텀시티 실제 도로 3D 주행): `./gradlew :demo:renderCentum`
 - `docs/시연영상/모두의운전석_숏폼.mp4` (37초, 세로 숏폼): `./gradlew :demo:renderShorts`

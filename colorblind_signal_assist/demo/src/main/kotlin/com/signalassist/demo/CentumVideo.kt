@@ -99,7 +99,7 @@ internal fun centumOutro(g: Graphics2D) {
 
 // ---------------------------------------------------------------- 지도
 
-private class CentumMap(file: File) {
+internal class CentumMap(file: File) {
     class Road(val lanes: Int, val path: Path2D.Float)
     class Building(val height: Float, val path: Path2D.Float)
     class Label(val x: Float, val y: Float, val text: String)
@@ -143,14 +143,14 @@ private class CentumMap(file: File) {
 /**
  * @param standaloneIndex 본 시연 영상 안에 들어갈 때의 시나리오 번호 (단독 영상이면 null)
  */
-internal class CentumRun(private val audio: AudioTimeline, private val standaloneIndex: Int?) {
+internal class CentumRun(private val audio: AudioTimeline, private val standaloneIndex: Int?, private val precompute: Boolean = true) {
     private val dir = listOf(File("../sim/data"), File("sim/data")).first { File(it, "centum_trace.csv").exists() }
     private val city = City3D(File(dir, "centum_map.txt"))
     private val camBuf = java.awt.image.BufferedImage(960, 540, java.awt.image.BufferedImage.TYPE_INT_RGB)
     private val carColors = listOf(Color(150, 155, 165), Color(60, 64, 72), Color(210, 212, 214), Color(120, 30, 34), Color(40, 60, 100))
 
     /** 전방 카메라: 실제 센텀 건물로 만든 3D 시점 (신호 인식기도 이 화면을 본다) */
-    private fun render3D(index: Int, s: com.signalassist.core.TraceStep, light: SignalState?, lightDist: Float): com.signalassist.core.Frame {
+    fun render3D(index: Int, s: com.signalassist.core.TraceStep, light: SignalState?, lightDist: Float): com.signalassist.core.Frame {
         val cam = City3D.Camera(s.x.toDouble(), s.y.toDouble(), 1.3, Math.toRadians(s.angleDeg.toDouble()), 0.0,
             960, 540, 960 * 0.866, 480.0, 540 * 0.55)
         val items = ArrayList<City3D.Item>()
@@ -163,8 +163,9 @@ internal class CentumRun(private val audio: AudioTimeline, private val standalon
         return City3D.toFrame(camBuf)
     }
 
-    private val player = TracePlayer(TraceParser.parse(File(dir, "centum_trace.csv").readLines()), frameRenderer = ::render3D)
-    private val map = CentumMap(File(dir, "centum_map.txt"))
+    val player = TracePlayer(TraceParser.parse(File(dir, "centum_trace.csv").readLines()), frameRenderer = ::render3D)
+    val map = CentumMap(File(dir, "centum_map.txt"))
+    private val minimap = CentumMinimap(map)
     private val profile = DriverProfile(setOf(DriverNeed.COLOR_VISION))
     private val queries = listOf(350) // 첫 빨간불 대기 중 '지금 신호?' (35.0초)
 
@@ -175,7 +176,7 @@ internal class CentumRun(private val audio: AudioTimeline, private val standalon
     init {
         val engine = DrivingAssistEngine(profile)
         var lastSignal: EngineOutput? = null
-        for (i in 0 until player.frameCount) {
+        for (i in 0 until if (precompute) player.frameCount else 0) {
             val s = player.sample(i)
             val out = engine.process(s.toInput())
             outputs += out.copy(input = out.input.copy(frame = null)) // 영상 프레임은 버리고 결과만 보관 (메모리)
@@ -220,13 +221,12 @@ internal class CentumRun(private val audio: AudioTimeline, private val standalon
     private var signal = SignalState.UNKNOWN
     private var lamps: List<LampDetection> = emptyList()
     private var distanceM: Float? = null
-    private var heading = Double.NaN
     private var pressedAt = -10_000L
     private var camIdx = -1
     private lateinit var cam: BufferedImage
 
     /** 센텀시티 상공을 도는 항공 시점 (실제 건물 높이) */
-    private fun flyover(g: Graphics2D, img: BufferedImage, emit: (BufferedImage) -> Unit, ms: Long): Long {
+    fun flyover(g: Graphics2D, img: BufferedImage, emit: (BufferedImage) -> Unit, ms: Long): Long {
         val (rx, ry) = city.route
         val cxw = rx.average(); val cyw = ry.average()
         val frames = (ms * FPS / 1000.0).roundToInt()
@@ -346,13 +346,66 @@ internal class CentumRun(private val audio: AudioTimeline, private val standalon
         val geo = "%.5f, %.5f".format(step.lat, step.lon)
         Fonts.draw(g, geo, 648f - Fonts.width(g, geo, Fonts.r(14f)), 478f, Fonts.r(14f), Pal.dim)
 
-        drawMinimap(g, step, 680, 84, 576, 300)
+        minimap.draw(g, step, 680, 84, 576, 300)
         drawAppPanel(g, 680, 396, 576, 114, now)
         drawBottom(g, now)
         flash?.let { drawFlashOverlay(g, 1280, 720, it, now - flashAt, 96f, 46f, 300f, 400f) }
     }
 
-    private fun drawMinimap(g: Graphics2D, step: com.signalassist.core.TraceStep, x: Int, y: Int, w: Int, h: Int) {
+    private fun drawAppPanel(g: Graphics2D, x: Int, y: Int, w: Int, h: Int, now: Long) {
+        g.round(x, y, w, h, 18f, Pal.panel)
+        Fonts.draw(g, "앱 화면", x + 14f, y + 22f, Fonts.r(13f), Pal.dim)
+        val cell = 62f; val left = x + 16f; val top = y + 34f
+        g.round(left, top, cell * 4, cell, 14f, Color(12, 12, 14))
+        val lit = listOf(signal.color == SignalColor.RED, signal.color == SignalColor.YELLOW, false, signal.color == SignalColor.GREEN)
+        val cols = listOf(Pal.vermilion, Pal.amber, Pal.green, Pal.green)
+        for (i in 0 until 4) {
+            val c = left + cell * (i + 0.5f)
+            g.color = if (lit[i]) cols[i] else Pal.off
+            g.fill(shape(i, c, top + cell / 2, cell * 0.33f))
+            if (lit[i]) { g.color = Color.WHITE; g.stroke = BasicStroke(2.5f); g.drawRoundRect((c - cell / 2 + 4).toInt(), (top + 4).toInt(), (cell - 8).toInt(), (cell - 8).toInt(), 10, 10) }
+        }
+        val (sym, label) = when (signal.color) {
+            SignalColor.RED -> "■" to "정지"; SignalColor.YELLOW -> "▲" to "주의"
+            SignalColor.GREEN -> "●" to "진행"; SignalColor.UNKNOWN -> "?" to "인식 중"
+        }
+        Fonts.draw(g, "$sym $label", left + cell * 4 + 24, top + 44, Fonts.b(38f), Pal.text)
+        val pressed = now - pressedAt in 0..700
+        val bw = Fonts.width(g, "? 지금 신호", Fonts.b(16f)) + 22
+        val bx = x + w - bw - 14f
+        g.round(bx, y + 10f, bw, 30f, 11f, if (pressed) Pal.amber else Pal.line)
+        Fonts.draw(g, "? 지금 신호", bx + 11f, y + 31f, Fonts.b(16f), if (pressed) Color.BLACK else Pal.text)
+        if (pressed) { g.color = Pal.amber; g.stroke = BasicStroke(3f); g.drawRoundRect((bx - 5).toInt(), y + 5, (bw + 10).toInt(), 40, 14, 14) }
+    }
+
+    private fun drawBottom(g: Graphics2D, now: Long) {
+        val y = 522
+        g.round(24, y, 1232, 86, 18f, Pal.panel)
+        val b = banner
+        if (b != null) {
+            g.round(24, y, 12, 86, 6f, if (now - bannerAt < 2_500) levelColor(b.alert.level) else Pal.line)
+            Fonts.draw(g, "${b.alert.symbol}  ${b.alert.message}", 54f, y + 40f, Fonts.b(28f), Pal.text)
+            val p = b.plan
+            val chips = listOfNotNull(("소리: " + toneName(b.alert.tone)).takeIf { p.tone }, "음성".takeIf { p.voice },
+                "화면 깜빡임".takeIf { p.visualFlash }, "헤드업 알림")
+            var x = 54f
+            for (c in chips) x += g.chip(x, y + 50f, c, Pal.line, size = 14f) + 8
+        } else {
+            Fonts.draw(g, "알림 대기 중", 54f, y + 52f, Fonts.r(24f), Pal.dim)
+        }
+        if (now < voiceUntil && voice != null) Fonts.draw(g, "음성 안내 “$voice”", 30f, 650f, Fonts.r(22f), Pal.sky)
+        caption?.takeIf { now < captionUntil }?.let { c ->
+            g.round(24, 664, 1232, 44, 12f, Color(40, 36, 10))
+            Fonts.draw(g, "왜?  $c", 40f, 693f, Fonts.r(21f), Pal.amber)
+        }
+    }
+}
+
+/** 진행 방향이 위로 오는 실제 지도 미니맵 (OpenStreetMap) */
+internal class CentumMinimap(private val map: CentumMap) {
+    private var heading = Double.NaN
+
+    fun draw(g: Graphics2D, step: com.signalassist.core.TraceStep, x: Int, y: Int, w: Int, h: Int) {
         g.round(x, y, w, h, 18f, Color(18, 20, 24))
         val oldClip = g.clip
         val oldTx = g.transform
@@ -425,53 +478,5 @@ internal class CentumRun(private val audio: AudioTimeline, private val standalon
         g.clip = oldClip
         Fonts.draw(g, "© OpenStreetMap contributors", x + w - 182f, y + h - 8f, Fonts.r(11f), Color(200, 200, 200))
         Fonts.draw(g, "실제 지도 · 경로 신호", x + 12f, y + 22f, Fonts.r(13f), Pal.dim)
-    }
-
-    private fun drawAppPanel(g: Graphics2D, x: Int, y: Int, w: Int, h: Int, now: Long) {
-        g.round(x, y, w, h, 18f, Pal.panel)
-        Fonts.draw(g, "앱 화면", x + 14f, y + 22f, Fonts.r(13f), Pal.dim)
-        val cell = 62f; val left = x + 16f; val top = y + 34f
-        g.round(left, top, cell * 4, cell, 14f, Color(12, 12, 14))
-        val lit = listOf(signal.color == SignalColor.RED, signal.color == SignalColor.YELLOW, false, signal.color == SignalColor.GREEN)
-        val cols = listOf(Pal.vermilion, Pal.amber, Pal.green, Pal.green)
-        for (i in 0 until 4) {
-            val c = left + cell * (i + 0.5f)
-            g.color = if (lit[i]) cols[i] else Pal.off
-            g.fill(shape(i, c, top + cell / 2, cell * 0.33f))
-            if (lit[i]) { g.color = Color.WHITE; g.stroke = BasicStroke(2.5f); g.drawRoundRect((c - cell / 2 + 4).toInt(), (top + 4).toInt(), (cell - 8).toInt(), (cell - 8).toInt(), 10, 10) }
-        }
-        val (sym, label) = when (signal.color) {
-            SignalColor.RED -> "■" to "정지"; SignalColor.YELLOW -> "▲" to "주의"
-            SignalColor.GREEN -> "●" to "진행"; SignalColor.UNKNOWN -> "?" to "인식 중"
-        }
-        Fonts.draw(g, "$sym $label", left + cell * 4 + 24, top + 44, Fonts.b(38f), Pal.text)
-        val pressed = now - pressedAt in 0..700
-        val bw = Fonts.width(g, "? 지금 신호", Fonts.b(16f)) + 22
-        val bx = x + w - bw - 14f
-        g.round(bx, y + 10f, bw, 30f, 11f, if (pressed) Pal.amber else Pal.line)
-        Fonts.draw(g, "? 지금 신호", bx + 11f, y + 31f, Fonts.b(16f), if (pressed) Color.BLACK else Pal.text)
-        if (pressed) { g.color = Pal.amber; g.stroke = BasicStroke(3f); g.drawRoundRect((bx - 5).toInt(), y + 5, (bw + 10).toInt(), 40, 14, 14) }
-    }
-
-    private fun drawBottom(g: Graphics2D, now: Long) {
-        val y = 522
-        g.round(24, y, 1232, 86, 18f, Pal.panel)
-        val b = banner
-        if (b != null) {
-            g.round(24, y, 12, 86, 6f, if (now - bannerAt < 2_500) levelColor(b.alert.level) else Pal.line)
-            Fonts.draw(g, "${b.alert.symbol}  ${b.alert.message}", 54f, y + 40f, Fonts.b(28f), Pal.text)
-            val p = b.plan
-            val chips = listOfNotNull(("소리: " + toneName(b.alert.tone)).takeIf { p.tone }, "음성".takeIf { p.voice },
-                "화면 깜빡임".takeIf { p.visualFlash }, "헤드업 알림")
-            var x = 54f
-            for (c in chips) x += g.chip(x, y + 50f, c, Pal.line, size = 14f) + 8
-        } else {
-            Fonts.draw(g, "알림 대기 중", 54f, y + 52f, Fonts.r(24f), Pal.dim)
-        }
-        if (now < voiceUntil && voice != null) Fonts.draw(g, "음성 안내 “$voice”", 30f, 650f, Fonts.r(22f), Pal.sky)
-        caption?.takeIf { now < captionUntil }?.let { c ->
-            g.round(24, 664, 1232, 44, 12f, Color(40, 36, 10))
-            Fonts.draw(g, "왜?  $c", 40f, 693f, Fonts.r(21f), Pal.amber)
-        }
     }
 }

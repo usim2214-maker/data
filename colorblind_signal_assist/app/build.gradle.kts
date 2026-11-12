@@ -28,7 +28,9 @@ android {
             val testTemp = layout.buildDirectory.dir("test-tmp").get().asFile
             it.systemProperty("java.io.tmpdir", testTemp.absolutePath)
             it.doFirst { testHome.mkdirs(); testTemp.mkdirs() }
-            it.maxHeapSize = "1g"
+            it.maxHeapSize = "2g"
+            // 시연 영상용 실제 화면 녹화 (DemoRecordingTest): -Precord=true 일 때만
+            it.systemProperty("record", (project.findProperty("record") ?: "false").toString())
             it.testLogging { events("passed", "failed", "skipped") }
         }
     }

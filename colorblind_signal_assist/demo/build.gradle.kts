@@ -64,3 +64,14 @@ tasks.register<JavaExec>("preview3d") {
     environment("LC_ALL", "C.UTF-8")
     workingDir = projectDir
 }
+
+// 0.2.0 실제 앱 화면 시연 영상 (먼저 :app 의 DemoRecordingTest 를 -Precord=true 로 실행)
+tasks.register<JavaExec>("renderAppVideo") {
+    group = "application"
+    description = "실제 앱 화면(Robolectric 녹화) 시연 영상 렌더링"
+    mainClass.set("com.signalassist.demo.AppVideoKt")
+    classpath = sourceSets["main"].runtimeClasspath
+    jvmArgs("-Dfile.encoding=UTF-8", "-Dstdout.encoding=UTF-8", "-Djava.awt.headless=true", "-Xmx3g")
+    environment("LC_ALL", "C.UTF-8")
+    workingDir = projectDir
+}

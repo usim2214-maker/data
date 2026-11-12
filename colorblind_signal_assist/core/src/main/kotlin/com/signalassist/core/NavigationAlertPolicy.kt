@@ -30,7 +30,7 @@ class NavigationAlertPolicy(private val thresholdsM: List<Float> = listOf(300f, 
             val text = if (m == Maneuver.DESTINATION) "${meters}m 앞 목적지" else "${meters}m 앞 ${m.labelKo}"
             val road = nav.roadName?.let { " ($it)" } ?: ""
             out += Alert(AlertType.NAV_MANEUVER_SOON, nowMs, customMessage = "$text$road", customSymbol = m.symbol,
-                customHeadline = "${m.symbol} ${meters}m")
+                customHeadline = "${meters}m") // 기호는 화면이 symbol 로 따로 붙인다 (중복 방지)
         }
         return out
     }

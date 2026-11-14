@@ -28,7 +28,8 @@ echo "▶ release APK 빌드"
 
 echo "▶ 프로젝트 복사 -> $OUT"
 ( cd "$HERE" && git -c core.quotePath=false ls-files -z -co --exclude-standard . ) | while IFS= read -r -d '' f; do
-  case "$f" in apk/*) continue ;; esac
+  # 팀원 이름이 들어 있는 접수용 정리본은 익명 제출본에 넣지 않는다
+  case "$f" in apk/*|docs/팀구성_*) continue ;; esac
   mkdir -p "$OUT/$(dirname "$f")"
   cp -p "$HERE/$f" "$OUT/$f"
 done
@@ -42,13 +43,22 @@ for w in "$(git config user.name || true)" "$(git config user.email || true)"; d
   [ -n "$w" ] && WORDS+=("$w") && WORDS+=("${w%@*}")
 done
 FOUND=0
+# .docx/.pptx 는 압축 파일이라 grep 이 못 읽는다 -> 풀어서 본문까지 검사
+DOCX_TXT="$(mktemp -d)"
+find "$OUT" -name '*.docx' -o -name '*.pptx' | while read -r f; do
+  unzip -p "$f" 'word/*.xml' 'ppt/*.xml' 'docProps/*.xml' 2>/dev/null | sed 's/<[^>]*>//g' > "$DOCX_TXT/$(basename "$f").txt"
+done
 for w in "${WORDS[@]}"; do
   [ -z "$w" ] && continue
   case "$w" in noreply|*noreply*) continue ;; esac   # 일반 단어 (개인정보 아님)
   if grep -rIl --exclude-dir=.git -F -- "$w" "$OUT" >/dev/null 2>&1; then
     echo "  ⚠ '$w' 발견:"; grep -rIl --exclude-dir=.git -F -- "$w" "$OUT" | sed 's/^/     /'; FOUND=1
   fi
+  if grep -rlF -- "$w" "$DOCX_TXT" >/dev/null 2>&1; then
+    echo "  ⚠ '$w' 발견 (문서 본문):"; grep -rlF -- "$w" "$DOCX_TXT" | sed 's#.*/#     #; s/\.txt$//'; FOUND=1
+  fi
 done
+rm -rf "$DOCX_TXT"
 [ "$FOUND" = 0 ] && echo "  ✓ 검사한 단어가 파일에 없습니다"
 
 echo "▶ 새 git 저장소 (작성자: $TEAM)"

@@ -367,7 +367,7 @@ class MainActivity : AppCompatActivity() {
         val text = settings.trips.firstOrNull() ?: return
         val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
             type = "text/plain"
-            putExtra(android.content.Intent.EXTRA_TEXT, "[모두의 운전석] 주행 요약\n$text")
+            putExtra(android.content.Intent.EXTRA_TEXT, "[SixthSense] 주행 요약\n$text")
         }
         runCatching { startActivity(android.content.Intent.createChooser(send, "주행 요약 공유")) }
     }

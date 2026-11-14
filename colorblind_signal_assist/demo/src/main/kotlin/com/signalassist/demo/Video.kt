@@ -49,7 +49,7 @@ import kotlin.math.sin
  * 공모전 시연 영상 렌더러.
  * 앱과 같은 엔진(DrivingAssistEngine)으로 시나리오를 돌리고, 전방 영상(합성) + 앱 화면 + 알림을 그려 mp4 로 만든다.
  *
- *   ./gradlew :demo:renderVideo            # build/video/모두의운전석_시연.mp4
+ *   ./gradlew :demo:renderVideo            # build/video/SixthSense_시연.mp4
  *   ./gradlew :demo:renderVideo --args="출력.mp4"
  */
 private const val W = 1280
@@ -58,7 +58,7 @@ internal const val FPS = 30
 internal const val SR = 44_100
 
 fun main(args: Array<String>) {
-    val out = File(args.firstOrNull() ?: "build/video/모두의운전석_시연.mp4").absoluteFile
+    val out = File(args.firstOrNull() ?: "build/video/SixthSense_시연.mp4").absoluteFile
     val r = VideoRenderer()
     encodeVideo(out, W, H, r.audio, { emit -> r.render(emit); r.totalMs })
 }
@@ -307,7 +307,7 @@ private class VideoRenderer {
     // ---- 카드 ----
 
     private fun opening(g: Graphics2D, t: Long) {
-        Fonts.center(g, "모두의 운전석", W / 2f, 250f, Fonts.b(72f), Pal.text)
+        Fonts.center(g, "SixthSense", W / 2f, 250f, Fonts.b(72f), Pal.text)
         Fonts.center(g, "색·소리·작은 경고등에 의존하는 차량 정보를", W / 2f, 330f, Fonts.r(30f), Pal.text)
         Fonts.center(g, "운전자 특성에 맞는 '다른 감각'으로 전달하는 Pleos Connect 앱", W / 2f, 372f, Fonts.r(30f), Pal.text)
         // 신호 4구 장식
@@ -406,7 +406,7 @@ private class VideoRenderer {
     }
 
     private fun closing(g: Graphics2D, t: Long) {
-        Fonts.center(g, "모두의 운전석", W / 2f, 110f, Fonts.b(48f), Pal.text)
+        Fonts.center(g, "SixthSense", W / 2f, 110f, Fonts.b(48f), Pal.text)
         val colX = listOf(90f, 700f)
         Fonts.draw(g, "사용하는 차량 데이터", colX[0], 190f, Fonts.b(28f), Pal.sky)
         listOf(

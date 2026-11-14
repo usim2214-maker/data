@@ -1,9 +1,17 @@
-# 모두의 운전석 — 운전자 특성에 맞춰 차량 정보를 '다른 감각'으로 전달하는 접근성 운전 보조 앱
+# SixthSense — 운전자 특성에 맞춰 차량 정보를 '다른 감각'으로 전달하는 접근성 운전 보조 앱
 
-> **한 줄 소개**: 색(신호등), 소리(경고음·방향지시등·내비 음성·사이렌), 작은 경고등처럼 **한 가지 감각에만 의존하는 차량 정보**를
-> 색각이상·청각장애·저시력·주의력 저하(고령) 운전자가 받아들일 수 있는 **소리 패턴·음성·화면 깜빡임·큰 글씨**로 바꿔 전달하는 Pleos Connect 앱
+> **앱 이름**: SixthSense (팀명 SixthSense)
+>
+> **한 줄 소개**: 신호등의 색을 구분하기 어렵거나 경고음을 듣기 어렵고 작은 경고등을 보기 어려운 운전자에게,
+> 차량 정보를 소리·음성·모양·화면 강조 등 다른 감각으로 전달하는 Pleos Connect 기반 운전 보조 앱
 
 ⚠️ 보조 기능입니다. 안전장치가 아니며, 운전자는 언제나 직접 신호와 주변을 확인해야 합니다.
+
+| 제출 항목 | 위치 |
+|---|---|
+| APK (release) | [`apk/SixthSense_SixthSense_release.apk`](apk/SixthSense_SixthSense_release.apk) |
+| 시연 영상 | [`docs/시연영상/`](docs/시연영상/) (전체 시연 · 내비와 함께 쓰기 · 실제 앱 화면 · 센텀시티 3D) |
+| 소스 | `core/`(판단 엔진) · `app/`(Pleos Connect 앱) · `demo/`(시연·검증 도구) · `sim/`(실제 도로 시뮬레이션) |
 
 ---
 
@@ -11,44 +19,51 @@
 
 ### APK 설치 (바로 실행)
 ```bash
-adb install apk/팀명_모두의운전석_release.apk
+adb install apk/SixthSense_SixthSense_release.apk
 ```
-앱 목록에서 **모두의 운전석**을 실행합니다. 처음 실행 시 차속·알림 권한(청각장애 프로필은 마이크 권한도)을 허용합니다.
+앱 목록에서 **SixthSense**를 실행합니다. 처음 실행 시 차속·알림 권한(청각장애 프로필은 마이크 권한도)을 허용합니다.
+첫 설정을 마치면 다음 시동(부팅)부터 알림 엔진이 자동으로 켜지고, 내비를 보는 동안 알림은 내비 위 카드로 뜹니다.
+
+### 에뮬레이터에서 시연하기
+1. 앱 아래쪽 **체험** 탭에서 시나리오 7종 중 하나를 고릅니다. 시나리오에 맞는 운전자 특성이 자동으로 선택됩니다. (체험 모드는 "가상 신호입니다" 안내를 항상 표시합니다)
+2. **설정** 탭에서 필요한 도움(색 구분·소리·작은 글씨·주의력)을 바꿔, 같은 상황에서 알림 방식이 달라지는 것을 확인합니다.
+3. **알림 배우기**로 각 알림의 소리와 의미를 들어 보고, **알림 다시 확인**·**지금 신호 확인**을 눌러 봅니다.
+4. 실차 모드(카메라 없이)에서는 Pleos 에뮬레이터 Virtual Console로 도어·방향지시등·좌석·조명을 바꿔 봅니다.
+   에뮬레이터는 차속을 시뮬레이션하지 못하므로, 차속이 들어오지 않으면 **시연용 차속** 막대가 나타납니다.
+5. 내비와 함께 쓰기: 홈 화면이나 내비 앱으로 나간 뒤 체험 시나리오를 진행하면, 알림이 화면 위 카드로 뜹니다.
 
 ### 소스 빌드
 ```bash
-./gradlew :core:test           # 단위·시나리오 테스트 90개 (Android SDK 불필요)
-./gradlew :demo:run            # PC 데모: 시나리오별 알림 로그, 신호 검출 정확도, 영상 처리 비율·처리 시간
-./gradlew :app:assembleRelease # APK (ANDROID_HOME 또는 local.properties 필요)
+./gradlew :core:test           # 판단 엔진 단위·시나리오 테스트 95개 (Android SDK 불필요)
+./gradlew :app:testDebugUnitTest   # 앱 화면·알림 카드·자동 시작 테스트 (Robolectric)
+./gradlew :app:assembleRelease # release APK (ANDROID_HOME 또는 local.properties 필요)
+./gradlew :demo:run            # PC 데모: 시나리오별 알림 로그, 신호 검출 정확도, 처리 시간
 ```
 
-### 시연 영상
-- `docs/시연영상/모두의운전석_내비와함께.mp4` (1분 47초): **내비와 함께 쓰기** — 내비 화면 위에 알림 카드가 뜨는 모습. 카드 내용은 앱 코드(AlertNotifier)가 센텀 주행에서 실제로 만든 값 — `./gradlew :app:testDebugUnitTest --tests '*NavCompanionTest*' -Precord=true && ./gradlew :demo:renderNavVideo`
-- `docs/시연영상/모두의운전석_실제앱_v0.2.mp4` (2분 27초): **0.2.0 실제 앱 화면** 녹화 (Robolectric, 에뮬레이터 없이) — `./gradlew :app:testDebugUnitTest --tests '*DemoRecordingTest*' -Precord=true && ./gradlew :demo:renderAppVideo`
-- `docs/시연영상/모두의운전석_시연.mp4` (3분 42초, 가로): `./gradlew :demo:renderVideo`
-- `docs/시연영상/모두의운전석_센텀시티.mp4` (93초, 부산 센텀시티 실제 도로 3D 주행): `./gradlew :demo:renderCentum`
-- `docs/시연영상/모두의운전석_숏폼.mp4` (37초, 세로 숏폼): `./gradlew :demo:renderShorts`
-- 챕터, 내레이션 대본, 숏폼 게시글 예시는 `docs/시연영상/README.md`에 있습니다.
-
-### 시연 순서 (에뮬레이터)
-1. 화면 아래 **모드**에서 `시뮬레이션: …` 시나리오 7종 중 하나를 고릅니다. 시나리오에 맞는 운전자 특성이 자동으로 선택됩니다.
-2. **운전자 특성**(색각이상·청각장애·저시력·주의력·고령)을 바꿔, 같은 상황에서 알림 방식이 달라지는 것을 확인합니다.
-3. **알림 배우기** 버튼으로 각 알림의 소리와 의미를 들어 봅니다. **↻ 다시 듣기**는 마지막 알림을 다시 전달합니다.
-4. `실차: 차량 경고·내비 (카메라 없이)` 모드에서는 Pleos 에뮬레이터 Virtual Console로 도어·방향지시등·좌석·조명을 바꿔 봅니다.
-   에뮬레이터는 차속을 시뮬레이션하지 못하므로, 차속이 들어오지 않으면 **시연용 차속** 막대가 나타납니다.
-
-## 테스트 환경 · 필요 설정
+## 테스트 환경 및 필요한 설정
 
 | 항목 | 내용 |
 |---|---|
-| 대상 | Pleos Connect (AAOS 기반), Android Automotive 에뮬레이터 API 34 |
-| 빌드 | minSdk 28 / targetSdk 34, Gradle 8.14, AGP 8.7, Kotlin 2.0, JDK 17+ |
-| 권한 | `android.car.permission.CAR_SPEED`(런타임), `CAR_POWERTRAIN`, `pleos.car.permission.CAR_SAFETY·SEATS·DOORS·LIGHTS·DRIVE`, 알림, 마이크(청각장애 프로필, 선택) |
-| Pleos 에뮬레이터 | Virtual Console: `adb forward tcp:8088 tcp:8088` 후 `http://127.0.0.1:8088/` |
-| 카메라 | 불필요 (Pleos 공개 API에 카메라 없음 → 합성 영상으로 대체, 아래 참고) |
+| **Pleos Connect 에뮬레이터** | **Pleos Connect Default Emulator (Android 13 / API 33 기반)** |
+| **화면 규격** | **1080 × 2400 px (FHD+)** · 앱 화면은 가로 1024×600dp 기준으로도 확인 |
+| 빌드 | minSdk 28 / targetSdk 34 / compileSdk 34, Gradle 8.14, AGP 8.7, Kotlin 2.0, JDK 17 이상 |
+| 권한 | `android.car.permission.CAR_SPEED`(런타임), `CAR_POWERTRAIN`, `pleos.car.permission.CAR_SAFETY·SEATS·DOORS·LIGHTS·DRIVE`, 알림(`POST_NOTIFICATIONS`), 부팅 후 자동 시작(`RECEIVE_BOOT_COMPLETED`), 마이크(청각장애 프로필, 선택) |
+| Virtual Console | `adb forward tcp:8088 tcp:8088` 후 `http://127.0.0.1:8088/` |
+| 카메라 | 불필요 (Pleos 공개 API에 카메라 없음 → 신호 인식은 합성 영상·3D 시뮬레이션으로 검증, 아래 참고) |
+| 시연 영상 다시 만들기 (선택) | ffmpeg, 나눔 글꼴 · 실제 도로 시뮬레이션은 Python + SUMO (`sim/README.md`) |
 
 ## APK 위치
-`apk/팀명_모두의운전석_release.apk`
+[`apk/SixthSense_SixthSense_release.apk`](apk/SixthSense_SixthSense_release.apk) (release 빌드)
+
+## 시연 영상 (`docs/시연영상/`)
+| 파일 | 길이 | 내용 |
+|---|---|---|
+| `SixthSense_시연.mp4` | 3분 42초 | 전체 기능 · 시나리오 · 센텀시티 실제 도로 |
+| `SixthSense_내비와함께.mp4` | 1분 47초 | 내비 화면 위에 뜨는 알림 카드 (카드 내용은 앱 코드가 만든 실제 값) |
+| `SixthSense_실제앱_v0.2.mp4` | 2분 27초 | 0.2.0 실제 앱 화면 녹화 (Robolectric) |
+| `SixthSense_센텀시티.mp4` | 1분 33초 | 부산 센텀시티 실제 지도 기반 3D 주행 |
+
+영상 다시 만들기: `./gradlew :demo:renderVideo` · `:demo:renderNavVideo` · `:demo:renderAppVideo` · `:demo:renderCentum` (앱 화면 녹화가 먼저 필요: `./gradlew :app:testDebugUnitTest --tests '*DemoRecordingTest*' --tests '*NavCompanionTest*' -Precord=true`)
 
 ---
 
@@ -179,7 +194,7 @@ OpenStreetMap 실제 도로·차로·신호등 위치로 SUMO 교통 시뮬레�
 
 ## 검증 결과 (합성 데이터 기준)
 
-- 테스트 90개 통과 (검출기, 상태 확정, 신호·차량·내비 알림, 중재, 사이렌, 영상 처리 조절, 주행 요약, 시나리오 E2E)
+- 테스트 95개 통과 (검출기, 상태 확정, 신호·차량·내비 알림, 중재, 사이렌, 영상 처리 조절, 주행 요약, 시나리오 E2E)
 - 단일 프레임 신호 검출: 무작위 합성 장면 600장에서 정확도 99.7%, **다른 색으로 오인 0건**, 좌회전 화살표 76/77
 - 거리 추정 오차: 중앙값 0.4%, 90% 지점 2.1%
 - 사이렌 감지: 오르내림음(wail)·빠른 yelp·먼 거리 사이렌을 3초 안에 감지. 도로 소음, 일정한 경적, 음악 멜로디, 말소리는 감지하지 않음
@@ -216,7 +231,6 @@ app/    Pleos Connect 앱
   camera/                   영상: 합성 시나리오 / 가상 신호 주기 / assets 테스트 이미지
   alert/                    TonePlayer(패턴별 합성음), AlertNotifier(TTS + 헤드업 알림)
 tools/make_submission.sh    블라인드 심사용 익명 제출 저장소 생성
-docs/기획서_초안.md          공모전 기획서 초안
 ```
 
 ## Pleos SDK 사용

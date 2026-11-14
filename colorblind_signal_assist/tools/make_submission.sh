@@ -4,7 +4,7 @@
 #   tools/make_submission.sh <팀명> [출력 폴더] [추가로 검사할 개인정보 단어...]
 #
 # 하는 일
-#   1) release APK 빌드 -> apk/<팀명>_모두의운전석_release.apk
+#   1) release APK 빌드 -> apk/<팀명>_SixthSense_release.apk
 #   2) 이 프로젝트 파일만 새 폴더로 복사 (기존 git 기록은 가져가지 않음)
 #   3) 새 git 저장소를 만들고 작성자를 팀명으로 커밋 (실명·이메일이 커밋에 남지 않음)
 #   4) 현재 PC 의 git 이름/이메일과 추가 단어가 파일에 남아 있는지 검사
@@ -15,7 +15,7 @@ set -euo pipefail
 TEAM="${1:?사용법: tools/make_submission.sh <팀명> [출력 폴더] [검사할 단어...]}"
 OUT="${2:-../submission_${TEAM}}"
 shift $(( $# >= 2 ? 2 : 1 ))
-APP="모두의운전석"
+APP="SixthSense"
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="$(mkdir -p "$OUT" && cd "$OUT" && pwd)"
 

@@ -20,10 +20,10 @@ import kotlin.math.roundToInt
  * 카드의 제목·문장·버튼·아이콘·떠 있는 시간은 앱 코드(AlertNotifier.buildCard)가 센텀 주행에서 실제로 만든 값이다.
  *
  *   ./gradlew :app:testDebugUnitTest --tests '*NavCompanionTest*' -Precord=true
- *   ./gradlew :demo:renderNavVideo        # build/video/모두의운전석_내비와함께.mp4
+ *   ./gradlew :demo:renderNavVideo        # build/video/SixthSense_내비와함께.mp4
  */
 fun main(args: Array<String>) {
-    val out = File(args.firstOrNull() ?: "build/video/모두의운전석_내비와함께.mp4").absoluteFile
+    val out = File(args.firstOrNull() ?: "build/video/SixthSense_내비와함께.mp4").absoluteFile
     val audio = AudioTimeline()
     encodeVideo(out, 1280, 720, audio) { emit -> NavVideo(audio).render(emit) }
 }
@@ -68,7 +68,7 @@ private class NavVideo(private val audio: AudioTimeline) {
     }
 
     private fun opening() {
-        Fonts.center(g, "모두의 운전석 · 내비와 함께 쓰기", 640f, 200f, Fonts.b(54f), Pal.text)
+        Fonts.center(g, "SixthSense · 내비와 함께 쓰기", 640f, 200f, Fonts.b(54f), Pal.text)
         Fonts.center(g, "운전 중엔 내비를 봐야 합니다. 이 앱 화면만 보고 있을 수는 없습니다.", 640f, 280f, Fonts.r(28f), Pal.sky)
         Fonts.center(g, "그래서 알림이 내비 위로 찾아갑니다", 640f, 330f, Fonts.b(30f), Pal.amber)
         listOf(
@@ -88,7 +88,7 @@ private class NavVideo(private val audio: AudioTimeline) {
             g.round(290, y, 700, 96, 18f, Color(36, 39, 46))
             g.round(310, y + 20, 56, 56, 12f, Pal.green)
             Fonts.center(g, "i", 338f, y + 60f, Fonts.b(32f), Color.WHITE)
-            Fonts.draw(g, "모두의 운전석", 384f, y + 40f, Fonts.b(22f), Pal.text)
+            Fonts.draw(g, "SixthSense", 384f, y + 40f, Fonts.b(22f), Pal.text)
             Fonts.draw(g, "내비와 함께 동작 중 · 알림은 내비 위 카드로 뜹니다", 384f, y + 72f, Fonts.r(19f), Pal.dim)
         }
         if (t > 2_400) {
@@ -208,7 +208,7 @@ private class NavVideo(private val audio: AudioTimeline) {
             Fonts.center(g, a, bx + bw / 2f, y + 162f, Fonts.b(22f), Pal.sky)
             bx += bw + 16
         }
-        Fonts.draw(g, "모두의 운전석", x + w - 150f, y + 30f, Fonts.r(15f), Pal.dim)
+        Fonts.draw(g, "SixthSense", x + w - 150f, y + 30f, Fonts.r(15f), Pal.dim)
     }
 
     /** 늘 떠 있는 상태 알림 (알림 센터): '내비와 함께 동작 중' + 버튼 두 개 */
@@ -218,7 +218,7 @@ private class NavVideo(private val audio: AudioTimeline) {
         g.round(x, y, w, h, 26f, Color(34, 37, 44, 250))
         g.round(x + 26, y + 22, 52, 52, 12f, Pal.green)
         Fonts.center(g, "i", x + 52f, y + 60f, Fonts.b(30f), Color.WHITE)
-        Fonts.draw(g, "모두의 운전석", x + 96f, y + 44f, Fonts.b(22f), Pal.text)
+        Fonts.draw(g, "SixthSense", x + 96f, y + 44f, Fonts.b(22f), Pal.text)
         Fonts.draw(g, "내비와 함께 동작 중 · 알림은 내비 위 카드로 뜹니다", x + 96f, y + 72f, Fonts.r(18f), Pal.dim)
         var bx = x + 96
         for (a in listOf("다시 듣기", "지금 신호")) {

@@ -31,10 +31,10 @@ import kotlin.math.sin
 
 /**
  * 부산 해운대구 센텀시티 실제 도로(OpenStreetMap + SUMO) 주행 시연.
- *   ./gradlew :demo:renderCentum     # build/video/모두의운전석_센텀시티.mp4
+ *   ./gradlew :demo:renderCentum     # build/video/SixthSense_센텀시티.mp4
  */
 fun main(args: Array<String>) {
-    val out = File(args.firstOrNull() ?: "build/video/모두의운전석_센텀시티.mp4").absoluteFile
+    val out = File(args.firstOrNull() ?: "build/video/SixthSense_센텀시티.mp4").absoluteFile
     val audio = AudioTimeline()
     encodeVideo(out, 1280, 720, audio) { emit ->
         val img = BufferedImage(1280, 720, BufferedImage.TYPE_3BYTE_BGR)

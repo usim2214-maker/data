@@ -23,10 +23,10 @@ import kotlin.math.roundToInt
  * 같은 순간의 전방 영상·실제 지도를 나란히 놓는다.
  *
  *   ./gradlew :app:testDebugUnitTest --tests '*DemoRecordingTest*' -Precord=true
- *   ./gradlew :demo:renderAppVideo        # build/video/모두의운전석_실제앱_v0.2.mp4
+ *   ./gradlew :demo:renderAppVideo        # build/video/SixthSense_실제앱_v0.2.mp4
  */
 fun main(args: Array<String>) {
-    val out = File(args.firstOrNull() ?: "build/video/모두의운전석_실제앱_v0.2.mp4").absoluteFile
+    val out = File(args.firstOrNull() ?: "build/video/SixthSense_실제앱_v0.2.mp4").absoluteFile
     val audio = AudioTimeline()
     encodeVideo(out, 1280, 720, audio) { emit -> AppVideo(audio).render(emit) }
 }
@@ -91,7 +91,7 @@ private class AppVideo(private val audio: AudioTimeline) {
     }
 
     private fun opening() {
-        Fonts.center(g, "모두의 운전석 0.2.0", 640f, 230f, Fonts.b(64f), Pal.text)
+        Fonts.center(g, "SixthSense 0.2.0", 640f, 230f, Fonts.b(64f), Pal.text)
         Fonts.center(g, "실제 앱 화면 시연", 640f, 300f, Fonts.r(34f), Pal.sky)
         Fonts.center(g, "앱 화면은 0.2.0 소스를 그대로 실행해 그렸습니다 (Robolectric · 에뮬레이터 없이)", 640f, 400f, Fonts.r(24f), Pal.text)
         Fonts.center(g, "같은 판단 엔진에 주행 상황을 0.1초마다 넣고, 앱 화면이 반응하는 모습을 그대로 녹화", 640f, 440f, Fonts.r(22f), Pal.dim)
@@ -106,7 +106,7 @@ private class AppVideo(private val audio: AudioTimeline) {
     }
 
     private fun closing() {
-        Fonts.center(g, "모두의 운전석 0.2.0", 640f, 170f, Fonts.b(48f), Pal.text)
+        Fonts.center(g, "SixthSense 0.2.0", 640f, 170f, Fonts.b(48f), Pal.text)
         listOf(
             "기능 연결 상태를 숨기지 않음: 신호 인식·내비·차속·마이크가 연결되지 않으면 그대로 표시",
             "체험 모드는 '가상 신호입니다. 실제 주행 판단에 사용하지 마세요.'를 항상 표시",
@@ -208,7 +208,7 @@ private class AppVideo(private val audio: AudioTimeline) {
                 lines.take(5).forEachIndexed { k, l -> Fonts.draw(g, l, 40f, 418f + k * 26, Fonts.r(17f), if (l.startsWith("⚠")) Pal.amber else Pal.dim) }
             }
             // 오른쪽: 0.2.0 실제 앱 화면
-            Fonts.draw(g, "실제 앱 화면 · 모두의 운전석 0.2.0", 458f, 70f, Fonts.r(15f), Pal.amber)
+            Fonts.draw(g, "실제 앱 화면 · SixthSense 0.2.0", 458f, 70f, Fonts.r(15f), Pal.amber)
             device(rec.frame(idx), 458, 82, 798, 467)
             // 아래: 알림·음성·이유
             val d = last

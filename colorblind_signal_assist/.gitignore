@@ -7,3 +7,4 @@ out/
 keystore.properties
 *.jks
 *.keystore
+.kotlin/
